@@ -477,9 +477,9 @@ ISSUER   : 0x2d27Da63Bbe23633c82ff553CfF009D974294e08   ≤20 tCTC · KUNCI DIPU
   own-goal ke juri sendiri
 - ❌ **Mengerjakan Babak 5 sebelum Fase 1–6 rapi**, atau membiarkan demo bergantung padanya
 - ❌ Memakai satu URL RPC tanpa pool/retry/User-Agent — akan mati di tengah jalan
-- ❌ **Meng-commit kode sebelum 13 Agustus 2026** — aturan lomba: *"original work created
-  during the hackathon"*. Riwayat git publik adalah buktinya. Jangan squash, jangan
-  rewrite history
+- ❌ **`git push --force` atau rewrite history** di repo publik. Riwayat git adalah
+  bukti kepatuhan *"original work created during the hackathon"* — commit pertama
+  22 Agustus, sesudah submission dibuka. Sekali dirusak, tidak bisa dipulihkan
 - ❌ Menyalin kode dari arsip lama — ✅ **sudah dihapus 9 Agt**, jadi tidak ada yang bisa
   disalin. Jangan memulihkannya dari mana pun.
 - ❌ Memakai implementasi MPT pihak ketiga (Babak 5) tanpa mengecek lisensi & atribusi
@@ -524,6 +524,10 @@ baru ditemukan 9 Agt: seluruh spek membahas VPS untuk *worker*, tapi tidak perna
 membahas di mana *dashboard* hidup — padahal juri membukanya berminggu-minggu setelah
 video, dengan mode kegagalan yang identik.
 
-⛔ **Tapi kode belum boleh di-commit sebelum 13 Agustus** (aturan lomba). Jendela
-9–13 Agt: salin kunci ke password manager, transfer dana ke operator & issuer, tanya
-rubrik di Discord, kumpulkan data tim.
+✅ **Gerbang 13 Agustus sudah lewat.** Repo publik hidup di
+**github.com/Nabil-Aufa/Corolary** sejak 22 Agustus, dan tidak ada lagi yang menahan
+penulisan kode.
+
+⏰ **Deadline submission 6 September — sisa ~2 minggu, kode masih nol.** Pakai urutan
+potong-dari-bawah di `docs/05-rencana-build.md` §7: Fase 0–4 dan 6 wajib; Fase 5, 7, 9
+hanya kalau yang wajib sudah rapi.

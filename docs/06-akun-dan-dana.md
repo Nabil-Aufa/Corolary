@@ -1,6 +1,6 @@
 # Akun & Dana — JANGAN SAMPAI HILANG
 
-Terakhir diverifikasi: **2 Agustus 2026** (saldo dicek langsung ke RPC).
+Terakhir diverifikasi: **9 Agustus 2026** (saldo & nonce dicek langsung ke RPC).
 
 ---
 
@@ -18,11 +18,12 @@ Jaringan : Creditcoin CC3 Testnet — chainId 102031 (0x18e8f)
 RPC      : https://rpc.cc3-testnet.creditcoin.network
 Explorer : https://creditcoin-testnet.blockscout.com/address/<alamat>
 
-DEPLOYER : 0x825003EdbE16AedfC63f99836553a15B1299f35e   ← butuh faucet
-OPERATOR : 0x7C1195c7e31ED2Dd4cE207D926d2fA3bA2e15Ff3   ← diisi dari deployer, ~100 tCTC
-ISSUER   : 0x2d27Da63Bbe23633c82ff553CfF009D974294e08   ← diisi ≤20 tCTC · KUNCI DIPUBLIKASIKAN (RT12)
+DEPLOYER : 0x825003EdbE16AedfC63f99836553a15B1299f35e   ✅ 9.880 tCTC   nonce 2
+OPERATOR : 0x7C1195c7e31ED2Dd4cE207D926d2fA3bA2e15Ff3   ✅   100 tCTC   nonce 0
+ISSUER   : 0x2d27Da63Bbe23633c82ff553CfF009D974294e08   ✅    20 tCTC   nonce 0
+                                                         KUNCI DIPUBLIKASIKAN (RT12)
 
-Ketiganya diverifikasi di chain 9 Agt: saldo 0, nonce 0, belum pernah dipakai.
+Faucet masuk 9 Agt, lalu deployer mengisi dua akun lain. Semua terverifikasi di chain.
 ```
 
 > ⚠️ **TESTNET-ONLY BURNER.** Private key tersimpan plaintext di `.env`.
@@ -42,8 +43,8 @@ Ketiganya diverifikasi di chain 9 Agt: saldo 0, nonce 0, belum pernah dipakai.
    ```
    Jalur cadangan: email **team@creditcoin.org**.
    ⏰ **Lakukan hari ini.** Faucet ini pernah jadi blocker sehari penuh, dan jendela
-   9–13 Agustus memang tidak bisa dipakai ngoding (aturan lomba) — jadi ini waktu yang
-   tepat untuk membereskannya.
+   9–13 Agustus memang tidak bisa dipakai ngoding (aturan lomba) — jadi itu waktu yang
+   tepat untuk membereskannya. *(Selesai: faucet masuk 9 Agt.)*
 
 Setelah deployer terisi, kirim sendiri ke dua akun lain: **~100 tCTC ke operator**,
 **≤20 tCTC ke issuer**. Jangan minta faucet tiga kali.
@@ -110,8 +111,8 @@ dalamnya, plus `*.tar.gz`, `*.key`, dan `secrets/`.
    `foundry.toml`, script deploy, atau README.
    **Satu pengecualian yang disengaja: kunci ISSUER di README (RT12)** — dan itu hanya
    setelah seluruh checklist §3 hijau.
-4. ⛔ **Commit pertama tetap ≥13 Agustus** (aturan lomba). `.gitignore` dan `.env` boleh
-   dibuat sekarang — yang belum boleh adalah **kode**.
+4. ✅ **Commit pertama 22 Agustus** — sesudah submission dibuka, aturan terpenuhi.
+   ⛔ **Jangan pernah rewrite history**; riwayat itulah buktinya.
 
 ## Cara cek saldo kapan saja
 
@@ -126,7 +127,7 @@ for A in 0x825003EdbE16AedfC63f99836553a15B1299f35e \
 done
 ```
 
-Per 9 Agustus 2026 ketiganya masih **0** — deployer menunggu faucet.
+Per 9 Agustus 2026: deployer **9.880** · operator **100** · issuer **20** tCTC.
 
 ⚠️ **Cek saldo operator saat memeriksa dead-man's switch.** Kalau operator kehabisan gas,
 worker berhenti, dashboard membeku, dan juri melihat angka basi (G13).

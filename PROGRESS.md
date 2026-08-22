@@ -3,11 +3,33 @@
 > *Solvency isn't claimed. It follows.*
 
 **Baca ini pertama, setiap sesi.** Status + lingkungan terverifikasi.
-Terakhir diperbarui: **9 Agustus 2026**.
+Terakhir diperbarui: **22 Agustus 2026**.
+
+**Repo:** https://github.com/Nabil-Aufa/Corolary — publik, riwayat utuh.
 
 ---
 
-## ⏳ YANG MASIH MENGGANTUNG (per 9 Agustus, sore)
+## 🔴 KALENDER — BACA INI SEBELUM APA PUN
+
+```
+13 Agt  Submission dibuka          ✅ LEWAT
+18 Agt  Online AMA                 ✅ LEWAT  ← kalau terlewat, tanya di Discord #buidl-ctc-qna
+30 Agt  Deadline internal (saran)  ⏰  8 HARI LAGI
+ 6 Sep  DEADLINE SUBMISSION        ⏰ 15 HARI LAGI
+18 Sep  Pengumuman pemenang            27 hari
+```
+
+⚠️ **Gerbang 13 Agustus sudah lewat — kode boleh (dan harus) ditulis sekarang.**
+Larangan lama *"jangan commit sebelum 13 Agustus"* sudah tidak berlaku; commit pertama
+repo ini tanggal 22 Agustus, aman terhadap aturan *"original work created during the
+hackathon"*.
+
+⚠️ **Sisa waktu 15 hari, dan kode masih nol.** `05-rencana-build.md` §7 punya urutan
+potong-dari-bawah — pakai itu, jangan mengerjakan Fase 5/7/9 sebelum 0–4 dan 6 beres.
+
+---
+
+## ⏳ YANG MASIH MENGGANTUNG
 
 - [x] ✅ Kunci di password manager
 - [x] ✅ **Dana terdistribusi** — deployer 9.880 · operator 100 · issuer 20 tCTC
@@ -19,8 +41,9 @@ Terakhir diperbarui: **9 Agustus 2026**.
 - [ ] **Buat akun host statis** (Cloudflare Pages / Vercel / Netlify) → G21.
       Aturan & uji akhir sudah di §9.4
 - [ ] **Akun healthchecks.io** — period 10 mnt, grace 20 mnt, alert email + Telegram
-- [ ] Daftar AMA: `https://luma.com/buidlctc-fall26-ama` (18 Agt, 07:00 ET)
-- [ ] Tanya rubrik di Discord `#buidl-ctc-qna`
+- [ ] **Tanya rubrik di Discord `#buidl-ctc-qna`** — AMA 18 Agt sudah lewat, jadi ini
+      satu-satunya jalur tersisa untuk menanyakan bagaimana *depth of Attestcoin
+      utilization* dinilai
 - [ ] Data tim 2 orang (nama, email, bio, peran, domisili, kewarganegaraan)
 - [x] ✅ Logo `logo-corolary.png` (PNG 1024×1024) — ⏳ masih perlu **URL publik**,
       form submission minta URL bukan berkas
@@ -37,8 +60,9 @@ Dana         : ✅ 10.000 tCTC di deployer 0x825003Ed…
 Gap          : 25 pertanyaan tertutup · 12 gap ditutup · 10 terbuka · 0 BLOCKER
                7 butuh kode · 2 butuh akun+pembayaran (runbook sudah lengkap)
                1 sudah diputuskan isinya (G12)
-Kode         : ❌ NOL — dan WAJIB tetap nol sampai 13 Agustus (aturan lomba)
-Langkah      : Fase 0 di docs/05-rencana-build.md
+Repo         : ✅ github.com/Nabil-Aufa/Corolary — publik, 16 berkas, .env aman
+Kode         : ❌ NOL — gerbang 13 Agt sudah lewat, tidak ada lagi yang menahan
+Langkah      : Fase 0 di docs/05-rencana-build.md — MULAI SEKARANG
 ```
 
 ---
@@ -58,7 +82,7 @@ Langkah      : Fase 0 di docs/05-rencana-build.md
 | **Operator** `0x7C1195c7e31ED2Dd4cE207D926d2fA3bA2e15Ff3` | ✅ **100 tCTC** |
 | **Issuer** `0x2d27Da63Bbe23633c82ff553CfF009D974294e08` | ✅ **20 tCTC** · **kunci dipublikasikan** (RT12) |
 | Akun lama `0x4e83Fa…` (10.000 tCTC) | ⚰️ **kunci hilang — dianggap mati.** Jangan dipakai di konfigurasi apa pun |
-| `.gitignore` + `.env` | ✅ dibuat 9 Agt · `.env` di-gitignore, kunci **belum** di password manager |
+| `.gitignore` + `.env` | ✅ `.env` di-gitignore & tidak pernah masuk riwayat git · kunci sudah di password manager |
 
 **Lag attestation terukur (pita, bukan titik):**
 
@@ -118,26 +142,27 @@ terbukti bisa di-proof di KEDUA lingkungan
 
 ---
 
-## 🔴 Aturan lomba yang menentukan KAPAN mulai
+## ✅ Aturan lomba soal orisinalitas — SUDAH AMAN
 
 > *"Must be original work created during the hackathon."* — Submission dibuka **13 Agustus**.
 
-**Kode kita masih nol, dan itu hadiah.** Artinya kepatuhan ini bisa dibuat **terbukti**:
+Terpenuhi, dan **bisa dibuktikan siapa pun**:
 
-- **Commit kode pertama pada atau setelah 13 Agustus.** Repo publik, riwayat utuh,
-  jangan squash.
-- ✅ **Arsip kode lama sudah dihapus (9 Agt)** — tidak ada kode lama tersisa di mana pun,
-  jadi tidak ada yang bisa disalin. Kepatuhan jadi fakta, bukan janji.
-- Nyatakan terus terang di README: riset & desain selesai sebelum submission dibuka,
-  **seluruh kode ditulis selama periode lomba, riwayat git bisa diperiksa siapa pun.**
+- **Commit pertama repo ini: 22 Agustus 2026** — sesudah submission dibuka. Repo publik,
+  riwayat utuh, tidak pernah di-squash.
+- ✅ **Arsip kode lama sudah dihapus** — tidak ada kode lama tersisa di mana pun, jadi
+  tidak ada yang bisa disalin. Kepatuhan jadi fakta, bukan janji.
+- [ ] Nyatakan terus terang di README (Fase 8): riset & desain selesai sebelum
+  submission dibuka, **seluruh kode ditulis selama periode lomba, riwayat git bisa
+  diperiksa siapa pun.**
 
-Sebelum 13 Agustus, yang boleh dikerjakan: dokumen, `tools/recon/` sebagai eksplorasi
-lokal (jangan di-commit sebagai kode proyek), pembuatan akun, dan data tim.
+⚠️ **Jangan pernah `git push --force` atau rewrite history di repo ini.** Riwayatnya
+adalah bukti kepatuhan; sekali dirusak, tidak bisa dipulihkan.
 
 ## Langkah berikutnya — Fase 0
 
-1. Scaffold repo (`03-spesifikasi-produk.md` §11) — **`.gitignore` memuat `.env*` dan
-   `*.tar.gz` SEBELUM commit pertama**
+1. ✅ ~~Repo + `.gitignore`~~ **SELESAI 22 Agt** — github.com/Nabil-Aufa/Corolary.
+   Sisa scaffold: `packages/{contracts,worker,web}` sesuai `03` §11
 2. Bangun `tools/recon/` (`01-riset-mendalam.md` §9) — **pool RPC + retry + header UA**
 3. Buat **dua akun baru**: operator worker (~100 tCTC) dan issuer demo (≤20 tCTC)
 4. Kunci istilah RT11 secara tertulis — frontend mulai Fase 6a di hari yang sama
