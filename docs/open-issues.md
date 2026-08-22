@@ -1,0 +1,270 @@
+# Gap, Blocker, dan Keputusan Tertunda
+
+> Register hidup. Setiap entri: apa masalahnya, kenapa penting, dan **solusinya**.
+> Yang sudah beres tetap dicatat di §1 supaya tidak "ditemukan ulang" lalu diperdebatkan lagi.
+>
+> Terakhir diperbarui: 2026-08-22
+
+---
+
+## 1. Sudah Diselesaikan (jangan dibuka lagi)
+
+| # | Temuan | Resolusi |
+|---|---|---|
+| R1 | Dokumen resmi memberi path import `EvmV1Decoder` yang salah (`contracts/decoding/...`) | Path benar: `@gluwa/usc-contracts/contracts/write-ability/common/EvmV1Decoder.sol` |
+| R2 | Pragma `^0.8.23` dari contoh tutorial akan gagal compile | `@gluwa/usc-contracts` v0.2.0 memakai `^0.8.28`. Seluruh kontrak Corolary ikut `^0.8.28`. |
+| R3 | `VerifierInterface.sol` di repo tutorial tidak punya overload batch | Pakai `INativeQueryVerifier` resmi dari paket — punya `verifyAndEmit`/`verify` varian batch |
+| R4 | `EvmV1Decoder.LogEntry` tidak memuat `logIndex` | On-chain memakai `txLogIndex` (posisi di `receipt.receiptLogs`); `logIndex` Ethereum disimpan off-chain saja |
+| R5 | `getLogsByEventSignature` menghilangkan posisi log | Iterasi `receipt.receiptLogs` langsung di jalur pencatatan |
+| R6 | Dua struct `MerkleProofEntry` berbeda (`hash` vs `sibling`) | Pakai milik `INativeQueryVerifier` saat memanggil precompile |
+| R7 | Semantik `Fact.amount` per `FactKind` belum terkunci | Dikunci di `architecture.md` §8.1; `Liquidated` = `debtToCover` + `debtAsset` |
+| R8 | Apakah batch verify didukung precompile? | **Ya** — terverifikasi dari ABI. Batching layak. |
+
+---
+
+## 2. Blocker Produk — butuh keputusan sebelum M3
+
+### B1 · Cold start: fakta lama tidak tertangkap eager proving 🔴
+
+**Masalah.** Eager proving hanya menangkap event **baru**. Tapi seluruh nilai Corolary
+ada pada riwayat yang **sudah** terjadi — peminjam yang melunasi 40 pinjaman Aave
+selama dua tahun. Kalau kita hanya mengindeks ke depan, pengguna pertama punya skor 0
+dan produknya tidak punya cerita sampai berbulan-bulan kemudian.
+
+Ini bukan detail teknis. Ini **risiko eksistensial produk** dan pasti ditanya juri.
+
+**Solusi: backfill on-demand berbatas ("Claim your history").**
+
+1. Pengguna memasukkan alamat dan menekan *Claim history*.
+2. Indexer memindai log Ethereum untuk alamat itu di seluruh protokol terdaftar,
+   dibatasi jendela waktu (usul awal: **24 bulan**).
+3. Transaksi yang ditemukan dibuktikan dalam **batch 10** — ini yang membuat proof
+   historis yang mahal tetap terjangkau.
+4. Fakta tercatat, skor terbentuk, pengguna langsung punya tier.
+
+**Biayanya jujur:** proof historis ~**3,13×10⁻⁴ CTC** (12x lipat dari yang segar).
+Peminjam aktif dengan 200 event → 20 batch → masih di orde **10⁻³ CTC**. Praktis nol.
+**Jadi mahalnya proof historis TIDAK menghalangi backfill** — ia hanya melarang
+backfill *buta seluruh chain*. Backfill per-alamat atas permintaan sepenuhnya layak.
+
+**Konsekuensi:** ini juga jadi mekanik akuisisi yang bagus — pengguna datang untuk
+mengklaim riwayat, dan tindakan itu sendiri yang mengisi registry.
+
+**Aksi:** rancang sebagai fitur produk kelas satu, bukan skrip admin.
+Pemilik: Dev A (indexer + endpoint) & Dev B (alur UI). Tenggat: sebelum M3.
+
+---
+
+### B2 · Aset apa yang dipinjamkan di CC3 Testnet? 🔴
+
+**Masalah.** `EfficiencyMarket` butuh token ERC20 untuk disuplai dan dipinjam.
+Di Creditcoin **testnet** tidak ada USDC/WETH sungguhan. Kita harus men-deploy ERC20
+testnet sendiri — dan sekilas itu terlihat melanggar aturan "nol mock".
+
+**Resolusi — dan ini harus dinyatakan terbuka di submission, bukan disembunyikan:**
+
+Bedakan dua hal yang berbeda:
+
+| Lapisan | Di testnet | Palsu? |
+|---|---|---|
+| **Fakta kredit** (riwayat Aave/Morpho/Compound) | Ethereum **mainnet** asli, dibuktikan kriptografis | **Tidak** |
+| **Harga** (Chainlink) | Ethereum **mainnet** asli, dibuktikan kriptografis | **Tidak** |
+| **Skor & tier** | Diturunkan dari fakta nyata | **Tidak** |
+| **Token yang dipinjamkan di pasar** | ERC20 testnet | Ya — **tak terhindarkan** |
+
+Aturan hackathon **mewajibkan** deploy di testnet. Token testnet adalah konsekuensi
+langsung dari aturan itu, bukan pilihan kita. Yang dilarang pemilik proyek adalah
+**data karangan** — angka yang dibuat-buat untuk membuat demo terlihat bagus.
+Tidak ada satu pun angka semacam itu di Corolary.
+
+**Aksi:** deploy `TestUSDC`/`TestWETH` di CC3 Testnet dengan faucet terbuka, dan beri
+label jelas di UI: *"Token pasar adalah token testnet. Riwayat kredit, harga, dan skor
+berasal dari Ethereum mainnet sungguhan."* Menyatakannya lebih dulu **memperkuat**
+kredibilitas, bukan melemahkannya — juri akan menyadarinya sendiri kalau kita diam.
+Masukkan kalimat ini ke deck dan video demo.
+
+---
+
+### B3 · Rasio kolateral berubah di tengah posisi 🟠
+
+**Masalah.** Kalau skor pengguna turun (kena likuidasi di Ethereum), rasio yang
+dipersyaratkan naik dari mis. 110% → 130%. Posisi yang tadinya sehat bisa **langsung
+dapat dilikuidasi tanpa pengguna melakukan apa pun**. Benar secara ekonomi, tapi kejam
+dan akan dipertanyakan reviewer.
+
+**Solusi: kunci rasio saat pinjam + masa tenggang.**
+- Simpan `ratioAtBorrow` di posisi saat `borrow`.
+- Evaluasi kesehatan memakai `ratioAtBorrow`, **bukan** rasio terkini.
+- Penurunan skor hanya berlaku untuk **pinjaman baru**.
+- Kenaikan skor berlaku **segera** (menguntungkan pengguna, aman bagi protokol).
+- Kalau skor turun, jadwalkan kenaikan rasio setelah masa tenggang (usul: **7 hari**)
+  dengan notifikasi di UI, memberi pengguna waktu menambah kolateral.
+
+**Aksi:** implementasikan asimetri ini secara eksplisit dan beri komentar di kode —
+reviewer pasti menanyakannya. Pemilik: Dev A. Tenggat: M3.
+
+---
+
+### B4 · Model suku bunga belum ditentukan 🟠
+
+**Masalah.** `EfficiencyMarket` butuh model bunga; belum dispesifikasi.
+
+**Solusi:** pakai model **linear kink** standar (gaya Aave), parameter per reserve:
+```
+utilization = totalBorrowed / totalSupplied
+u <= kink :  rate = base + slope1 × (u / kink)
+u >  kink :  rate = base + slope1 + slope2 × ((u - kink) / (1 - kink))
+```
+Nilai awal: `base = 0%`, `slope1 = 4%`, `slope2 = 60%`, `kink = 80%`, `reserveFactor = 10%`.
+Ini bukan bagian inovatif produk — pakai yang sudah teruji, jangan menciptakan sendiri.
+
+**Aksi:** implementasi + uji monotonisitas indeks. Pemilik: Dev A. Tenggat: M3.
+
+---
+
+## 3. Blocker Teknis — hanya bisa dituntaskan saat development
+
+### T1 · Tipe transaksi mana yang benar-benar didukung decoder? 🟠
+
+**Masalah.** ABI `EvmV1Decoder` mencantumkan `decodeTransactionType0..4`, tetapi sumber
+Solidity hanya mengimplementasikan Type0 (legacy) dan Type2 (EIP-1559) secara penuh.
+Hampir semua transaksi Aave modern bertipe 2, jadi kemungkinan besar aman — tapi
+**belum dibuktikan**.
+
+**Solusi:** di M1, uji dengan transaksi mainnet nyata bertipe 2. Kalau
+`isValidTransactionType` menolak tipe tertentu, indexer harus menandainya `skipped`
+(bukan `failed`) dan mencatat metrik. Jangan biarkan satu tipe tak dikenal menghentikan pipeline.
+
+**Aksi:** verifikasi di M1. Pemilik: Dev A.
+
+---
+
+### T2 · Batas gas `recordFact` untuk transaksi ber-log banyak 🟠
+
+**Masalah.** Satu transaksi Aave bisa memuat 20+ log (token transfer, aToken, pool).
+Kita mengiterasi semuanya. Ditambah continuity proof panjang, `recordFact` bisa
+menabrak batas gas blok — dan kita belum mengukurnya.
+
+**Solusi:**
+- Ukur gas nyata di M1 dengan transaksi mainnet asli.
+- Kalau mendekati batas: tambahkan `recordFactAtLogIndex(bundle, encodedTx, source, txLogIndex)`
+  untuk memproses satu log spesifik, dan biarkan indexer memecah transaksi berat.
+- Jangan optimasi sebelum diukur.
+
+**Aksi:** ukur di M1, siapkan varian fallback. Pemilik: Dev A.
+
+---
+
+### T3 · Batasan sebenarnya dari batch verify 🟡
+
+**Masalah.** Dokumen menyebut maks 10 proof dan rentang 1000 blok. Yang belum jelas:
+apakah precompile menolak keras di luar batas, apakah semua tinggi harus menaik, dan
+bagaimana perilakunya kalau satu transaksi dalam batch tidak valid — apakah seluruh
+batch gagal (kemungkinan besar ya, karena mengembalikan satu `bool`).
+
+**Solusi:** uji empiris di M1. Asumsikan **semua-atau-tidak-sama-sekali** sampai
+terbukti sebaliknya. Indexer harus bisa jatuh ke mode per-transaksi saat satu batch
+gagal, agar satu transaksi buruk tidak memblokir sembilan yang sehat.
+
+**Aksi:** uji + implementasi fallback. Pemilik: Dev A.
+
+---
+
+### T4 · Pemetaan `Id` → `loanToken` di Morpho Blue 🟠
+
+**Masalah.** Event Morpho membawa `Id` (hash parameter pasar), bukan alamat token.
+Dari log saja, alamat token **tidak bisa** diturunkan.
+
+**Solusi:** indexer memanggil `idToMarketParams(Id)` di Morpho (Ethereum) untuk
+me-resolve `loanToken`/`collateralToken`, lalu kurator mendaftarkannya ke adapter lewat
+`setMarket(Id, loanToken, collateralToken)`. Pasar yang belum terdaftar → `ok == false`,
+di-skip, dan memicu alert supaya kurator menambahkannya.
+
+**Catatan cakupan:** kalau waktu menipis, **kirim dengan Aave V3 saja**. Aave sendiri
+sudah cukup untuk membuktikan tesis, dan adapter yang setengah jadi lebih buruk
+daripada tidak ada adapter. Morpho dan Compound adalah bukti *ekstensibilitas*, bukan
+syarat kelayakan.
+
+**Aksi:** implementasikan setelah Aave berjalan. Pemilik: Dev A.
+
+---
+
+### T5 · Rotasi aggregator Chainlink 🟠
+
+**Masalah.** Chainlink mengganti aggregator di balik proxy saat upgrade feed. Kalau
+kita hanya mempercayai satu alamat, feed **berhenti terbarui secara senyap** —
+jenis kegagalan paling berbahaya karena tidak ada error yang muncul.
+
+**Solusi:**
+- `PriceRegistry` menyimpan **himpunan** aggregator tepercaya per aset, bukan satu.
+- Indexer memanggil `aggregator()` pada proxy setiap N blok; kalau berubah → alert.
+- `maxPriceAge` (24 jam) memastikan feed yang mati **membekukan pasar**, bukan
+  menjalankannya dengan harga basi. Kegagalan senyap berubah menjadi kegagalan berisik.
+
+**Aksi:** implementasi pemantauan. Pemilik: Dev A. Tenggat: M3.
+
+---
+
+### T6 · Reorg Ethereum sebelum attestation 🟡
+
+**Masalah.** Indexer bisa melihat event di blok yang kemudian ter-reorg.
+
+**Solusi:** hanya proses log dari blok bertag **`finalized`** (bukan `latest`).
+Finalitas Ethereum ~13 menit, attestation ~8 menit — jadi menunggu finalitas tidak
+menambah latensi yang berarti karena kita memang harus menunggu attestation.
+Sebagai jaring pengaman: attestation itu sendiri hanya terjadi pada blok terkonfirmasi,
+sehingga transaksi ter-reorg tidak akan pernah punya proof yang sah.
+
+**Aksi:** pakai tag `finalized` di watcher. Pemilik: Dev A.
+
+---
+
+### T7 · Gas CTC untuk dompet indexer 🟡
+
+**Masalah.** Indexer mengirim transaksi terus-menerus. Kalau CTC habis, pipeline mati senyap.
+
+**Solusi:** monitor saldo, alert di ambang batas, dan **jangan** memakai satu dompet
+untuk semua peran. Faucet testnet punya limit — minta lebih awal, jangan saat sudah kering.
+
+**Aksi:** alert saldo + runbook. Pemilik: Dev A.
+
+---
+
+## 4. Peluang yang Sedang Dipantau
+
+### O1 · Writability ternyata SUDAH ada di paket kontrak 🟢
+
+`@gluwa/usc-contracts` v0.2.0 (rilis 17 Agustus 2026) memuat suite writability lengkap:
+`Outbox`, `Inbox`, `AttestorRegistry`, `RelayerContract`, `AcknowledgementValidator`,
+`USCRelayingQuoter`, dan lainnya.
+
+Dokumentasi masih menyatakan writability **belum rilis di testnet** dan sedang diaudit.
+Jadi kontraknya ada, jalurnya mungkin belum aktif.
+
+**Sikap:** **jangan bangun apa pun di atasnya.** Arsitektur Corolary tetap searah.
+Tapi ini layak disebut di deck sebagai arah roadmap: begitu writability aktif, Corolary
+bisa memancarkan attestation skor **kembali ke Ethereum**, menjadikan reputasi yang
+dibangun di Creditcoin dapat dipakai di chain asalnya. Itu cerita ekspansi yang kuat
+untuk pembicaraan CEIP.
+
+**Aksi:** cek berkala apakah `Outbox` sudah aktif di CC3 Testnet. Jangan jadikan dependensi.
+
+---
+
+## 5. Ringkasan Prioritas
+
+| Prioritas | Item | Kapan |
+|---|---|---|
+| 🔴 Kritis | **B1** backfill on-demand — tanpa ini produk tidak punya cerita | sebelum M3 |
+| 🔴 Kritis | **B2** posisi jujur soal token testnet — masukkan ke deck & video | sebelum M5 |
+| 🟠 Tinggi | **T1, T2, T3** verifikasi empiris jalur proof | **di M1** |
+| 🟠 Tinggi | **B3** kunci rasio + masa tenggang | M3 |
+| 🟠 Tinggi | **B4** model bunga linear kink | M3 |
+| 🟠 Tinggi | **T5** pemantauan rotasi aggregator | M3 |
+| 🟠 Sedang | **T4** Morpho — boleh dilepas kalau waktu menipis | setelah Aave jalan |
+| 🟡 Rendah | **T6, T7** finalized tag, alert saldo gas | M2 |
+| 🟢 Pantau | **O1** kesiapan writability | berkala |
+
+> **Satu kalimat kalau harus memilih:** kerjakan **M1** dulu (satu event Aave mainnet
+> nyata terbukti dan tercatat), karena T1/T2/T3 hanya bisa dijawab di sana — dan
+> ketiganya berpotensi mengubah desain. Semua pekerjaan lain bertumpu pada jawaban itu.
