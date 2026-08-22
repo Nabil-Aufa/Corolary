@@ -1,0 +1,44 @@
+# ── RAHASIA — jangan pernah ter-commit ────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# ── arsip ─────────────────────────────────────────────────────────────
+*.tar.gz
+*.tgz
+*.zip
+
+# ── dependency & build ────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+out/
+cache/
+artifacts/
+broadcast/
+coverage/
+.next/
+.turbo/
+
+# ── Foundry ───────────────────────────────────────────────────────────
+lib/
+cache_forge/
+
+# ── worker ────────────────────────────────────────────────────────────
+packages/worker/data/
+*.sqlite
+*.sqlite-journal
+
+# ── OS & editor ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# ── log ───────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
