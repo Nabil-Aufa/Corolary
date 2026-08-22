@@ -1,114 +1,145 @@
 # Corolary
 
-> *Solvency isn't claimed. It follows.*
+**Reputasi yang mengikuti dari bukti.**
 
-> Token yang **tidak bisa dicetak melebihi cadangan yang terbukti** — bahkan oleh
-> pemegang kunci admin yang sudah dibajak sepenuhnya.
+Riwayat kredit on-chain yang portabel dan terbukti secara kriptografis — diturunkan dari
+aktivitas pinjam-meminjam **nyata di Ethereum mainnet** melalui **Attestcoin Protocol** —
+dipakai untuk membuka **efisiensi kolateral** di pasar pinjaman **Creditcoin**.
 
-> **Pintu keluarnya tidak punya kunci.**
-
-Entri **BUIDL CTC 2026 Fall** (Creditcoin & Credit Labs), track **RWA**.
-Deadline submission: **6 September 2026**.
-
-Status per **9 Agustus 2026**: **dokumentasi FINAL, kode nol, 0 blocker.**
-Semua parameter `immutable` sudah punya angka terukur; semua prasyarat Fase 1 terpenuhi.
-Repo sengaja direset ke nol pada 2 Agustus 2026 untuk dibangun ulang di atas arsitektur
-yang lebih baik.
-
-⚠️ **File ini masih bahasa Indonesia — dan itu disengaja untuk sekarang.**
-README diterjemahkan ke Inggris **di Fase 8**, saat proyeknya sudah selesai.
-
-Sampai saat itu dia tetap dipakai sebagai dokumen kerja — **tapi jangan ditulis ulang
-dari nol nanti.** README menumpuk isinya sepanjang fase (kunci issuer masuk di Fase 3,
-perintah `docker run` di Fase 4, URL dashboard di Fase 6c). Daftar lengkap apa yang harus
-ada beserta fase asalnya: `docs/05-rencana-build.md` Fase 8.
+> Dibangun untuk **BUIDL CTC 2026 Fall** · Track: DeFi / RWA
 
 ---
 
-## Masalahnya
+## Masalah
 
-Dua stablecoin runtuh tahun ini karena hal yang sama: satu kunci dibajak, token dicetak
-tanpa cadangan.
+DeFi hari ini menuntut over-kolateralisasi 150–200% untuk *semua orang*. Peminjam yang
+sudah melunasi 40 pinjaman Aave selama dua tahun diperlakukan persis sama dengan dompet
+yang dibuat lima menit lalu.
 
-- **Resolv (USR)** — 22 Maret 2026
-- **StablR (USDR/EURR)** — 24 Mei 2026. Berlisensi Malta, patuh MiCA, didukung Tether.
-  $13,5 juta dicetak tanpa backing. EURR jatuh ke **$0,548**.
+**Reputasi tidak punya nilai ekonomi** — bukan karena tidak ada, tapi karena riwayat itu
+terkunci di chain lain dan tidak bisa dibuktikan di tempat kita berdiri.
 
-Standar kepatuhan terbaik hari ini (GENIUS Act) mewajibkan pengungkapan cadangan
-**bulanan**. Keduanya runtuh **dalam hitungan jam**. Laporan bulanan adalah foto;
-yang dibutuhkan adalah kunci pada pintunya.
+## Solusi
 
-## Solusinya
+Corolary membuktikan riwayat itu secara kriptografis, lalu memberinya harga.
 
-Kontrak di Creditcoin memelihara saldo cadangan sebuah treasury di Ethereum. Saldo itu
-**hanya** bergerak lewat event `Transfer` ERC-20 nyata yang dibuktikan secara
-kriptografis ter-include di blok Ethereum final, lewat **Attestcoin Protocol**.
+```
+Peminjam melunasi pinjaman di Aave V3 (Ethereum mainnet)
+        ↓  event nyata, transaksi nyata
+Attestcoin Protocol — jaringan attestor terdesentralisasi mencapai konsensus
+        ↓  Merkle proof + continuity proof
+FactRegistry di Creditcoin — verifikasi sinkron via precompile 0x0FD2
+        ↓  fakta permanen, dapat diaudit siapa pun
+CreditGraph — skor 0..1000, tiap komponen menunjuk ke bukti spesifik
+        ↓
+EfficiencyMarket — rasio kolateral 150% → 110%
+```
 
-- `mint()` **revert** kalau melanggar lantai kolateral — bukan warning, **revert**.
-- `redeem()` **selalu** terbuka, dan kontraknya **tidak bisa di-upgrade** — jadi tidak
-  ada seorang pun yang bisa mengunci pintu keluarnya. Termasuk kami.
-- Pembekuan terjadi **sendiri** saat penarikan terbukti mendarat.
-- **Kunci issuer-nya kami terbitkan di README ini.** Silakan ambil — kamu tidak akan bisa
-  mencetak satu token pun tanpa cadangan, karena kunci itu memang tidak punya kekuasaan
-  itu. *(Terbit di Fase 3, setelah test immutability hijau.)*
+**Yang kami jual bukan pinjaman tanpa jaminan.** Semua pinjaman tetap over-kolateral.
+Peminjam dengan reputasi terbukti hanya perlu mengunci modal jauh lebih sedikit.
+Protokol tetap solven tanpa perlu identitas maupun jalur hukum — dan itulah yang
+membedakan Corolary dari upaya credit-scoring on-chain sebelumnya yang gagal.
 
-Dan karena kita membaca rantai itu sendiri — bukan bertanya kepada issuer — **siapa pun
-bisa mengarahkannya ke treasury issuer mana pun di Ethereum mainnet, tanpa izin mereka.**
+---
 
-## Kenapa mustahil tanpa Attestcoin
+## Integrasi Attestcoin Protocol
 
-Kita membaca event dari kontrak ERC-20 **yang bukan milik kita** — misalnya USDC milik
-Circle — di **Ethereum mainnet**, dari kontrak di **Creditcoin**. Tidak ada oracle
-terpusat yang memberikan ini secara trustless, dan tidak ada bridge yang relevan.
+Attestcoin bukan tempelan di proyek ini — **ia adalah produknya**.
 
-Yang dibuktikan: **treasury issuer X memegang N USDC.** Bukan: "backing USDC itu sendiri"
-— cadangan Circle ada di bank, dan tidak ada siapa pun on-chain yang bisa membuktikannya.
+| Pemakaian | Detail |
+|---|---|
+| **Sumber data inti** | Setiap fakta kredit berasal dari transaksi Ethereum mainnet yang dibuktikan lewat Block Prover Precompile `0x0FD2` |
+| **Oracle harga** | Harga kolateral dibuktikan dari event Chainlink `AnswerUpdated` di Ethereum — **nol oracle terpusat di seluruh sistem** |
+| **Eager proving** | Proof dibuat dalam jendela < 24 jam (**10x lebih murah**), fakta disimpan permanen → mengubah Attestcoin dari oracle per-query menjadi lapisan data terbukti yang persisten |
+| **Batch proving** | 10 transaksi per batch berbagi satu continuity proof |
+| **Ekstraksi selektif** | `QueryBuilder` dari SDK untuk decoding parsial hemat gas |
+| **Registry ChainInfo** | Precompile `0x0fd3` untuk pelacakan status attestation |
 
-Sudah dibuktikan end-to-end (2 Agustus 2026): `verifySingle` atas transaksi USDC
-Ethereum mainnet sungguhan → `true` dalam 1.357 ms.
+### Nol mock data
+
+Hackathon mewajibkan deploy di **testnet**. Kami tidak mau memakai data palsu.
+Keduanya terlihat bertentangan — ternyata tidak.
+
+Creditcoin CC3 **Testnet** mendukung **Ethereum Mainnet** sebagai source chain
+(`chainKey = 3`, terverifikasi langsung dari precompile). Corolary berjalan di testnet
+sesuai aturan, sambil mengonsumsi event Aave V3, Morpho Blue, Compound V3, dan Chainlink
+yang **sungguhan** dari Ethereum mainnet.
+
+Tidak ada satu pun angka di produk ini yang dikarang.
+
+---
+
+## Arsitektur
+
+```
+packages/contracts/    Solidity — FactRegistry, CreditGraph, EfficiencyMarket, adapter
+packages/shared/       Tipe TypeScript + ABI (kontrak antar-developer)
+services/indexer/      Worker eager-proving (watcher → prover → submitter)
+services/api/          REST API (Hono)
+apps/web/              Frontend (Next.js 16)
+```
+
+Tiga lapis: **FactRegistry** (infrastruktur — dapat dipakai dApp Creditcoin lain)
+→ **CreditGraph** (skor) → **EfficiencyMarket** (pasar).
 
 ---
 
 ## Dokumentasi
 
-**Mulai dari [`PROGRESS.md`](PROGRESS.md)**, lalu:
-
 | Dokumen | Isi |
 |---|---|
-| [`docs/00-hackathon.md`](docs/00-hackathon.md) | Aturan lomba, timeline, checklist submission |
-| [`docs/01-riset-mendalam.md`](docs/01-riset-mendalam.md) | Riset teknis + pasar + kompetitif. Semua angka terukur sendiri. |
-| [`docs/02-keputusan-ide.md`](docs/02-keputusan-ide.md) | Ranking 7 ide + alasan pemilihan |
-| [`docs/03-spesifikasi-produk.md`](docs/03-spesifikasi-produk.md) | **PRD + arsitektur + desain kontrak.** Rujukan utama saat ngoding. |
-| [`docs/04-gap-dan-blocker.md`](docs/04-gap-dan-blocker.md) | Gap terbuka + cara memverifikasinya |
-| [`docs/05-rencana-build.md`](docs/05-rencana-build.md) | Build order berurutan + definition-of-done |
-| [`docs/06-akun-dan-dana.md`](docs/06-akun-dan-dana.md) | **Akun deployer berdana. Jangan sampai hilang.** |
-| [`docs/07-red-team.md`](docs/07-red-team.md) | **13 cara ide ini bisa kalah** + perbaikannya |
-| [`docs/08-kerja-paralel.md`](docs/08-kerja-paralel.md) | **Tim 2 orang** — kepemilikan file, serah-terima, aturan |
-| [`docs/09-narasi-dan-deck.md`](docs/09-narasi-dan-deck.md) | **Narasi, argumen pasar, urutan demo, jawaban hafalan.** Baca sebelum menulis copy apa pun. |
+| [`docs/architecture.md`](docs/architecture.md) | **Tulang punggung** — desain sistem, kontrak antar-bagian |
+| [`docs/attestcoin-research.md`](docs/attestcoin-research.md) | Riset protokol Attestcoin, terverifikasi live |
+| [`docs/contracts.md`](docs/contracts.md) | Spesifikasi smart contract |
+| [`docs/scoring.md`](docs/scoring.md) | Algoritma credit graph |
+| [`docs/indexer.md`](docs/indexer.md) | Desain worker eager-proving |
+| [`docs/api.md`](docs/api.md) | Referensi REST API |
+| [`docs/shared-types.md`](docs/shared-types.md) | **Kontrak tipe Dev A ↔ Dev B** |
+| [`docs/frontend.md`](docs/frontend.md) | Spesifikasi frontend |
+| [`docs/setup.md`](docs/setup.md) | Setup lingkungan dev |
+| [`docs/deployment.md`](docs/deployment.md) | **Apa yang di-deploy dan di mana** |
+| [`docs/business.md`](docs/business.md) | Model bisnis & materi pitch |
+| [`docs/workstreams.md`](docs/workstreams.md) | Pembagian kerja tim |
+| [`docs/open-issues.md`](docs/open-issues.md) | **Gap, blocker, dan keputusan tertunda** |
+| [`docs/hackathon.md`](docs/hackathon.md) | Aturan & checklist submission |
+| [`docs/ideas.md`](docs/ideas.md) | Catatan keputusan — kenapa ide ini dipilih |
 
-## Mulai membangun
+---
 
-Dikerjakan **2 orang** — kepemilikan file dipisah tegas, keduanya bisa mulai hari pertama.
+## Mulai cepat
 
-1. **Baca [`CLAUDE.md`](CLAUDE.md) §0** — tentukan kamu pegang frontend atau backend
-2. **Baca [`docs/08-kerja-paralel.md`](docs/08-kerja-paralel.md)** — kepemilikan file,
-   artefak serah-terima, mock data, aturan yang tidak boleh dilanggar sepihak
-3. Frontend mulai dari **Fase 6a**, backend dari **Fase 0**
-   di [`docs/05-rencana-build.md`](docs/05-rencana-build.md)
-4. **Jangan generate wallet baru** — pakai yang sudah berdana,
-   lihat [`docs/06-akun-dan-dana.md`](docs/06-akun-dan-dana.md)
+```bash
+pnpm install
+docker compose up -d
+cp .env.example .env      # isi ETHEREUM_RPC_URL (harus archive-capable)
+pnpm db:migrate
+pnpm dev
+```
 
-## Aturan yang tidak bisa ditawar
+Panduan lengkap: [`docs/setup.md`](docs/setup.md)
 
-Satu klaim palsu membunuh seluruh submission. Sebelum menulis apa pun yang dilihat juri,
-saring lewat daftar klaim terlarang di [`docs/01-riset-mendalam.md`](docs/01-riset-mendalam.md) §7.
+---
 
-Ringkasnya: **jangan** bilang "omnichain", "15 detik", "fully decentralized",
-"proof of reserves lengkap", atau "real-time".
+## Deployment
 
-Ditambahkan 9 Agustus — **jangan** bilang:
-- **"lag 44 blok"** → lag itu **pita**: 32–42 blok (testnet), 65–73 (CC mainnet)
-- **"kami membuktikan saldo treasury"** → attestation tidak menyentuh `stateRoot`
-  Ethereum. Kami membuktikan **setiap pergerakan**, bukan saldo (`01` §1.7)
-- **"kami mengaudit Ethena"** → dicabut dari daftar target sah
-- **"Attestcoin bisa menulis balik ke Ethereum"** → writability masih audit, belum rilis
+| Komponen | Jaringan | Alamat |
+|---|---|---|
+| FactRegistry | Creditcoin CC3 Testnet (102031) | _diisi setelah deploy_ |
+| PriceRegistry | Creditcoin CC3 Testnet | _diisi setelah deploy_ |
+| CreditGraph | Creditcoin CC3 Testnet | _diisi setelah deploy_ |
+| EfficiencyMarket | Creditcoin CC3 Testnet | _diisi setelah deploy_ |
+
+---
+
+## Tim
+
+| Peran | Cakupan |
+|---|---|
+| Dev A | Smart contract, indexer, API, infrastruktur |
+| Dev B | Frontend, desain, integrasi wallet |
+
+---
+
+## Lisensi
+
+MIT
