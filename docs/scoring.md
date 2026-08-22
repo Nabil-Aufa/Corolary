@@ -214,7 +214,7 @@ tidak pernah butuh renormalisasi.
 
 **Masalah yang harus diselesaikan sebelum sekadar menjumlah USD:** menjumlah
 `amountUsd` mentah bisa digembungkan lewat *wash-history* — pinjam-lunas cepat
-berulang untuk mendaur-ulang modal yang sama tanpa risiko nyata (lihat §5 untuk
+berulang untuk mendaur-ulang modal yang sama tanpa risiko nyata (lihat §6 untuk
 analisis kuantitatif penuh). Karena itu `repaymentVolume` **tidak** memakai
 `amountUsd` mentah, melainkan **volume terbobot**:
 
@@ -228,9 +228,9 @@ repaymentVolume = saturating(V, K_VOLUME, 300)
 di mana:
 - `amountUsd_i` — modal-berisiko riil pada pelunasan ke-`i` (dari §2).
 - `durationFactor_i ∈ [0, 1e18]` — seberapa lama posisi pinjaman itu benar-benar
-  terbuka, dihitung dari `LoanOriginated` yang berpasangan (§5.2, §8).
+  terbuka, dihitung dari `LoanOriginated` yang berpasangan (§6.1, §8).
 - `counterpartyDiversityFactor(subject) ∈ [0.5e18, 1e18]` — seberapa beragam jejak
-  protokol+aset subjek (§5.3), dihitung ulang di setiap pelunasan dari state
+  protokol+aset subjek (§6.1), dihitung ulang di setiap pelunasan dari state
   *saat itu*.
 - `K_VOLUME = 50.000 USD` (WAD) — dipilih agar borrower ritel DeFi (puluhan
   ribu dolar kumulatif) sudah mendapat kenaikan poin berarti, sementara whale
@@ -300,7 +300,7 @@ export function repaymentVolumePoints(weightedRepaidUsdWad: bigint): number {
 
 **Fakta input:** `LoanRepaid` yang "bermateri" — `amountUsd_i ≥ MIN_MATERIAL_USD (10 USD)`.
 Ambang ini murni untuk mencegah *spam* hitungan lewat ribuan pelunasan receh
-(bukan pertahanan wash utama — pertahanan wash utama ada di §3.1/§5 lewat pembobotan
+(bukan pertahanan wash utama — pertahanan wash utama ada di §3.1/§6 lewat pembobotan
 volume; ambang ini hanya menjaga `repaymentCount` sendiri tidak trivial digembungkan
 tanpa modal berarti sama sekali).
 
@@ -662,7 +662,7 @@ Untuk mendekati Tier 4 dibutuhkan kira-kira: `repaymentVolume` ≈ 250/300 poin
 ≈ 130+/200 (butuh ≈2 tahun), `protocolDiversity` = 100 (4 protokol), dan
 `activeStanding` mendekati 200 (aktif & bersih).
 
-Ambil rute paling murah yang masih memenuhi bobot durasi minimum (`§5.2`,
+Ambil rute paling murah yang masih memenuhi bobot durasi minimum (§6.1,
 `MIN_MEANINGFUL_DAYS=7`) untuk tidak kena diskon flash-wash: siklus pinjam
 $50.000, tahan selama rata-rata 3 bulan (jauh di atas ambang 7 hari sehingga
 `durationFactor≈1`), lunasi, ulangi 5 kali untuk mencapai `V≈$250.000` terbobot
@@ -736,9 +736,9 @@ jujur: struct `Fact` (`architecture.md` §8.1) **tidak menyimpan alamat
 lawan-transaksi per pinjaman** — Aave/Compound/Morpho di model data ini semua
 tercatat sebagai interaksi dengan `protocol` (alamat pool/kontrak), bukan
 peer individual. Karena keragaman lawan-transaksi sejati tidak bisa dihitung
-dari data yang tersedia (batasan mendasar Attestcoin §2.1 — hanya event,
-bukan state, dan event ini tidak mengekspos peer), **proksi praktis** yang
-dipakai adalah keragaman **protokol + aset**:
+dari data yang tersedia (batasan mendasar Attestcoin, `attestcoin-research.md`
+§2.1 — hanya event, bukan state, dan event ini tidak mengekspos peer),
+**proksi praktis** yang dipakai adalah keragaman **protokol + aset**:
 
 ```
 counterpartyDiversityFactor(subject) = max(0.5e18, min(1e18,
