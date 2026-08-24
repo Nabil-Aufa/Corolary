@@ -117,9 +117,12 @@ reputasi terbukti: **150% (baseline) → 110% (terbukti sangat baik)**.
 
 ### ⚠️ Keputusan desain yang menyelamatkan ide ini
 
-Skor kredit on-chain punya kuburan panjang: Spectral, Cred Protocol, ARCx — semua
-gagal. Penyebabnya sama: mereka menjanjikan **pinjaman tanpa kolateral ke dompet
-anonim**. Tanpa identitas dan tanpa jalur hukum, peminjam selalu untung kabur.
+Skor kredit on-chain punya sejarah panjang tanpa adopsi: Spectral, Cred Protocol,
+ARCx, Credora — lima tahun berjalan, belum ada yang tersambung ke manfaat ekonomi
+berarti. (Sebagian **masih aktif dan didanai baik** — jangan sebut mereka "gagal";
+lihat `docs/business.md` §9 untuk lanskap terverifikasi.) Yang benar-benar runtuh
+adalah produk turunannya: **pinjaman tanpa kolateral ke dompet anonim**. Tanpa
+identitas dan tanpa jalur hukum, peminjam selalu untung kabur.
 
 **Cornerstone tidak mengulangi kesalahan itu.** Kita tidak menjual "pinjaman tanpa
 jaminan". Kita menjual **efisiensi kolateral berjenjang**. Pinjaman selalu

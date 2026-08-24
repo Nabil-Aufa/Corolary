@@ -18,7 +18,8 @@ aktivitas pinjam-meminjam **nyata di Ethereum mainnet**, dipakai untuk membuka
 **Yang kami jual bukan pinjaman tanpa jaminan.** Semua pinjaman tetap over-kolateral.
 Peminjam dengan riwayat terbukti hanya perlu mengunci modal jauh lebih sedikit:
 **150% → 110%**. Protokol tetap solven tanpa perlu identitas atau jalur hukum.
-Ini pembeda utama dari Spectral/Cred/ARCx yang gagal.
+Ini pembeda utama dari kategori skor kredit on-chain sebelumnya
+(lihat `docs/business.md` §9 untuk lanskap terverifikasi).
 
 ---
 

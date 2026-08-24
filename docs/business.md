@@ -310,30 +310,163 @@ lebih panjang — realistis hanya bisa dikejar serius setelah didanai (§11).
 
 ## 9. Lanskap Kompetitif
 
-| Proyek | Apa yang mereka janjikan | Kenapa gagal / stagnan |
+> **Status verifikasi:** bagian ini diperbarui **2026-08-25** lewat pencarian web
+> langsung, menggantikan versi sebelumnya yang ditulis dari ingatan. Versi lama
+> menyebut Spectral/Cred/ARCx "gagal" tanpa rujukan — klaim itu **tidak akurat untuk
+> Spectral** dan sudah dikoreksi di bawah. Rujukan ada di §9.7.
+>
+> **Kenapa koreksi ini penting:** pembaca dokumen ini adalah Credit Labs. Mereka
+> mengenal lanskap ini. Satu klaim kompetitif yang salah dan mudah dicek merusak
+> kredibilitas seluruh dokumen — termasuk bagian yang benar.
+
+Corolary bersinggungan dengan **empat kategori tetangga**. Tidak ada satu pun pemain
+yang menggabungkan keempatnya, dan tidak ada satu pun yang hadir di Creditcoin.
+
+### 9.1 Kategori A — Skor kredit on-chain
+
+Kategori paling ramai dan paling tua (sejak ~2020).
+
+| Proyek | Yang mereka bangun | Status terverifikasi (Agu 2026) |
 |---|---|---|
-| **Spectral** | Skor kredit on-chain (MACRO score) sebagai basis pinjaman | Skor tidak pernah cukup dipercaya pasar untuk membuka pinjaman under-collateralized dalam skala berarti; nilai ekonomi skor tidak pernah terbukti besar dibanding kompleksitasnya |
-| **Cred Protocol** | Skor kredit on-chain, mirip skor FICO untuk dompet | Masalah struktural sama: skor tanpa recourse hukum tidak cukup untuk meyakinkan protokol memberi pinjaman lebih murah dalam jumlah besar |
-| **ARCx** | Passport identitas + skor untuk membuka under-collateralized lending | Produk under-collateralized lending mereka gagal menahan risiko gagal bayar — dompet anonim dengan skor tinggi tetap bisa kabur begitu insentif berbalik |
-| **Credora** | Skor kredit privat/terenkripsi untuk institusi DeFi | Bertahan lebih baik di segmen institusi (KYC/permissioned), tapi model ini tidak scalable ke pengguna ritel anonim tanpa kembali butuh identitas terverifikasi |
+| **Spectral** | MACRO score — skor risiko kredit multi-aset dari data transaksi on-chain; wallet dibundel jadi NFC (non-fungible credit) | **Masih aktif.** Skor on-chain paling banyak dikutip secara akademis di kategori ini; didanai General Catalyst. **Bukan proyek mati.** |
+| **Cred Protocol** | Skor ala FICO untuk dompet, mencampur data on-chain + off-chain + identitas | Aktif, masih di tahap eksperimental |
+| **ARCx** | "DeFi Passport" — skor portabel lintas platform | Aktif sebagai skor; produk under-collateralized lending-nya tidak bertahan |
+| **Credora** | Credit intelligence institusional lewat proof of solvency terenkripsi | Aktif dan relatif berhasil, tapi di segmen **institusi ber-KYC** — tidak scalable ke ritel anonim tanpa balik butuh identitas |
+| **Guild** | Reputasi berbasis jaringan/endorsement, bukan skor numerik statis | Eksperimental |
+| **Ethos** | Skor reputasi dari riwayat wallet | Eksperimental |
 
-**Pola kegagalan yang sama di tiga dari empat:** mereka menjanjikan **pinjaman tanpa
-jaminan (under-collateralized/unsecured) ke dompet anonim**. Tanpa identitas dan
-tanpa jalur hukum recourse, insentif rasional peminjam begitu skor cukup tinggi untuk
-mendapat pinjaman besar tanpa jaminan penuh adalah **meminjam sebanyak mungkin lalu
-tidak membayar** — kerugiannya nol secara reputasi karena dompet anonim bisa
-ditinggalkan. Skor kredit yang bagus tidak mengubah kalkulus ini kalau taruhannya
-tetap "pinjaman tanpa jaminan".
+**Pembacaan yang jujur atas kategori ini:** klaim yang benar **bukan** "mereka gagal",
+melainkan — **kategori ini sudah lima tahun berjalan dan belum ada satu pun yang
+mencapai adopsi ekonomi berarti.** Skor diproduksi; skor jarang dikonsumsi. Alasannya
+struktural, dan penting untuk dipahami karena Corolary harus menghindarinya:
 
-**Kenapa Corolary berbeda secara fundamental, bukan sekadar secara pemasaran:**
-Corolary **tidak pernah** menjanjikan pinjaman tanpa jaminan. Setiap pinjaman di
-EfficiencyMarket tetap **over-kolateral** — floor-nya 110% untuk tier terbaik, bukan
-0% atau di bawah 100%. Yang berubah hanya *berapa banyak* kolateral berlebih yang
-dibutuhkan, bukan *apakah* kolateral dibutuhkan. Protokol tetap solven secara
-matematis tanpa perlu bergantung sama sekali pada identitas, recourse hukum, atau
-"kepercayaan" pada reputasi. Skor kredit di sini adalah **pengganda efisiensi modal**,
-bukan **pengganti jaminan**. Ini bukan perbedaan gradasi — ini kelas produk yang
-berbeda dari apa yang membuat Spectral/Cred/ARCx gagal.
+1. **Skornya adalah kotak hitam.** Model risiko proprietary. Protokol yang mau memakai
+   skor itu harus mempercayai penerbitnya — persis jenis kepercayaan yang seharusnya
+   dihapus oleh DeFi. Tidak ada protokol besar yang mau menaruh solvensinya di atas
+   angka yang tidak bisa mereka verifikasi sendiri.
+2. **Skor tidak pernah tersambung ke manfaat ekonomi konkret.** Mereka menjual angka,
+   lalu berharap orang lain membangun pasar yang memakainya. Pasar itu tidak pernah
+   datang dalam skala berarti.
+3. **Yang tersambung ke pasar, tersambung ke produk yang salah** — pinjaman tanpa
+   jaminan ke dompet anonim (lihat §9.2).
+
+### 9.2 Kategori B — Pinjaman tanpa jaminan (ruang yang Corolary tolak masuki)
+
+| Proyek | Model | Catatan |
+|---|---|---|
+| **3Jane** | Credit line USDC tanpa kolateral, peer-to-pool; underwriting **off-chain** memakai data on-chain + rekening bank + skor kredit tradisional | **Pesaing ide paling serius.** Seed $5,2 juta dipimpin Paradigm (Jun 2024). Yield: Aave base rate + spread + premi risiko gagal bayar |
+| **TrueFi** | Pinjaman tanpa jaminan, rekam jejak pelunasan sebagai reputasi | Aktif |
+| **Goldfinch** | Underwriting berbasis aktivitas bisnis nyata, bukan over-kolateralisasi | Aktif, fokus RWA |
+| **Maple** | Kredit institusional dengan pool delegate | Aktif |
+
+**Kenapa 3Jane justru memperkuat posisi Corolary, bukan melemahkannya:** underwriting
+3Jane berjalan **di luar chain, lewat algoritma tertutup**, dan menarik data bank serta
+skor kredit tradisional. Untuk memakainya, kamu harus mempercayai algoritma mereka dan
+menyerahkan data off-chain. Corolary tidak meminta keduanya: setiap komponen skor
+menunjuk ke `factId` yang bisa diverifikasi ulang oleh siapa pun, on-chain, tanpa
+mempercayai Corolary sedikit pun. Ini bukan produk yang sama dengan sudut pandang
+berbeda — ini asumsi kepercayaan yang berbeda.
+
+**Pola risiko yang dihindari seluruh kategori ini:** tanpa identitas dan tanpa jalur
+hukum recourse, insentif rasional peminjam begitu skornya cukup tinggi untuk mendapat
+pinjaman besar tanpa jaminan penuh adalah **meminjam sebanyak mungkin lalu tidak
+membayar** — biayanya nol karena dompet anonim bisa ditinggalkan. Skor yang bagus
+tidak mengubah kalkulus itu selama taruhannya tetap "pinjaman tanpa jaminan".
+
+### 9.3 Kategori C — Infrastruktur bukti (paling dekat dengan `FactRegistry`)
+
+Ini tetangga terdekat Corolary **secara teknis**, dan bagian yang paling sering
+terlewat saat orang membandingkan Corolary dengan proyek skor kredit.
+
+| Proyek | Yang mereka lakukan |
+|---|---|
+| **Axiom** | Query terverifikasi ZK atas seluruh riwayat Ethereum (block header, account, storage) dengan callback ke kontrak |
+| **Herodotus** | Storage proof + Historical Block Hash Accumulator — akses state historis melewati batas 256 blok EVM |
+| **Brevis** | ZK data coprocessor + zkVM; marketplace query (`zkQueryNet`) |
+| **Lagrange** | Komputasi lintas chain, arsitektur hibrida ZK + optimistic |
+
+**Perbedaan arsitektur yang nyata — dan ini klaim teknis inti Corolary:** keempatnya
+adalah **query-per-request**. Setiap pertanyaan tentang riwayat adalah proof baru yang
+harus dibayar lagi. Model biayanya berbanding lurus dengan **jumlah pembacaan**.
+
+Corolary membalik itu: bukti dibuat **sekali**, di jendela biaya termurah
+(< 24 jam, 2,59×10⁻⁵ CTC — 10x lebih murah dari jendela mahal), lalu **faktanya
+disimpan permanen** di `FactRegistry`. Setiap pembacaan berikutnya, oleh siapa pun,
+selamanya, adalah `SLOAD` biasa. Biaya berbanding lurus dengan **jumlah fakta**, bukan
+jumlah pembacaan — dan jumlah fakta terbatas sementara jumlah pembacaan tidak.
+
+Inilah yang membuat Corolary infrastruktur dan bukan aplikasi, dan inilah yang harus
+ditonjolkan ke juri teknis — **bukan** bagian scoring-nya, yang secara kategori sudah
+ramai.
+
+### 9.4 Kategori D — Cross-chain lending
+
+**Radiant** (via LayerZero), **Balanced**, dan sejenisnya memindahkan **kolateral**
+lintas chain: deposit di chain A, pinjam di chain B, dengan pesan bridge merelai bukti
+deposit. Corolary memindahkan **reputasi**, bukan aset. Tidak ada aset Corolary yang
+pernah melintasi chain — hanya fakta yang dibuktikan. Kategori berbeda; disebut di sini
+hanya supaya tidak tertukar saat orang mendengar "cross-chain lending".
+
+### 9.5 Di ekosistem Creditcoin sendiri
+
+Pencarian terhadap ekosistem Creditcoin (Agu 2026) memunculkan **Penguinbase** (hub
+resmi ekosistem: airdrop, game, dApp, NFT dengan akses token-gated) dan **Spacecoin**
+(internet satelit terdesentralisasi, program reward untuk holder CTC).
+
+**Tidak ditemukan satu pun proyek credit scoring crypto-native di Creditcoin.**
+
+Yang paling dekat adalah **Credal milik Gluwa sendiri** — dan itu kredit **off-chain**
+(KYC, riwayat pembayaran fintech tradisional). Ini memperkuat, bukan melemahkan,
+posisi di §10: Corolary bukan pesaing Credal, melainkan sisi crypto-native yang
+belum mereka punya.
+
+### 9.6 Matriks orisinalitas (penilaian jujur)
+
+| Komponen | Orisinal? | Alasan |
+|---|---|---|
+| Skor kredit dari riwayat DeFi | ❌ | Ada sejak 2020; enam pemain aktif (§9.1) |
+| Membuktikan riwayat Ethereum secara trustless ke kontrak | ❌ | Axiom/Herodotus/Brevis/Lagrange sudah (§9.3) |
+| Skor → rasio kolateral berjenjang, tetap over-kolateral | 🟡 | Jarang — mayoritas kategori mengejar pinjaman *tanpa* jaminan (§9.2) |
+| **Eager proving + registry fakta permanen yang dibaca gratis** | ✅ | Tidak ditemukan padanannya; semua pembanding query-per-request |
+| **Setiap poin skor menunjuk ke bukti yang bisa diverifikasi ulang** | ✅ | Semua pembanding di §9.1 adalah model tertutup |
+| **Hadir di Creditcoin** | ✅ | Kategori kosong total (§9.5) |
+
+**Kesimpulan yang harus dipegang saat pitching:** yang orisinal dari Corolary bukan
+*ide skor kredit on-chain* — itu ide lama dan ramai. Yang orisinal adalah **kombinasi
+arsitekturnya**: bukti eager yang disimpan permanen, skor yang sepenuhnya dapat
+diaudit, produk yang menolak masuk ke ruang pinjaman-tanpa-jaminan, dan penempatan di
+chain yang DNA-nya memang kredit tapi lapisan crypto-native-nya masih kosong.
+
+Jangan pernah mengklaim "belum ada yang melakukan ini". Klaim yang benar dan tetap
+kuat: **"kategori ini sudah lima tahun mencoba dan belum ada yang tersambung ke
+manfaat ekonomi nyata — karena semuanya menjual angka yang harus dipercaya, bukan
+bukti yang bisa diverifikasi."**
+
+**Jawaban satu kalimat untuk pertanyaan juri "apa bedanya dengan Spectral?":**
+> Spectral memberi kamu **skor**. Corolary memberi kamu **bukti** yang bisa
+> diverifikasi ulang oleh siapa pun, on-chain, tanpa perlu mempercayai kami.
+
+### 9.7 Yang BELUM bisa diverifikasi (jangan diklaim di deck)
+
+1. **Submission peserta lain di BUIDL CTC 2026 Fall.** Belum diumumkan. Klaim
+   "tidak ada tim lain yang punya ini" **tidak dapat dibuktikan** dan tidak boleh
+   masuk deck.
+2. **Angka TVL/traksi terkini** dari pemain di §9.1–§9.2. Yang diverifikasi hanya
+   *keberadaan dan status aktif*, bukan ukuran. Jangan mengarang angka pembanding.
+3. **Daftar lengkap dApp Creditcoin.** Pencarian tidak memunculkan direktori resmi
+   yang menyeluruh; §9.5 adalah hasil terbaik yang tersedia, bukan sensus. Klaim
+   "ekosistem tipis" aman; klaim "hanya ada N dApp" tidak.
+
+**Rujukan:**
+- Metaverse Post — *7 Projects Building Crypto-Native Credit Scores In 2026*: https://mpost.io/7-projects-building-crypto-native-credit-scores-in-2026/
+- ChainAware — *DeFi Credit Score Platforms Compared*: https://chainaware.ai/blog/defi-credit-score-comparison/
+- General Catalyst — *Our Investment in Spectral*: https://www.generalcatalyst.com/stories/our-investment-in-spectral-building-programmable-creditworthiness
+- Leviathan News — *3Jane Lending Protocol Explained*: https://leviathannews.substack.com/p/3jane-lending-protocol-explained
+- 3Jane Docs: https://docs.3jane.xyz/introduction
+- ABCDE — *A Deep Dive into ZK Coprocessor and Its Future*: https://www.abcde.com/blog/a-deep-dive-into-zk-coprocessor-and-its-future
+- Herodotus Docs — *Storage Proofs*: https://docs.herodotus.dev/herodotus-docs/developers/storage-proofs
+- CoinMarketCap — *Creditcoin Latest Updates*: https://coinmarketcap.com/cmc-ai/creditcoin/latest-updates/
+- Reactive Network — *Cross-Chain Lending Protocol*: https://blog.reactive.network/cross-chain-lending-protocol/
 
 ---
 
@@ -423,10 +556,11 @@ pendapatan #5 (§6.5) bukan sekadar ide di atas kertas.
    bukti"), track (DeFi), logo, nama tim.
 2. **Masalah** — over-kolateralisasi 150–200% berlaku sama untuk semua orang;
    reputasi kredit terkunci di chain asalnya, tak bisa dibuktikan atau dibawa pergi.
-3. **Kenapa masalah ini belum terpecahkan** — proyek credit-scoring on-chain
-   sebelumnya (Spectral, Cred, ARCx) gagal karena menjanjikan pinjaman tanpa jaminan
-   ke dompet anonim tanpa recourse — bukan karena idenya salah, tapi karena eksekusi
-   modelnya rapuh.
+3. **Kenapa masalah ini belum terpecahkan** — kategori credit-scoring on-chain
+   sudah lima tahun berjalan (Spectral, Cred, ARCx, Credora) tanpa satu pun mencapai
+   adopsi ekonomi berarti: mereka menjual **angka yang harus dipercaya**, dan yang
+   tersambung ke pasar tersambung ke produk yang salah — pinjaman tanpa jaminan ke
+   dompet anonim tanpa recourse (§9).
 4. **Solusi Corolary dalam satu kalimat** — riwayat kredit terbukti kriptografis dari
    Ethereum mainnet, dipakai untuk efisiensi kolateral (150% → 110%), bukan pinjaman
    tanpa jaminan.
@@ -447,8 +581,12 @@ pendapatan #5 (§6.5) bukan sekadar ide di atas kertas.
 12. **Kecocokan strategis dengan Creditcoin** — Credal + Aella + traksi
     4,27 juta transaksi/$79,7 juta/337.000 nasabah; Corolary sebagai pelengkap sisi
     crypto-native.
-13. **Lanskap kompetitif** — kenapa Spectral/Cred/ARCx gagal, kenapa Corolary
-    berbeda secara struktural (over-collateralized selalu, bukan gradasi framing).
+13. **Lanskap kompetitif** (§9) — kenapa kategori skor on-chain stagnan (kotak
+    hitam, tidak tersambung ke manfaat ekonomi), kenapa infrastruktur bukti
+    (Axiom/Herodotus/Brevis) query-per-request sementara Corolary menyimpan fakta
+    permanen, dan kenapa Corolary berbeda secara struktural (over-collateralized
+    selalu, bukan gradasi framing). **Jangan pakai kata "gagal" untuk Spectral —
+    mereka masih aktif dan pembaca tahu itu.**
 14. **Roadmap & penggunaan dana CEIP** — audit keamanan, ekspansi adapter protokol,
     kemitraan formal Gluwa/Credal, ekspansi tim.
 15. **Tim & ask** — Dev A/Dev B, peran masing-masing, kontak, ajakan untuk masuk
