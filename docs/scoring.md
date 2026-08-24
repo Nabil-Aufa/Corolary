@@ -840,6 +840,14 @@ seluruh `factId` historis di on-chain.
 
 ### 8.1 State per-subjek (on-chain, `CreditGraph.sol`)
 
+> ⚠️ **Fakta bisa datang TIDAK BERURUTAN.** Backfill "Claim your history" (B1)
+> menerapkan fakta lama **setelah** fakta segar sudah masuk. Karena itu
+> `lastPositiveFactAt` dan `lastLiquidationAt` wajib `max(lama, baru)`, bukan
+> penugasan langsung. Penugasan langsung membuat likuidasi lama yang di-backfill
+> **memutihkan** likuidasi baru — pengguna yang dilikuidasi kemarin memulihkan
+> `standingPts` penuh hanya dengan mengklaim riwayat lama. Lihat catatan keamanan
+> `docs/contracts.md` §9.
+
 ```solidity
 struct SubjectState {
     // repaymentVolume

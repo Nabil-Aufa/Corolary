@@ -757,6 +757,45 @@ function _tierOf(uint16 score) internal pure returns (uint8 tier, uint16 bps) {
   penalti kasus terburuk. Asimetri ini disengaja (lihat `scoring.md` §2).
 - **`applyFact` tidak boleh revert karena harga.** Kalau ia revert, `recordFact` ikut
   revert dan fakta yang sah jadi hilang. Tangani ketidaktersediaan harga, jangan lempar.
+- **Fakta wajib idempoten (`factApplied`).** Tanpa dedupe, pemegang
+  `FACT_CONSUMER_ROLE` bisa menggelembungkan skor siapa pun sampai 1000 hanya
+  dengan menerapkan ulang SATU fakta yang sah berulang kali. Dengan dedupe, ia
+  tetap hanya bisa menerapkan fakta yang benar-benar ada di registry, tepat sekali.
+  Duplikat menjadi **no-op**, bukan revert — revert akan menjatuhkan `recordFact`.
+- **Timestamp hanya boleh MAJU.** `lastPositiveFactAt` dan `lastLiquidationAt`
+  wajib memakai `max(lama, baru)`, bukan penugasan langsung. Alur backfill
+  "Claim your history" (B1) menerapkan fakta **lama setelah** fakta baru, jadi
+  penugasan langsung akan:
+  1. memundurkan jam recency, sehingga **mengklaim riwayat justru menurunkan
+     skor** — kebalikan persis dari maksud fiturnya; dan
+  2. yang jauh lebih buruk — likuidasi lama yang di-backfill akan **memutihkan**
+     likuidasi baru. Pengguna yang dilikuidasi kemarin bisa memulihkan
+     `standingPts` penuh hanya dengan mengklaim riwayat lama yang memuat
+     likuidasi yang lebih tua.
+
+  Dikunci sebagai tes (`test_BackfillingOldLiquidationDoesNotResetRecovery`) dan
+  diverifikasi lewat mutation test: mencopot penjagaannya membuat tes gagal.
+- **Akumulator memakai penjumlahan JENUH.** `weightedRepaidUsd1e18` dan
+  `liquidationPenaltyPts` tumbuh tanpa batas. Overflow akan me-revert `applyFact`
+  → me-revert `recordFact` → fakta hilang permanen. Keduanya toh di-clamp saat
+  dibaca, jadi menjenuh di batas atas tidak mengubah apa pun yang terlihat.
+- **`observedAt` dijepit ke `block.timestamp`.** Ia tidak dibuktikan kriptografis;
+  tanggal MASA DEPAN akan membuat `now - observedAt` underflow dan **mengunci
+  pembacaan skor subjek itu ke revert selamanya**. Backdating tetap mungkin — itu
+  batas kepercayaan yang dinyatakan terbuka, bukan yang disembunyikan.
+- **`tierOf` dibuat publik dengan sengaja.** Kalau ia privat, tes batas tier hanya
+  bisa menyalin ulang tabelnya ke file tes lalu membandingkannya dengan dirinya
+  sendiri — tautologi yang tetap hijau meski kontraknya salah.
+- **Nomor bit protokol ditetapkan eksplisit, bukan diurutkan otomatis.** Kalau bit
+  diturunkan dari posisi array, menghapus satu protokol akan menggeser bit
+  protokol lain — dan itu diam-diam menulis ulang `protocolDiversity` setiap
+  subjek yang sudah ada. Bitmap `uint8` memberi plafon 8 protokol.
+- **`IPriceRegistry.toUsd1e18` di §8 tidak bisa dipakai apa adanya.** Ia meminta
+  `assetDecimals` sebagai parameter, padahal struct `Fact` on-chain **tidak
+  memuat** desimal aset — jadi `CreditGraph`, satu-satunya pemanggil, tidak punya
+  nilai itu. Bentuk yang dipakai: `tryToUsd1e18(asset, amount) -> (usdWad, ok)`;
+  registry menyimpan sendiri desimal per aset. §8 perlu diselaraskan saat
+  `PriceRegistry` diimplementasikan.
 
 ### Kasus uji
 | # | Skenario | Ekspektasi |
