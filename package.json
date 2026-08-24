@@ -1,0 +1,29 @@
+{
+  "name": "corolary",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Proven on-chain credit history from Ethereum mainnet, unlocking collateral efficiency on Creditcoin",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "dev:indexer": "pnpm --filter @corolary/indexer dev",
+    "dev:api": "pnpm --filter @corolary/api dev",
+    "dev:web": "pnpm --filter @corolary/web dev",
+    "db:migrate": "pnpm --filter @corolary/api db:migrate",
+    "contracts:build": "pnpm --filter @corolary/contracts build",
+    "contracts:test": "pnpm --filter @corolary/contracts test",
+    "contracts:abi": "pnpm --filter @corolary/contracts abi",
+    "contracts:deploy:testnet": "pnpm --filter @corolary/contracts deploy:testnet"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2"
+  }
+}

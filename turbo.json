@@ -1,0 +1,39 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "globalEnv": [
+    "NODE_ENV",
+    "ETHEREUM_RPC_URL",
+    "ETHEREUM_CHAIN_KEY",
+    "CREDITCOIN_RPC_URL",
+    "CREDITCOIN_CHAIN_ID",
+    "PROOF_BUILDER_URL",
+    "SUBMITTER_PRIVATE_KEY",
+    "FACT_REGISTRY_ADDRESS",
+    "PRICE_REGISTRY_ADDRESS",
+    "CREDIT_GRAPH_ADDRESS",
+    "EFFICIENCY_MARKET_ADDRESS",
+    "DATABASE_URL",
+    "API_PORT"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "out/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {},
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

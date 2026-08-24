@@ -1,0 +1,24 @@
+# Postgres lokal untuk indexer + API.
+# Kolom `amount` HARUS NUMERIC(78,0) — uint256 tidak muat di BIGINT.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: corolary-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: corolary
+      POSTGRES_PASSWORD: corolary
+      POSTGRES_DB: corolary
+    ports:
+      - '5432:5432'
+    volumes:
+      - corolary-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U corolary -d corolary']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  corolary-pgdata:
