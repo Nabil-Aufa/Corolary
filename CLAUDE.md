@@ -206,6 +206,15 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
 - **`observedAt` adalah satu-satunya field Fact yang TIDAK terbukti kriptografis.**
   Receipt Ethereum tidak memuat timestamp. Untuk urutan, durasi, dan kesegaran,
   pakai `blockHeight` — bukan `observedAt`.
+- **Morpho punya DUA jebakan yang sama seperti Aave.** Pada `Borrow` dan
+  `WithdrawCollateral`, `caller` tidak di-index sehingga `assets` ada di **`data[1]`**.
+  Subjeknya selalu `onBehalf`/`borrower`, tidak pernah `caller` atau `receiver`.
+  Pada `Liquidate`, pakai `repaidAssets` (word 0), bukan `seizedAssets` (word 2).
+- **JANGAN petakan `Supply`/`Withdraw` aset dasar Compound V3.** Saldo aset dasar
+  Comet bertanda, dan event-nya hanya memancarkan total — menyetor sebagai pemberi
+  pinjaman tidak bisa dibedakan dari melunasi utang. Memetakannya berarti siapa pun
+  bisa menyetor USDC lalu menarik lagi untuk mendapat reputasi gratis. Hanya
+  `SupplyCollateral`, `WithdrawCollateral`, dan `AbsorbDebt` yang tidak ambigu.
 - **Aggregator Chainlink bisa berganti** saat upgrade feed. Resolve `aggregator()`
   dari proxy secara berkala; simpan himpunan aggregator tepercaya, jangan hardcode satu.
 - **Dokumentasi Creditcoin memakai path lama.** `docs.creditcoin.org/creditcoin-usc`

@@ -582,21 +582,84 @@ eksplisit menegaskan adapter TIDAK membaca word 0.
 ### 7b. `adapters/MorphoBlueAdapter.sol`
 **Sumber:** `0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb`
 
-Morpho memakai `Id marketParams` alih-alih alamat reserve. Adapter harus memetakan
-`Id` → `loanToken` lewat tabel yang di-set kurator saat registrasi, karena `Id` adalah
-hash parameter pasar dan tidak bisa didekode menjadi alamat token dari log saja.
-Event: `Borrow`, `Repay`, `Liquidate`, `SupplyCollateral`, `WithdrawCollateral`.
+Morpho memakai `Id marketParams` alih-alih alamat reserve. Adapter memetakan
+`Id` → `loanToken`/`collateralToken` lewat tabel yang di-set kurator (`setMarket`),
+karena `Id` adalah hash parameter pasar dan tidak bisa didekode menjadi alamat token
+dari log saja. Pasar yang belum terdaftar → `ok == false`, di-skip. **Ini satu-satunya
+adapter yang punya state**; `decodeLog` tetap `view`, jadi tetap dipanggil lewat STATICCALL.
+
+Deklarasi diverifikasi dari `morpho-blue/src/libraries/EventsLib.sol` (2026-08-25).
+`Id` adalah `type Id is bytes32`, jadi di tanda tangan event ia muncul sebagai `bytes32`.
+
+| Event | topics | subject | asset | amount |
+|---|---|---|---|---|
+| `Borrow(id, caller, onBehalf, receiver, assets, shares)` | `t1=id`, `t2=onBehalf`, `t3=receiver` | **`onBehalf`** (t2) | `loanToken` | **`data[1]`** ⚠️ |
+| `Repay(id, caller, onBehalf, assets, shares)` | `t1=id`, `t2=caller`, `t3=onBehalf` | **`onBehalf`** (t3) | `loanToken` | `data[0]` |
+| `Liquidate(id, caller, borrower, repaidAssets, …)` | `t1=id`, `t2=caller`, `t3=borrower` | `borrower` (t3) | `loanToken` | **`repaidAssets` = `data[0]`** |
+| `SupplyCollateral(id, caller, onBehalf, assets)` | `t1=id`, `t2=caller`, `t3=onBehalf` | `onBehalf` (t3) | **`collateralToken`** | `data[0]` |
+| `WithdrawCollateral(id, caller, onBehalf, receiver, assets)` | `t1=id`, `t2=onBehalf`, `t3=receiver` | `onBehalf` (t2) | **`collateralToken`** | **`data[1]`** ⚠️ |
+
+> ⚠️ **Dua jebakan yang sama persis seperti Aave.**
+> 1. Pada `Borrow` dan `WithdrawCollateral`, `caller` **tidak** di-index sehingga ia
+>    menempati word 0 dan `assets` bergeser ke **word 1**. Membaca word 0 akan
+>    mencatat alamat sebagai jumlah.
+> 2. Subjeknya selalu `onBehalf`/`borrower`, **tidak pernah** `caller` atau
+>    `receiver`. Memberi kredit ke `caller` berarti reputasi bisa dibeli dengan
+>    melunasi utang orang lain.
+>
+> Pada `Liquidate`, pakai `repaidAssets` (word 0), **bukan** `seizedAssets` (word 2) —
+> padanan `debtToCover` di Aave.
 
 ### 7c. `adapters/CompoundV3Adapter.sol`
 **Sumber:** `0xc3d688B66703497DAA19211EEdff47f25384cdc3` (cUSDCv3)
 
-Compound V3 tidak punya event `Borrow` terpisah — meminjam adalah `Withdraw` pada aset
-dasar ketika saldo menjadi negatif. Adapter memetakan `Withdraw` → `LoanOriginated` dan
-`Supply` → `LoanRepaid` **hanya untuk aset dasar**, dan
-`SupplyCollateral`/`WithdrawCollateral` → fakta kolateral. Aset dasar di-set saat konstruksi.
+> 🔴 **KOREKSI KEAMANAN 2026-08-25 — pemetaan yang semula ditulis di sini TIDAK AMAN
+> dan sudah dibatalkan.**
+>
+> Versi sebelumnya mengarahkan: `Withdraw` → `LoanOriginated`, `Supply` → `LoanRepaid`
+> pada aset dasar. **Jangan lakukan itu.**
+>
+> Saldo aset dasar Comet **bertanda**: positif = menyuplai, negatif = meminjam.
+> `supplyBase` memecah jumlahnya menjadi porsi *repay* dan porsi *supply*;
+> `withdrawBase` memecahnya menjadi *withdraw* dan *borrow*. Kedua event hanya
+> memancarkan **totalnya**. Dari satu log `Supply` saja **mustahil** membedakan
+> peminjam yang melunasi utang dari pemberi pinjaman yang sekadar menyetor USDC.
+>
+> Kalau pemetaan lama diikuti, **siapa pun bisa menyetor USDC ke Compound V3 dan
+> langsung memperoleh fakta `LoanRepaid` bernilai besar — reputasi gratis tanpa
+> pernah meminjam sepeser pun.** Ini menghancurkan klaim Sybil-resistance di
+> `business.md` §3: "biaya memalsukan riwayat ≈ biaya memiliki riwayat asli" runtuh
+> jadi "biaya = deposit yang bisa langsung ditarik kembali".
 
-> Nuansa ini harus didokumentasikan di komentar kode. Tanpa itu, pembaca berikutnya
-> akan menyangka pemetaannya terbalik.
+**Yang dipetakan (semuanya tidak ambigu):**
+
+| Event | topics | subject | asset | amount | kind |
+|---|---|---|---|---|---|
+| `SupplyCollateral(from, dst, asset, amount)` | `t1=from`, `t2=dst`, `t3=asset` | `dst` (t2) | `asset` (t3) | `data[0]` | `CollateralSupplied` |
+| `WithdrawCollateral(src, to, asset, amount)` | `t1=src`, `t2=to`, `t3=asset` | `src` (t1) | `asset` (t3) | `data[0]` | `CollateralWithdrawn` |
+| `AbsorbDebt(absorber, borrower, basePaidOut, usdValue)` | `t1=absorber`, `t2=borrower` — **hanya 3 topic** | `borrower` (t2) | `BASE_TOKEN` | `basePaidOut` = `data[0]` | `Liquidated` |
+
+**Yang sengaja TIDAK dipetakan:** `Supply` dan `Withdraw` pada aset dasar.
+
+Menghitung **kurang** itu aman — subjek hanya kehilangan poin yang layak ia dapat.
+Menghitung **lebih** itu fatal dan permanen. Compound V3 tetap menyumbang kolateral,
+likuidasi, dan diversity protokol; hanya volume pelunasannya yang absen.
+
+Jalan menuju fidelitas penuh ada di `docs/open-issues.md` **T8**.
+
+### 7d. `adapters/SparkAdapter.sol`
+**Sumber:** `0xC13e21B648A5Ee794902342038FF3aDAB66BE987` (SparkLend Pool)
+
+SparkLend adalah fork Aave V3, jadi deklarasi event-nya identik dan topic0-nya sama
+persis. Logika decode dibagi lewat `AaveV3StyleAdapter` (abstract) — menyalinnya dua
+kali berarti menyalin juga jebakan offset `data[1]`, dan salinan kedua pasti luput
+diperbarui saat yang pertama diperbaiki. Yang berbeda hanya alamat pool dan nama.
+
+> ⚠️ **Kesamaan tanda tangan Spark masih ASUMSI.** Belum diverifikasi terhadap log
+> Spark sungguhan dari mainnet — lakukan sebelum submit. Kalau Spark ternyata
+> mem-fork versi Aave yang lebih tua dengan tanda tangan berbeda, adapter akan diam
+> saja mengembalikan `ok == false` untuk semua log: tidak berbahaya, tapi tidak ada
+> fakta Spark yang pernah tercatat. **Gagal senyap**, jadi harus dicek aktif.
 
 ### Kasus uji adapter
 | # | Skenario | Ekspektasi |

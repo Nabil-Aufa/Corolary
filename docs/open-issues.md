@@ -209,7 +209,7 @@ gagal, agar satu transaksi buruk tidak memblokir sembilan yang sehat.
 
 ---
 
-### T4 · Pemetaan `Id` → `loanToken` di Morpho Blue 🟠
+### T4 · Pemetaan `Id` → `loanToken` di Morpho Blue ✅ **SELESAI**
 
 **Masalah.** Event Morpho membawa `Id` (hash parameter pasar), bukan alamat token.
 Dari log saja, alamat token **tidak bisa** diturunkan.
@@ -219,12 +219,57 @@ me-resolve `loanToken`/`collateralToken`, lalu kurator mendaftarkannya ke adapte
 `setMarket(Id, loanToken, collateralToken)`. Pasar yang belum terdaftar → `ok == false`,
 di-skip, dan memicu alert supaya kurator menambahkannya.
 
-**Catatan cakupan:** kalau waktu menipis, **kirim dengan Aave V3 saja**. Aave sendiri
-sudah cukup untuk membuktikan tesis, dan adapter yang setengah jadi lebih buruk
-daripada tidak ada adapter. Morpho dan Compound adalah bukti *ekstensibilitas*, bukan
-syarat kelayakan.
+**Diimplementasikan 2026-08-25.** `MorphoBlueAdapter.setMarket(id, loanToken,
+collateralToken)` di bawah `CURATOR_ROLE`. Pasar yang belum terdaftar mengembalikan
+`ok == false` dan di-skip — adapter tidak pernah menebak token.
 
-**Aksi:** implementasikan setelah Aave berjalan. Pemilik: Dev A.
+**Keputusan cakupan diperbarui:** pemotongan ke "Aave V3 saja" **dibatalkan** atas
+keputusan pemilik proyek (2026-08-25). Keempat protokol dikirim: Aave V3, SparkLend,
+Morpho Blue, Compound V3. Konsekuensinya `TARGET_DIVERSITY_PROTOCOLS = 4` kini
+benar-benar bisa dipenuhi, jadi `protocolDiversity` 100 poin tercapai dan langit-langit
+skor kembali mendekati 1000 — bukan ~900 seperti pada skenario Aave-only.
+
+**Aksi tersisa:** indexer memanggil `idToMarketParams(Id)` di Morpho (Ethereum) untuk
+me-resolve token, lalu memicu alert supaya kurator mendaftarkan pasar baru.
+
+---
+
+### T8 · Compound V3: pinjam/lunas aset dasar tidak bisa dibedakan dari satu log 🟠
+
+**Masalah.** Saldo aset dasar Comet **bertanda** — positif menyuplai, negatif meminjam.
+`supplyBase` memecah jumlahnya jadi porsi *repay* + porsi *supply*; `withdrawBase`
+memecahnya jadi *withdraw* + *borrow*. Event `Supply`/`Withdraw` hanya memancarkan
+**totalnya**, jadi dari satu log saja mustahil membedakan peminjam yang melunasi dari
+pemberi pinjaman yang menyetor.
+
+**Kenapa ini kritis, bukan sekadar kurang lengkap.** `docs/contracts.md` §7c semula
+mengarahkan `Supply` → `LoanRepaid`. Kalau itu diikuti, siapa pun bisa menyetor USDC
+ke Compound V3 dan langsung memperoleh fakta pelunasan bernilai besar — **reputasi
+gratis tanpa pernah meminjam**, lalu dana langsung ditarik lagi. Seluruh argumen
+Sybil-resistance runtuh.
+
+**Yang sudah dilakukan:** `Supply`/`Withdraw` aset dasar **tidak dipetakan sama sekali**.
+Compound V3 tetap menyumbang `SupplyCollateral`, `WithdrawCollateral`, dan `AbsorbDebt`
+(likuidasi) — semuanya tidak ambigu. Menghitung kurang itu aman; menghitung lebih itu
+fatal dan permanen.
+
+**Jalan menuju fidelitas penuh.** Sinyal pembedanya ADA, hanya tidak di log itu: Comet
+memancarkan `Transfer` terpisah **hanya untuk porsi supply/withdraw-nya**, sehingga
+porsi pinjam/lunas = selisih antara jumlah di `Supply`/`Withdraw` dan jumlah di
+`Transfer` yang menyertainya. Membacanya menuntut **korelasi antar log dalam satu
+transaksi**, sementara `IProtocolAdapter.decodeLog` sengaja hanya melihat satu log
+supaya tetap murah dan deterministik.
+
+Kalau ini mau dikejar, ubah interfacenya jadi:
+```solidity
+function decodeLog(EvmV1Decoder.LogEntry[] calldata logs, uint256 index) external view returns (...);
+```
+Biayanya: seluruh array log harus di-ABI-encode ulang untuk **setiap** panggilan
+adapter — kira-kira O(n²) terhadap ukuran log. Ukur dulu sebelum berkomitmen; anggaran
+gas `recordFact` sudah didominasi decode receipt (T2).
+
+**Aksi:** biarkan seperti sekarang kecuali volume pelunasan Compound terbukti penting
+bagi demo. Pemilik: Dev A.
 
 ---
 
@@ -302,7 +347,8 @@ untuk pembicaraan CEIP.
 | 🟠 Tinggi | **B3** kunci rasio + masa tenggang | M3 |
 | 🟠 Tinggi | **B4** model bunga linear kink | M3 |
 | 🟠 Tinggi | **T5** pemantauan rotasi aggregator | M3 |
-| 🟠 Sedang | **T4** Morpho — boleh dilepas kalau waktu menipis | setelah Aave jalan |
+| ✅ Selesai | **T4** Morpho — tabel pasar via `setMarket` | 2026-08-25 |
+| 🟠 Sedang | **T8** Compound V3 — pinjam/lunas aset dasar tidak dipetakan (aman, tapi tidak lengkap) | opsional |
 | 🟡 Rendah | **T6, T7** finalized tag, alert saldo gas | M2 |
 | 🟢 Pantau | **O1** kesiapan writability | berkala |
 
