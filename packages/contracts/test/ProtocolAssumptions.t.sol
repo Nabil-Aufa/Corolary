@@ -2,14 +2,14 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {EvmV1Decoder} from
-    "@gluwa/usc-contracts/contracts/write-ability/common/EvmV1Decoder.sol";
+import {EvmV1Decoder} from "@gluwa/usc-contracts/contracts/write-ability/common/EvmV1Decoder.sol";
 import {
     INativeQueryVerifier,
     NativeQueryVerifierLib
 } from "@gluwa/usc-contracts/contracts/write-ability/common/INativeQueryVerifier.sol";
-import {BlockProverTypes} from
-    "@gluwa/usc-contracts/contracts/write-ability/common/BlockProverTypes.sol";
+import {
+    BlockProverTypes
+} from "@gluwa/usc-contracts/contracts/write-ability/common/BlockProverTypes.sol";
 
 /// @title Kunci asumsi protokol Attestcoin
 /// @notice Setiap asumsi tentang @gluwa/usc-contracts yang dipegang arsitektur
@@ -82,10 +82,7 @@ contract ProtocolAssumptionsTest is Test {
 
     /// @notice Asumsi #5: alamat precompile Block Prover.
     function test_PrecompileAddress() public pure {
-        assertEq(
-            NativeQueryVerifierLib.PRECOMPILE,
-            0x0000000000000000000000000000000000000FD2
-        );
+        assertEq(NativeQueryVerifierLib.PRECOMPILE, 0x0000000000000000000000000000000000000FD2);
     }
 
     /// @notice Asumsi #6: CC3 Testnet (102031) dikenali sebagai chain Creditcoin.
@@ -108,9 +105,7 @@ contract ProtocolAssumptionsTest is Test {
         // sebelum runtime, dan jauh sebelum demo.
         assertTrue(this._singleOverloadResolves.selector != bytes4(0), "overload tunggal");
         assertTrue(this._batchOverloadResolves.selector != bytes4(0), "overload batch");
-        assertTrue(
-            this._singleOverloadResolves.selector != this._batchOverloadResolves.selector
-        );
+        assertTrue(this._singleOverloadResolves.selector != this._batchOverloadResolves.selector);
     }
 
     /// @dev Tidak pernah dieksekusi. Ada murni supaya kompiler me-resolve overload

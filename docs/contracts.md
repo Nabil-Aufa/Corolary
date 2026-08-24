@@ -297,6 +297,24 @@ function _requireEmitter(address actual, address expected) internal pure {
   boleh diproses sekali, berapa pun log yang dikandungnya.
 - **`allowedChainKeys` harus di-set eksplisit** saat deploy. Produksi: hanya `3`
   (Ethereum mainnet). Jangan biarkan kosong dan jangan izinkan `1` (Sepolia) di rilis akhir.
+- **`calculateTxIndex` mengembalikan `uint64`, `queryId`/`factId` memakai `uint32`.**
+  Pemotongan diam-diam akan memetakan dua transaksi berbeda ke `queryId` yang sama —
+  satu bisa memblokir pencatatan yang lain secara permanen. `_toTxIndex` me-revert
+  dengan `TxIndexOutOfRange` alih-alih memotong. Blok nyata tidak pernah mendekati
+  2³² transaksi; justru karena itu ia harus revert, bukan dipotong.
+- **`nonReentrant` di semua entrypoint pencatatan.** `creditGraph.applyFact` adalah
+  panggilan eksternal ke kontrak yang bisa diganti admin. Fakta sudah tersimpan
+  sebelum panggilan itu (checks-effects-interactions), dan guard menutup sisanya.
+  Catatan urutan modifier: `onlyRole` berjalan **sebelum** `nonReentrant`, jadi
+  pemanggil tanpa `RECORDER_ROLE` tertahan lebih dulu oleh kontrol akses. Tes
+  reentrancy harus memberi penyerang `RECORDER_ROLE`, kalau tidak ia menguji
+  gerbang yang salah dan tetap hijau meski guard-nya dicopot.
+- **Adapter di-`staticcall`.** `IProtocolAdapter.decodeLog` dideklarasikan `view`,
+  sehingga kompiler memancarkan STATICCALL — adapter tidak bisa menulis state
+  maupun masuk kembali, bahkan kalau kurator salah mendaftarkan kontrak jahat.
+- **`registerAdapter` memaksa adapter menyetujui alamat sumbernya sendiri.**
+  Tanpa itu, kurator yang salah ketik memasang adapter di bawah alamat sumber lain,
+  dan gerbang emitter kemudian membandingkan log terhadap alamat yang salah.
 
 ### Kasus uji
 | # | Skenario | Ekspektasi |
@@ -389,13 +407,13 @@ error ZeroAddress();
 /// @notice Catat semua fakta relevan dari SATU transaksi Ethereum terbukti.
 /// @param bundle proof Attestcoin
 /// @param encodedTransaction transaksi terenkode dari Proof Builder
-/// @param sourceContract kontrak protokol yang lognya akan dibaca
+/// @param observedAt waktu Ethereum saat event terjadi — lihat catatan kepercayaan
 /// @return factIds fakta yang berhasil dicatat
 function recordFact(
     ProofBundle calldata bundle,
     bytes calldata encodedTransaction,
-    address sourceContract
-) external onlyRole(RECORDER_ROLE) returns (bytes32[] memory factIds);
+    uint64 observedAt
+) external onlyRole(RECORDER_ROLE) nonReentrant returns (bytes32[] memory factIds);
 
 /// @notice Versi batch — beberapa transaksi berbagi SATU continuity proof.
 /// @dev Memakai overload batch precompile:
@@ -412,8 +430,8 @@ struct BatchProofBundle {
 function recordFactBatch(
     BatchProofBundle calldata bundle,
     bytes[] calldata encodedTransactions,
-    address[] calldata sourceContracts
-) external onlyRole(RECORDER_ROLE) returns (bytes32[] memory factIds);
+    uint64[] calldata observedAts
+) external onlyRole(RECORDER_ROLE) nonReentrant returns (bytes32[] memory factIds);
 
 // --- Kurasi ---
 function registerAdapter(address sourceContract, address adapter) external onlyRole(CURATOR_ROLE);
@@ -432,21 +450,22 @@ function protocolCount() external view returns (uint256);
 
 ### Alur `recordFact` (urutan wajib)
 ```
-1. adapter = adapterOf[sourceContract]; if (adapter == 0) revert NoAdapterForProtocol
-2. (receipt, txIndex) = _verifyAndDecode(bundle, encodedTransaction)
+1. (receipt, txIndex) = _verifyAndDecode(bundle, encodedTransaction)
       → gerbang 1 (inklusi) + gerbang 2 (receiptStatus) + replay
-3. untuk i = 0 .. receipt.receiptLogs.length - 1:      ← ITERASI LANGSUNG
+2. untuk i = 0 .. receipt.receiptLogs.length - 1:      ← ITERASI LANGSUNG
       a. log = receipt.receiptLogs[i];  txLogIndex = uint32(i)
-         jika log.address_ != sourceContract → lewati (BUKAN revert;
+      b. adapter = adapterOf[log.address_]        ← GERBANG 3, dipilih OLEH emitter
+         jika adapter == 0 → lewati (BUKAN revert;
          satu transaksi wajar memuat log dari banyak kontrak)
-      b. (ok, kind, subject, asset, amount) = adapter.decodeLog(log)
-      c. jika !ok → lewati
-      d. factId = FactTypes.computeFactId(chainKey, blockHeight, txIndex, txLogIndex)
-      e. jika _facts[factId].subject != 0 → lewati (idempoten di level log)
-      f. simpan Fact; push ke _factsBySubject[subject]; ++totalFacts
-      g. emit FactRecorded
-      h. jika creditGraph != 0 → creditGraph.applyFact(factId)
-4. jika factIds kosong → revert NoRelevantLogs
+      c. (ok, kind, subject, asset, amount) = adapter.decodeLog(log)
+      d. jika !ok → lewati
+      e. jika subject == 0 → revert InvalidSubject (adapter rusak — gagal keras)
+      f. factId = FactTypes.computeFactId(chainKey, blockHeight, txIndex, txLogIndex)
+      g. jika _facts[factId].subject != 0 → lewati (idempoten di level log)
+      h. simpan Fact; push ke _factsBySubject[subject]; ++totalFacts
+      i. emit FactRecorded
+      j. jika creditGraph != 0 → creditGraph.applyFact(factId)   ← panggilan eksternal TERAKHIR
+3. jika factIds kosong → revert NoRelevantLogs
 ```
 
 > **Kenapa iterasi manual, bukan `getLogsByEventSignature`:** helper itu mengembalikan
@@ -462,6 +481,32 @@ function protocolCount() external view returns (uint256);
 >
 > **Kenapa 3e "lewati" bukan "revert":** replay per-transaksi sudah dijaga di langkah 2.
 > Cek per-log ini adalah pertahanan berlapis untuk kasus batch yang tumpang tindih.
+
+> **PERUBAHAN 2026-08-25 — `sourceContract` tidak lagi jadi parameter.**
+> Adapter dipilih **oleh alamat emitter log**, bukan oleh pemanggil. Dua alasan:
+>
+> 1. **Cacat korektness nyata pada desain lama.** `queryId` dikunci per transaksi
+>    sumber, sementara `recordFact` hanya menerima SATU `sourceContract`. Transaksi
+>    Ethereum yang menyentuh Aave **dan** Morpho — aggregator, migrasi posisi,
+>    kontrak strategi — hanya bisa dicatat untuk protokol pertama; panggilan kedua
+>    kena `QueryAlreadyProcessed` dan fakta protokol kedua **hilang permanen**.
+> 2. **Gerbang emitter jadi lebih kuat.** Kalau adapter dipilih oleh emitter,
+>    "adapter salah dipasangkan dengan log" bukan sekadar tercegah — ia tidak bisa
+>    diungkapkan sama sekali. Tidak ada lagi parameter yang bisa salah diisi.
+>
+> Biayanya satu SLOAD dingin per log (~2.100 gas × 10 log ≈ 5% dari biaya decode
+> 375k gas). Dikunci sebagai tes: `test_SingleTxTouchingTwoProtocolsRecordsBoth`.
+
+> ⚠️ **`observedAt` adalah SATU-SATUNYA field yang tidak dibuktikan kriptografis.**
+> Receipt Ethereum tidak memuat timestamp blok, jadi waktu tidak bisa diturunkan
+> on-chain dari proof. Ia diisi operator dan **hanya untuk tampilan**.
+>
+> Apa pun yang security-relevant — urutan kejadian, durasi riwayat, kesegaran —
+> **HARUS** memakai `blockHeight`, yang dibuktikan. `CreditGraph` tidak boleh
+> menurunkan `historyDuration` dari `observedAt`.
+>
+> Ini harus dinyatakan terbuka di submission, sama seperti B2 soal token testnet.
+> Juri akan menemukannya sendiri kalau kita diam.
 
 ### Kasus uji
 | # | Skenario | Ekspektasi |
@@ -497,10 +542,10 @@ bytes32 constant WITHDRAW_SIG = 0x3115d1449a7b732c986cba18244e897a450f61e1bb8d58
 
 | Event | topics | subject | asset | amount | kind |
 |---|---|---|---|---|---|
-| `Borrow(reserve, user, onBehalfOf, amount, rateMode, rate, referral)` | `t1=reserve`, `t2=onBehalfOf`, `t3=referral` | **`onBehalfOf`** (t2) | `reserve` (t1) | `data[0]` | `LoanOriginated` |
+| `Borrow(reserve, user, onBehalfOf, amount, rateMode, rate, referral)` | `t1=reserve`, `t2=onBehalfOf`, `t3=referral` | **`onBehalfOf`** (t2) | `reserve` (t1) | **`data[1]`** ⚠️ | `LoanOriginated` |
 | `Repay(reserve, user, repayer, amount, useATokens)` | `t1=reserve`, `t2=user`, `t3=repayer` | **`user`** (t2) | `reserve` (t1) | `data[0]` | `LoanRepaid` |
 | `LiquidationCall(collateralAsset, debtAsset, user, debtToCover, liqCollateral, liquidator, receiveAToken)` | `t1=collateralAsset`, `t2=debtAsset`, `t3=user` | `user` (t3) | **`debtAsset` (t2)** | **`debtToCover` = `data[0]`** | `Liquidated` |
-| `Supply(reserve, user, onBehalfOf, amount, referral)` | `t1=reserve`, `t2=onBehalfOf`, `t3=referral` | `onBehalfOf` (t2) | `reserve` (t1) | `data[0]` | `CollateralSupplied` |
+| `Supply(reserve, user, onBehalfOf, amount, referral)` | `t1=reserve`, `t2=onBehalfOf`, `t3=referral` | `onBehalfOf` (t2) | `reserve` (t1) | **`data[1]`** ⚠️ | `CollateralSupplied` |
 | `Withdraw(reserve, user, to, amount)` | `t1=reserve`, `t2=user`, `t3=to` | `user` (t2) | `reserve` (t1) | `data[0]` | `CollateralWithdrawn` |
 
 > **Kenapa `Borrow` memakai `onBehalfOf` tapi `Repay` memakai `user`:**
@@ -510,8 +555,29 @@ bytes32 constant WITHDRAW_SIG = 0x3115d1449a7b732c986cba18244e897a450f61e1bb8d58
 > Memberi kredit ke `repayer` akan membiarkan orang membeli reputasi dengan melunasi
 > utang orang lain. Salah satu dari dua pilihan ini meracuni seluruh sistem skor.
 
-Catatan: `amount` di `data` non-indexed, offset 0 untuk kelima event di atas
-(`useATokens`/`receiveAToken` bertipe bool menyusul setelahnya).
+> ⚠️ **KOREKSI 2026-08-25 — offset `amount` TIDAK sama untuk kelima event.**
+> Versi sebelumnya dokumen ini menyatakan `data[0]` untuk semuanya. Itu **salah
+> untuk `Borrow` dan `Supply`**, dan mengikutinya secara harfiah akan mencatat
+> **alamat dompet sebagai jumlah pinjaman** — angka astronomis yang meracuni
+> `repaymentVolume` tanpa gejala apa pun sampai skor sudah salah berminggu-minggu.
+>
+> Sebabnya: pada `Borrow` dan `Supply`, parameter `user` **tidak** di-index,
+> sehingga ia menempati word 0 dari `data` dan `amount` bergeser ke word 1.
+> Diverifikasi langsung dari `aave-v3-origin/IPool.sol`:
+
+| Event | non-indexed `data`, berurutan | offset `amount` |
+|---|---|---|
+| `Borrow` | `user`, `amount`, `interestRateMode`, `borrowRate` | **1** |
+| `Supply` | `user`, `amount` | **1** |
+| `Repay` | `amount`, `useATokens` | 0 |
+| `Withdraw` | `amount` | 0 |
+| `LiquidationCall` | `debtToCover`, `liquidatedCollateralAmount`, `liquidator`, `receiveAToken` | 0 |
+
+Dikunci sebagai tes di `packages/contracts/test/AaveV3Adapter.t.sol`. Tes itu
+**memancarkan event Aave sungguhan** lewat kontrak dengan deklarasi identik lalu
+membaca hasilnya dengan `vm.recordLogs`, jadi yang menghasilkan layout adalah ABI
+encoder EVM — bukan asumsi kita. `test_BorrowAmountIsNotTheUserAddress` secara
+eksplisit menegaskan adapter TIDAK membaca word 0.
 
 ### 7b. `adapters/MorphoBlueAdapter.sol`
 **Sumber:** `0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb`

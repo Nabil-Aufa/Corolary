@@ -2,8 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
-import {EvmV1Decoder} from
-    "@gluwa/usc-contracts/contracts/write-ability/common/EvmV1Decoder.sol";
+import {EvmV1Decoder} from "@gluwa/usc-contracts/contracts/write-ability/common/EvmV1Decoder.sol";
 
 /// @notice Profil gas jalur decode receipt — menjawab open-issues T2 dengan
 ///         pengukuran, bukan tebakan. Input: tx Ethereum mainnet nyata.

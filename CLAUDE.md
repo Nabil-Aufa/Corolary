@@ -197,6 +197,15 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
 
 - **Subjek Aave `Borrow` adalah `onBehalfOf`, bukan `user`.** Untuk `Repay`, subjeknya
   `user` (yang berutang), bukan `repayer`. Salah pilih = seluruh skor teracuni.
+- **Offset `amount` Aave TIDAK sama untuk semua event.** Pada `Borrow` dan `Supply`,
+  `user` **tidak** di-index sehingga ia menempati `data[0]` dan `amount` bergeser ke
+  **`data[1]`**. Pada `Repay`, `Withdraw`, dan `LiquidationCall`, `amount` memang di
+  `data[0]`. Membaca word 0 untuk `Borrow`/`Supply` akan mencatat **alamat dompet
+  sebagai jumlah pinjaman** — angka astronomis yang meracuni skor tanpa gejala.
+  Diverifikasi dari `aave-v3-origin/IPool.sol` dan dikunci sebagai tes.
+- **`observedAt` adalah satu-satunya field Fact yang TIDAK terbukti kriptografis.**
+  Receipt Ethereum tidak memuat timestamp. Untuk urutan, durasi, dan kesegaran,
+  pakai `blockHeight` — bukan `observedAt`.
 - **Aggregator Chainlink bisa berganti** saat upgrade feed. Resolve `aggregator()`
   dari proxy secara berkala; simpan himpunan aggregator tepercaya, jangan hardcode satu.
 - **Dokumentasi Creditcoin memakai path lama.** `docs.creditcoin.org/creditcoin-usc`

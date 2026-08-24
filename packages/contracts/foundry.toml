@@ -27,3 +27,11 @@ line_length = 100
 tab_width = 4
 bracket_spacing = false
 int_types = "long"
+
+# Verifikasi kontrak di explorer CC3 Testnet (Blockscout).
+# Blockscout tidak butuh API key sungguhan, tapi Foundry tetap meminta field-nya.
+[etherscan]
+cc3-testnet = { key = "unused", chain = 102031, url = "https://creditcoin-testnet.blockscout.com/api" }
+
+[rpc_endpoints]
+cc3-testnet = "${CREDITCOIN_RPC_URL}"
