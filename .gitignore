@@ -25,6 +25,9 @@ coverage/
 
 # ── Foundry ───────────────────────────────────────────────────────────
 lib/
+# forge-std adalah git submodule — gitlink-nya HARUS ikut ter-commit, kalau
+# tidak `forge build` gagal di mesin lain. Clone: git submodule update --init
+!packages/contracts/lib/forge-std
 cache_forge/
 
 # ── worker ────────────────────────────────────────────────────────────

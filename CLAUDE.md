@@ -177,7 +177,23 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
 - **Ada DUA struct `MerkleProofEntry` yang berbeda** di paket yang sama:
   `INativeQueryVerifier.MerkleProofEntry` memakai field `hash`, sedangkan
   `BlockProverTypes.MerkleProofEntry` memakai field `sibling`. Untuk memanggil
-  precompile, pakai yang dari `INativeQueryVerifier`.
+  precompile, pakai yang dari `INativeQueryVerifier`. Keduanya bertipe
+  `(bytes32, bool)` sehingga **ABI-nya identik** — kompiler tidak akan menolong
+  kalau kamu salah pilih.
+- **Ada DUA file `INativeQueryVerifier.sol`** di paket yang sama. Yang di
+  `contracts/write-ability/INativeQueryVerifier.sol` adalah salinan vendored yang
+  **basi**: pragma `^0.8.20`, hanya `verify` tunggal, **tanpa** `verifyAndEmit`.
+  Yang benar selalu `contracts/write-ability/common/INativeQueryVerifier.sol`.
+  Aturan praktis: di paket ini, **`common/` selalu yang benar**.
+- **`via_ir = true` WAJIB.** Overload batch `verifyAndEmit` menerima array calldata
+  bersarang dan menabrak "stack too deep" di codegen lama. Sudah dibuktikan, bukan
+  dugaan. Tanpa ini, strategi batching — inti model biaya proyek — tidak bisa dipanggil.
+- **Dependensi Solidity dipasang lewat pnpm, bukan `forge install`.** `.gitignore`
+  mengabaikan `lib/`, jadi submodule Foundry akan hilang dari repo. `remappings.txt`
+  menunjuk ke `node_modules/`. Hanya `forge-std` yang tetap submodule.
+- **Biaya gas `recordFact` didominasi ukuran `encodedTx`, BUKAN jumlah log.** Terukur
+  atas tx mainnet nyata: decode receipt 4.864 byte = 375.316 gas, sementara mengiterasi
+  seluruh 10 log hanya 2.254 gas (0,6%). Batasi batch berdasarkan **total byte**.
 
 - **Subjek Aave `Borrow` adalah `onBehalfOf`, bukan `user`.** Untuk `Repay`, subjeknya
   `user` (yang berutang), bukan `repayer`. Salah pilih = seluruh skor teracuni.

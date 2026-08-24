@@ -1,0 +1,29 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["node_modules", "lib"]
+solc = "0.8.28"                  # dipaksa @gluwa/usc-contracts v0.2.0 — BUKAN 0.8.23
+optimizer = true
+optimizer_runs = 200
+
+# WAJIB. Overload BATCH `verifyAndEmit` menerima array calldata bersarang
+# (uint64[], bytes[], MerkleProof[]) dan menabrak "stack too deep" di codegen
+# lama — sudah dibuktikan, bukan dugaan. Batching adalah strategi biaya inti
+# Corolary, jadi via_ir tidak opsional di repo ini.
+via_ir = true
+
+# Konservatif sampai dukungan opcode CC3 Testnet diverifikasi langsung.
+# `paris` menghindari PUSH0/MCOPY/TSTORE. Naikkan ke shanghai/cancun hanya
+# setelah dibuktikan di chain, bukan berdasarkan asumsi.
+evm_version = "paris"
+
+# Test membaca proof Ethereum mainnet ASLI dari docs/samples — bukan fixture.
+fs_permissions = [{ access = "read", path = "../../docs/samples" }]
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = false
+int_types = "long"

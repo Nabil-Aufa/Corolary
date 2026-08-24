@@ -3,7 +3,7 @@
 > Register hidup. Setiap entri: apa masalahnya, kenapa penting, dan **solusinya**.
 > Yang sudah beres tetap dicatat di §1 supaya tidak "ditemukan ulang" lalu diperdebatkan lagi.
 >
-> Terakhir diperbarui: 2026-08-22
+> Terakhir diperbarui: 2026-08-25
 
 ---
 
@@ -19,6 +19,9 @@
 | R6 | Dua struct `MerkleProofEntry` berbeda (`hash` vs `sibling`) | Pakai milik `INativeQueryVerifier` saat memanggil precompile |
 | R7 | Semantik `Fact.amount` per `FactKind` belum terkunci | Dikunci di `architecture.md` §8.1; `Liquidated` = `debtToCover` + `debtAsset` |
 | R8 | Apakah batch verify didukung precompile? | **Ya** — terverifikasi dari ABI. Batching layak. |
+| R9 | Ada **DUA** file `INativeQueryVerifier.sol` di paket yang sama | `contracts/write-ability/INativeQueryVerifier.sol` adalah salinan vendored yang **basi** (pragma `^0.8.20`, hanya `verify` tunggal, tanpa `verifyAndEmit`). Yang benar: `contracts/write-ability/common/INativeQueryVerifier.sol` (`^0.8.28`, lengkap dengan overload batch + `NativeQueryVerifierLib`). |
+| R10 | Overload **batch** `verifyAndEmit` gagal compile — "stack too deep" | Butuh `via_ir = true`. Sudah diaktifkan di `packages/contracts/foundry.toml`. Bukan opsional: batching adalah strategi biaya inti. |
+| R11 | Struktur paket dipasang lewat **npm**, bukan `forge install` | `.gitignore` mengabaikan `lib/`, jadi submodule Foundry akan hilang dari repo. `@gluwa/usc-contracts` & OpenZeppelin dipasang lewat pnpm; `remappings.txt` menunjuk ke `node_modules/`. Hanya `forge-std` yang tetap submodule (dengan pengecualian eksplisit di `.gitignore`). |
 
 ---
 
@@ -124,18 +127,30 @@ Ini bukan bagian inovatif produk — pakai yang sudah teruji, jangan menciptakan
 
 ## 3. Blocker Teknis — hanya bisa dituntaskan saat development
 
-### T1 · Tipe transaksi mana yang benar-benar didukung decoder? 🟠
+### T1 · Tipe transaksi mana yang benar-benar didukung decoder? ✅ **SELESAI**
 
 **Masalah.** ABI `EvmV1Decoder` mencantumkan `decodeTransactionType0..4`, tetapi sumber
 Solidity hanya mengimplementasikan Type0 (legacy) dan Type2 (EIP-1559) secara penuh.
 Hampir semua transaksi Aave modern bertipe 2, jadi kemungkinan besar aman — tapi
 **belum dibuktikan**.
 
-**Solusi:** di M1, uji dengan transaksi mainnet nyata bertipe 2. Kalau
-`isValidTransactionType` menolak tipe tertentu, indexer harus menandainya `skipped`
-(bukan `failed`) dan mencatat metrik. Jangan biarkan satu tipe tak dikenal menghentikan pipeline.
+**Terjawab 2026-08-25 — tanpa perlu deploy sama sekali.** Membaca sumber
+`EvmV1Decoder.sol` v0.2.0 langsung:
 
-**Aksi:** verifikasi di M1. Pemilik: Dev A.
+Batas Type0/Type2 hanya berlaku untuk decoder **type-specific**
+(`decodeTransactionType0` / `decodeTransactionType2`) — dan **Corolary tidak pernah
+memanggilnya.** Fakta selalu datang dari log, jadi kita hanya memakai
+`decodeReceiptFields`, yang memanggil `_decodeReceiptChunk`. Fungsi itu memilih indeks
+chunk berdasarkan tipe (`2` untuk t0–t2, `3` untuk t3–t4) dan menerima seluruh rentang
+`txType <= 4`. Jalur receipt **agnostik terhadap tipe transaksi**.
+
+Dikunci sebagai test: `test_ReceiptDecodeIsTypeAgnostic` di
+`packages/contracts/test/ProtocolAssumptions.t.sol`, dijalankan atas `txBytes`
+Ethereum mainnet asli dari `docs/samples/`. Transaksi sampel terkonfirmasi **Type 2**
+(EIP-1559), sesuai dugaan.
+
+**Sisa aksi:** tetap tandai `skipped` (bukan `failed`) untuk apa pun yang ditolak
+decoder, supaya satu transaksi aneh tidak menghentikan pipeline. Pemilik: Dev A.
 
 ---
 
@@ -145,13 +160,37 @@ Hampir semua transaksi Aave modern bertipe 2, jadi kemungkinan besar aman — ta
 Kita mengiterasi semuanya. Ditambah continuity proof panjang, `recordFact` bisa
 menabrak batas gas blok — dan kita belum mengukurnya.
 
-**Solusi:**
-- Ukur gas nyata di M1 dengan transaksi mainnet asli.
-- Kalau mendekati batas: tambahkan `recordFactAtLogIndex(bundle, encodedTx, source, txLogIndex)`
-  untuk memproses satu log spesifik, dan biarkan indexer memecah transaksi berat.
-- Jangan optimasi sebelum diukur.
+**Terukur 2026-08-25** atas transaksi Ethereum mainnet asli
+(`docs/samples/proof-ethereum-mainnet.json`, Type 2, 4.864 byte, 10 log, 22 topic) —
+`packages/contracts/test/ReceiptGasProfile.t.sol`:
 
-**Aksi:** ukur di M1, siapkan varian fallback. Pemilik: Dev A.
+| Tahap | Gas |
+|---|---|
+| `decodeReceiptFields` | **375.316** |
+| Iterasi seluruh 10 log | **2.254** |
+| Total | **377.570** |
+
+**Ini membalik asumsi awal.** Biayanya **bukan** pada jumlah log — mengiterasi
+sepuluh log hanya 2.254 gas, yaitu **0,6%** dari total. Hampir seluruh biaya ada di
+ABI-decode `encodedTx` itu sendiri (≈77 gas per byte).
+
+**Konsekuensi: `recordFactAtLogIndex` yang diusulkan tidak akan menolong.** Untuk
+mencapai log mana pun, receipt harus di-decode utuh lebih dulu; memproses satu log
+menghemat 225 gas dari 377.570. Mitigasi itu **dibatalkan** — jangan diimplementasikan.
+
+**Variabel yang benar-benar mengikat adalah ukuran `encodedTx`, bukan jumlah log.**
+Estimasi kasar: transaksi Aave 20-log berukuran ~10 KB → ~770k gas untuk decode saja.
+Batch 10 transaksi → **~3,8 juta gas** hanya untuk decode, belum termasuk verifikasi
+precompile dan biaya calldata.
+
+**Aksi yang benar:**
+- Batasi batch berdasarkan **total byte**, bukan hanya jumlah transaksi. Indexer harus
+  menjumlahkan `encodedTx.length` dan memecah batch sebelum menembus anggaran gas.
+- Ukur batas gas blok CC3 Testnet yang sebenarnya, lalu turunkan anggaran itu dari sana.
+- Ukur ulang dengan transaksi Aave V3 nyata (sampel saat ini belum tentu Aave) untuk
+  mendapat angka byte/log yang representatif.
+
+Pemilik: Dev A.
 
 ---
 
@@ -257,7 +296,9 @@ untuk pembicaraan CEIP.
 |---|---|---|
 | 🔴 Kritis | **B1** backfill on-demand — tanpa ini produk tidak punya cerita | sebelum M3 |
 | 🔴 Kritis | **B2** posisi jujur soal token testnet — masukkan ke deck & video | sebelum M5 |
-| 🟠 Tinggi | **T1, T2, T3** verifikasi empiris jalur proof | **di M1** |
+| ✅ Selesai | **T1** tipe transaksi — jalur receipt agnostik tipe | 2026-08-25 |
+| 🟠 Tinggi | **T2** anggaran batch berbasis BYTE (bukan jumlah log) | terukur; batas blok CC3 masih perlu diukur |
+| 🟠 Tinggi | **T3** batas batch verify | **di M1** |
 | 🟠 Tinggi | **B3** kunci rasio + masa tenggang | M3 |
 | 🟠 Tinggi | **B4** model bunga linear kink | M3 |
 | 🟠 Tinggi | **T5** pemantauan rotasi aggregator | M3 |

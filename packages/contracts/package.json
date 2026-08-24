@@ -1,0 +1,17 @@
+{
+  "name": "@corolary/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test -vvv",
+    "clean": "forge clean && rm -rf .turbo",
+    "abi": "node scripts/export-abi.mjs",
+    "deploy:testnet": "forge script script/Deploy.s.sol --rpc-url $CREDITCOIN_RPC_URL --private-key $DEPLOYER_PRIVATE_KEY --broadcast"
+  },
+  "dependencies": {
+    "@gluwa/usc-contracts": "0.2.0",
+    "@openzeppelin/contracts": "^5.1.0"
+  }
+}
