@@ -80,7 +80,16 @@ langsung dari aturan itu, bukan pilihan kita. Yang dilarang pemilik proyek adala
 **data karangan** — angka yang dibuat-buat untuk membuat demo terlihat bagus.
 Tidak ada satu pun angka semacam itu di Corolary.
 
-**Aksi:** deploy `TestUSDC`/`TestWETH` di CC3 Testnet dengan faucet terbuka, dan beri
+**Terimplementasi 2026-08-25:** `src/testnet/FaucetToken.sol` (faucet terbuka,
+cooldown 1 jam), di-deploy sebagai `tUSDC`/`tWETH` oleh `Deploy.s.sol`.
+
+**Yang tidak terduga saat implementasi:** token testnet tidak punya feed Chainlink
+sendiri, sementara feed mainnet sungguhan sudah dipetakan ke aset kanoniknya untuk
+scoring — dan satu aggregator hanya bisa menunjuk satu aset. Diselesaikan lewat
+`PriceRegistry.setPriceAlias`, sehingga `tUSDC` dinilai memakai **harga USDC
+mainnet yang benar-benar dibuktikan**. Tokennya stand-in; harganya tidak.
+
+**Aksi tersisa:** beri
 label jelas di UI: *"Token pasar adalah token testnet. Riwayat kredit, harga, dan skor
 berasal dari Ethereum mainnet sungguhan."* Menyatakannya lebih dulu **memperkuat**
 kredibilitas, bukan melemahkannya — juri akan menyadarinya sendiri kalau kita diam.
@@ -88,7 +97,7 @@ Masukkan kalimat ini ke deck dan video demo.
 
 ---
 
-### B3 · Rasio kolateral berubah di tengah posisi 🟠
+### B3 · Rasio kolateral berubah di tengah posisi ✅ **SELESAI**
 
 **Masalah.** Kalau skor pengguna turun (kena likuidasi di Ethereum), rasio yang
 dipersyaratkan naik dari mis. 110% → 130%. Posisi yang tadinya sehat bisa **langsung
@@ -103,12 +112,16 @@ dan akan dipertanyakan reviewer.
 - Kalau skor turun, jadwalkan kenaikan rasio setelah masa tenggang (usul: **7 hari**)
   dengan notifikasi di UI, memberi pengguna waktu menambah kolateral.
 
-**Aksi:** implementasikan asimetri ini secara eksplisit dan beri komentar di kode —
-reviewer pasti menanyakannya. Pemilik: Dev A. Tenggat: M3.
+**Terimplementasi 2026-08-25** di `EfficiencyMarket.effectiveRatioBps` +
+`refreshRatio`. Rasio dikunci saat `borrow`; perbaikan berlaku segera; penurunan
+menunggu `RATIO_GRACE_PERIOD = 7 days`. Penurunan didorong lewat `refreshRatio`
+yang permissionless — likuidator berkepentingan memanggilnya, jadi pasar
+mengoreksi dirinya tanpa keeper. Dikunci sebagai
+`test_ScoreDegradationWaitsForGracePeriod` dan diverifikasi lewat mutation test.
 
 ---
 
-### B4 · Model suku bunga belum ditentukan 🟠
+### B4 · Model suku bunga belum ditentukan ✅ **SELESAI**
 
 **Masalah.** `EfficiencyMarket` butuh model bunga; belum dispesifikasi.
 
@@ -121,7 +134,9 @@ u >  kink :  rate = base + slope1 + slope2 × ((u - kink) / (1 - kink))
 Nilai awal: `base = 0%`, `slope1 = 4%`, `slope2 = 60%`, `kink = 80%`, `reserveFactor = 10%`.
 Ini bukan bagian inovatif produk — pakai yang sudah teruji, jangan menciptakan sendiri.
 
-**Aksi:** implementasi + uji monotonisitas indeks. Pemilik: Dev A. Tenggat: M3.
+**Terimplementasi 2026-08-25** di `libraries/InterestRateModel.sol` dengan
+parameter persis di atas. Monotonisitas kurva dan `borrowIndex` diuji
+(`test_InterestCurveIsMonotonicAndKinks`, `test_InterestAccruesAndIndexIsMonotonic`).
 
 ---
 
@@ -349,12 +364,12 @@ untuk pembicaraan CEIP.
 | Prioritas | Item | Kapan |
 |---|---|---|
 | 🔴 Kritis | **B1** backfill on-demand — tanpa ini produk tidak punya cerita | sebelum M3 |
-| 🔴 Kritis | **B2** posisi jujur soal token testnet — masukkan ke deck & video | sebelum M5 |
+| 🔴 Kritis | **B2** posisi jujur soal token testnet — masukkan ke deck & video (kontrak ✅, komunikasi belum) | sebelum M5 |
 | ✅ Selesai | **T1** tipe transaksi — jalur receipt agnostik tipe | 2026-08-25 |
 | 🟠 Tinggi | **T2** anggaran batch berbasis BYTE (bukan jumlah log) | terukur; batas blok CC3 masih perlu diukur |
 | 🟠 Tinggi | **T3** batas batch verify | **di M1** |
-| 🟠 Tinggi | **B3** kunci rasio + masa tenggang | M3 |
-| 🟠 Tinggi | **B4** model bunga linear kink | M3 |
+| ✅ Selesai | **B3** kunci rasio + masa tenggang 7 hari | 2026-08-25 |
+| ✅ Selesai | **B4** model bunga linear kink | 2026-08-25 |
 | ✅ Selesai | **T5** himpunan aggregator + kesegaran di titik baca | 2026-08-25 |
 | 🟡 Sisa | **T5b** indexer memantau `aggregator()` proxy & alert | M3 |
 | ✅ Selesai | **T4** Morpho — tabel pasar via `setMarket` | 2026-08-25 |

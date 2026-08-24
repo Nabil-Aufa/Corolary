@@ -62,6 +62,19 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
     ///      aset, jadi `CreditGraph` tidak punya cara memasoknya.
     mapping(address => uint8) public assetDecimals;
 
+    /// @notice Aset yang meminjam harga aset lain. alias => kanonik.
+    /// @dev Dibutuhkan oleh aturan hackathon, bukan oleh keinginan kita.
+    ///      `EfficiencyMarket` berjalan di CC3 Testnet, di mana USDC/WETH sungguhan
+    ///      tidak ada — jadi token testnet harus di-deploy (open-issues B2). Tapi
+    ///      token itu tidak punya feed Chainlink sendiri, dan feed mainnet yang
+    ///      sungguhan sudah dipetakan ke aset kanoniknya untuk keperluan scoring.
+    ///
+    ///      Alias menyelesaikan keduanya tanpa berbohong: `TestUSDC` dinilai dengan
+    ///      harga USDC MAINNET yang benar-benar dibuktikan. Tokennya stand-in;
+    ///      harganya tidak. Ini harus dinyatakan terbuka di submission, sama seperti
+    ///      B2 sendiri.
+    mapping(address => address) public priceAliasOf;
+
     uint64 public maxPriceAge = 24 hours;
 
     event PriceRecorded(
@@ -75,6 +88,7 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
     event AggregatorTrusted(address indexed asset, address indexed aggregator, uint8 feedDecimals);
     event AggregatorUntrusted(address indexed asset, address indexed aggregator);
     event AssetRegistered(address indexed asset, uint8 decimals);
+    event PriceAliasSet(address indexed aliasAsset, address indexed canonicalAsset);
     event MaxPriceAgeUpdated(uint64 maxPriceAge);
 
     error PriceUnavailable(address asset);
@@ -193,7 +207,7 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
 
     /// @notice Harga mentah; revert bila tidak ada atau basi.
     function getPrice(address asset) external view returns (uint256 answer, uint8 decimals) {
-        PriceData storage p = _prices[asset];
+        PriceData storage p = _prices[_canonical(asset)];
         if (p.roundId == 0) revert PriceUnavailable(asset);
         if (_ageOf(p.updatedAt) > maxPriceAge) {
             revert PriceStale(asset, p.updatedAt, maxPriceAge);
@@ -212,16 +226,24 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
     }
 
     function priceDataOf(address asset) external view returns (PriceData memory) {
-        return _prices[asset];
+        return _prices[_canonical(asset)];
+    }
+
+    function _canonical(address asset) private view returns (address) {
+        address c = priceAliasOf[asset];
+        return c == address(0) ? asset : c;
     }
 
     /// @notice Umur harga dalam detik, memakai waktu Ethereum yang TERBUKTI.
     function priceAgeSeconds(address asset) external view returns (uint64) {
-        return _ageOf(_prices[asset].updatedAt);
+        return _ageOf(_prices[_canonical(asset)].updatedAt);
     }
 
     function _peek(address asset) private view returns (uint256 answer, uint8 dec, bool fresh) {
-        PriceData storage p = _prices[asset];
+        // Harga di-resolve lewat aset kanonik; DESIMAL tetap milik aset itu
+        // sendiri, karena token stand-in boleh punya desimal berbeda.
+        address canonical = priceAliasOf[asset];
+        PriceData storage p = _prices[canonical == address(0) ? asset : canonical];
         if (p.roundId == 0) return (0, 0, false);
         if (_ageOf(p.updatedAt) > maxPriceAge) return (0, 0, false);
         return (p.answer, p.feedDecimals, true);
@@ -270,6 +292,22 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
     /// @dev Harus dipanggil sebelum `trustAggregator`. Desimal salah = seluruh
     ///      nilai USD aset itu meleset berkali-kali lipat, dan tidak ada gejala
     ///      apa pun sampai skor sudah salah.
+    /// @notice Buat `aliasAsset` memakai harga terbukti milik `canonicalAsset`.
+    /// @dev Hanya harganya yang dipinjam. Desimal `aliasAsset` tetap harus
+    ///      didaftarkan sendiri lewat `registerAsset`.
+    function setPriceAlias(address aliasAsset, address canonicalAsset)
+        external
+        onlyRole(CURATOR_ROLE)
+    {
+        if (aliasAsset == address(0) || canonicalAsset == address(0)) revert ZeroAddress();
+        if (assetDecimals[aliasAsset] == 0) revert AssetNotRegistered(aliasAsset);
+        // Alias berantai akan membuat resolusi butuh loop dan bisa membentuk
+        // siklus. Satu tingkat saja - itu semua yang dibutuhkan.
+        if (priceAliasOf[canonicalAsset] != address(0)) revert AssetNotRegistered(canonicalAsset);
+        priceAliasOf[aliasAsset] = canonicalAsset;
+        emit PriceAliasSet(aliasAsset, canonicalAsset);
+    }
+
     function registerAsset(address asset, uint8 decimals) external onlyRole(CURATOR_ROLE) {
         if (asset == address(0)) revert ZeroAddress();
         if (decimals == 0 || decimals > 36) revert AssetNotRegistered(asset);

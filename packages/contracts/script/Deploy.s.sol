@@ -5,6 +5,8 @@ import {Script, console} from "forge-std/Script.sol";
 import {FactRegistry} from "../src/FactRegistry.sol";
 import {CreditGraph} from "../src/CreditGraph.sol";
 import {PriceRegistry} from "../src/PriceRegistry.sol";
+import {EfficiencyMarket} from "../src/EfficiencyMarket.sol";
+import {FaucetToken} from "../src/testnet/FaucetToken.sol";
 import {AaveV3Adapter} from "../src/adapters/AaveV3Adapter.sol";
 import {SparkAdapter} from "../src/adapters/SparkAdapter.sol";
 import {MorphoBlueAdapter} from "../src/adapters/MorphoBlueAdapter.sol";
@@ -93,6 +95,27 @@ contract Deploy is Script {
 
         graph.setPriceRegistry(address(prices));
 
+        // --- Lapis 3: pasar ---
+        EfficiencyMarket market = new EfficiencyMarket(admin, address(graph), address(prices));
+        market.grantRole(market.CURATOR_ROLE(), admin);
+
+        // Token testnet (open-issues B2). Aturan hackathon mewajibkan deploy di
+        // testnet dan CC3 tidak punya USDC/WETH sungguhan, jadi ini tak
+        // terhindarkan - dan dinyatakan terbuka, bukan disembunyikan.
+        //
+        // Harganya TIDAK dikarang: alias membuat keduanya dinilai memakai harga
+        // Ethereum mainnet yang benar-benar dibuktikan lewat Attestcoin.
+        FaucetToken tUsdc = new FaucetToken("Corolary Test USDC", "tUSDC", 6, 10_000e6);
+        FaucetToken tWeth = new FaucetToken("Corolary Test WETH", "tWETH", 18, 5e18);
+
+        prices.registerAsset(address(tUsdc), 6);
+        prices.registerAsset(address(tWeth), 18);
+        prices.setPriceAlias(address(tUsdc), USDC);
+        prices.setPriceAlias(address(tWeth), WETH);
+
+        market.addReserve(address(tUsdc), 1000, true); // dapat dipinjam
+        market.addReserve(address(tWeth), 1000, false); // kolateral saja
+
         // Morpho butuh tabel Id pasar -> alamat token; Id-nya spesifik per pasar
         // dan di-resolve indexer lewat `idToMarketParams`, jadi tidak bisa
         // di-hardcode di sini. Kurator mendaftarkannya setelah deploy.
@@ -112,6 +135,9 @@ contract Deploy is Script {
         console.log("SPARK_ADAPTER_ADDRESS =", address(sparkAdapter));
         console.log("MORPHO_BLUE_ADAPTER_ADDRESS =", address(morphoAdapter));
         console.log("COMPOUND_V3_ADAPTER_ADDRESS =", address(compoundAdapter));
+        console.log("EFFICIENCY_MARKET_ADDRESS =", address(market));
+        console.log("TEST_USDC_ADDRESS =", address(tUsdc));
+        console.log("TEST_WETH_ADDRESS =", address(tWeth));
         console.log("");
         console.log(
             "LANGKAH LANJUTAN: daftarkan pasar Morpho lewat setMarket(id, loan, collateral)"

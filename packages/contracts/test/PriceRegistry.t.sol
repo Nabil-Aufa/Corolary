@@ -143,6 +143,7 @@ contract PriceRegistryTest is Test {
 
         (bool ok, uint256 answer, uint8 dec) = registry.tryGetPrice(WETH);
         assertTrue(ok);
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(answer, uint256(ETH_USD_ANSWER));
         assertEq(dec, 8);
         assertEq(registry.priceDataOf(WETH).sourceBlock, HEIGHT);
@@ -163,8 +164,10 @@ contract PriceRegistryTest is Test {
         _record(ETH_USD_AGG, ETH_USD_ANSWER, 100, updatedAt);
 
         (, uint256 answer,) = registry.tryGetPrice(WETH);
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(answer, uint256(ETH_USD_ANSWER), "harga dari topics[1]");
         assertTrue(answer != updatedAt, "BUKAN updatedAt dari data[0]");
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(registry.priceDataOf(WETH).updatedAt, uint64(updatedAt), "updatedAt dari data[0]");
     }
 
@@ -310,6 +313,7 @@ contract PriceRegistryTest is Test {
         registry.recordPrice(_bundle(ETH_MAINNET, HEIGHT + 1), older);
 
         (, uint256 answer,) = registry.tryGetPrice(WETH);
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(answer, uint256(ETH_USD_ANSWER), "harga baru dipertahankan");
     }
 

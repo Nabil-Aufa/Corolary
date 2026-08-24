@@ -261,6 +261,7 @@ contract IntegrationTest is Test {
 
         // Dan harga yang menilainya juga punya asal-usul yang bisa dicek.
         assertGt(prices.priceDataOf(USDC).sourceBlock, 0, "harga punya blok sumber");
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(prices.priceDataOf(USDC).answer, uint256(USDC_USD_ANSWER));
     }
 

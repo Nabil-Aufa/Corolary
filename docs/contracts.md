@@ -1020,6 +1020,51 @@ pinjam dan saat evaluasi kesehatan**.
 - **Token fee-on-transfer dan rebasing tidak didukung.** Tegakkan lewat allowlist aset kurator.
 - **Checks-effects-interactions** di semua jalur.
 
+### Catatan implementasi (2026-08-25)
+
+- **B3 terimplementasi lewat `effectiveRatioBps` + `refreshRatio`.** Asimetrinya:
+  perbaikan skor berlaku **segera** (menguntungkan pengguna, aman bagi protokol
+  karena kolateral yang sudah terkunci jadi lebih dari cukup); penurunan menunggu
+  **7 hari**. Penurunan harus **didorong** lewat `refreshRatio` karena fungsi
+  `view` tidak bisa mencatat KAPAN penurunan mulai. Itu bukan celah: likuidator
+  punya insentif langsung memanggilnya — itulah yang membuat sebuah posisi bisa
+  dilikuidasi. Pasar mengoreksi dirinya tanpa keeper khusus. Diverifikasi lewat
+  mutation test.
+- **B4 di `libraries/InterestRateModel.sol`**, parameter awal persis dari
+  open-issues: base 0%, slope1 4%, slope2 60%, kink 80%, reserveFactor 10%.
+  Utilisasi dijepit ke 100% supaya kurvanya tidak meledak saat bunga terakumulasi
+  melebihi likuiditas tersisa.
+- **Pembekuan harga basi berlaku untuk yang MENAMBAH risiko saja.** `borrow` dan
+  `liquidate` membeku; begitu juga `withdrawCollateral` **bila pengguna punya
+  utang**. Pengguna tanpa utang tetap bisa menarik kolateralnya — feed yang mati
+  tidak boleh menyandera dana orang yang tidak meminjam sepeser pun.
+- **Fee-on-transfer ditolak di titik masuk, bukan hanya lewat allowlist.**
+  `_pullExact` membandingkan saldo sebelum dan sesudah; selisih yang tidak sama
+  persis dengan `amount` me-revert `UnsupportedToken`. Kalau lolos, akuntansi
+  internal menyimpang dari saldo nyata, dan penyimpangan itu berakhir sebagai
+  kekurangan dana saat penarikan terakhir — ditanggung pengguna terakhir.
+- **Pelunasan penuh membersihkan `debtScaled` sampai nol secara eksplisit.**
+  Menghitung ulang scaled dari jumlah yang diterima bisa menyisakan debu 1-wei
+  akibat pembulatan, dan debu itu terus berbunga selamanya sehingga posisi tidak
+  pernah benar-benar bisa ditutup.
+- **`capitalSavedUsdWad`** adalah angka utama yang dijual produk, dan ia dihitung
+  dari state nyata: `utangUsd x (15000 - rasioEfektif) / 10000`.
+
+### Token testnet & alias harga (open-issues B2)
+
+`src/testnet/FaucetToken.sol` — ERC-20 testnet dengan faucet terbuka (cooldown 1
+jam). Aturan hackathon mewajibkan deploy di testnet dan CC3 tidak punya USDC/WETH
+sungguhan, jadi ini tak terhindarkan.
+
+Yang tidak jelas sebelum diimplementasikan: token itu **tidak punya feed Chainlink
+sendiri**, sementara feed mainnet yang sungguhan sudah dipetakan ke aset kanoniknya
+untuk keperluan scoring — dan `assetOfAggregator` hanya bisa menunjuk satu aset per
+aggregator. Diselesaikan lewat `PriceRegistry.setPriceAlias(alias, kanonik)`:
+`tUSDC` dinilai memakai harga **USDC mainnet yang benar-benar dibuktikan**.
+
+> **Tokennya stand-in; harganya tidak.** Ini harus dinyatakan terbuka di deck dan
+> video demo, persis seperti B2 sendiri.
+
 ### Kasus uji
 | # | Skenario | Ekspektasi |
 |---|---|---|

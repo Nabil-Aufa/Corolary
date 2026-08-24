@@ -229,6 +229,15 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
 - **Backend pakai ethers v6, frontend pakai viem/wagmi.** Disengaja — SDK Attestcoin
   memaksa ethers. Jangan diseragamkan; keduanya tak pernah bertemu di satu file.
 - **Kolom `amount` di Postgres harus `NUMERIC(78,0)`**, bukan `BIGINT`.
+- **Di tes Foundry, jangan pakai `vm.warp(block.timestamp + X)` di dalam LOOP.**
+  Dengan `via_ir`, optimizer meng-hoist `TIMESTAMP` keluar dari loop, sehingga
+  setiap iterasi warp ke detik yang SAMA dan loopnya diam-diam tidak memajukan
+  waktu sama sekali — tesnya tetap hijau sambil menguji hal yang salah. Lacak
+  waktu di variabel lokal (`t += 1 days; vm.warp(t);`).
+- **Token testnet dinilai lewat `PriceRegistry.setPriceAlias`.** `tUSDC`/`tWETH`
+  tidak punya feed Chainlink sendiri, dan satu aggregator hanya bisa menunjuk satu
+  aset. Alias membuat mereka memakai harga mainnet yang benar-benar dibuktikan —
+  tokennya stand-in, harganya tidak.
 
 ---
 
