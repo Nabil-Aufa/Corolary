@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {Script, console} from "forge-std/Script.sol";
 import {FactRegistry} from "../src/FactRegistry.sol";
 import {CreditGraph} from "../src/CreditGraph.sol";
+import {PriceRegistry} from "../src/PriceRegistry.sol";
 import {AaveV3Adapter} from "../src/adapters/AaveV3Adapter.sol";
 import {SparkAdapter} from "../src/adapters/SparkAdapter.sol";
 import {MorphoBlueAdapter} from "../src/adapters/MorphoBlueAdapter.sol";
@@ -24,6 +25,18 @@ contract Deploy is Script {
     /// @dev Comet cUSDCv3 dan aset dasarnya di Ethereum mainnet.
     address internal constant COMET_USDC = 0xc3d688B66703497DAA19211EEdff47f25384cdc3;
     address internal constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address internal constant WBTC = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
+
+    /// @dev Aggregator Chainlink di balik proxy, terverifikasi live 2026-08-22.
+    ///      Ini alamat PEMANCAR event `AnswerUpdated` - bukan alamat proxy.
+    ///      Chainlink menggantinya saat upgrade feed, jadi indexer harus
+    ///      me-resolve `aggregator()` dari proxy secara berkala dan memberi tahu
+    ///      kurator. Semua feed berdesimal 8.
+    address internal constant ETH_USD_AGG = 0x7d4E742018fb52E48b08BE73d041C18B21de6Fb5;
+    address internal constant BTC_USD_AGG = 0x4a3411ac2948B33c69666B35cc6d055B27Ea84f1;
+    address internal constant USDC_USD_AGG = 0xc9E1a09622afdB659913fefE800fEaE5DBbFe9d7;
+    uint8 internal constant CHAINLINK_FEED_DECIMALS = 8;
 
     function run() external {
         address admin = vm.envAddress("DEPLOYER_ADDRESS");
@@ -33,6 +46,7 @@ contract Deploy is Script {
 
         FactRegistry registry = new FactRegistry(admin);
         CreditGraph graph = new CreditGraph(admin, address(registry));
+        PriceRegistry prices = new PriceRegistry(admin);
 
         AaveV3Adapter aaveAdapter = new AaveV3Adapter();
         SparkAdapter sparkAdapter = new SparkAdapter();
@@ -62,6 +76,23 @@ contract Deploy is Script {
         graph.assignProtocolBit(morphoAdapter.sourceContract(), 3);
         graph.assignProtocolBit(compoundAdapter.sourceContract(), 4);
 
+        // --- Harga: nol oracle terpusat ---
+        prices.grantRole(prices.CURATOR_ROLE(), admin);
+        prices.grantRole(prices.PRICE_RECORDER_ROLE(), recorder);
+        prices.setChainKeyAllowed(ETHEREUM_MAINNET_CHAIN_KEY, true);
+
+        // Desimal token harus terdaftar SEBELUM aggregator-nya - salah desimal
+        // membuat seluruh nilai USD aset itu meleset berkali-kali lipat, tanpa
+        // gejala apa pun sampai skornya sudah salah.
+        prices.registerAsset(WETH, 18);
+        prices.registerAsset(USDC, 6);
+        prices.registerAsset(WBTC, 8);
+        prices.trustAggregator(WETH, ETH_USD_AGG, CHAINLINK_FEED_DECIMALS);
+        prices.trustAggregator(USDC, USDC_USD_AGG, CHAINLINK_FEED_DECIMALS);
+        prices.trustAggregator(WBTC, BTC_USD_AGG, CHAINLINK_FEED_DECIMALS);
+
+        graph.setPriceRegistry(address(prices));
+
         // Morpho butuh tabel Id pasar -> alamat token; Id-nya spesifik per pasar
         // dan di-resolve indexer lewat `idToMarketParams`, jadi tidak bisa
         // di-hardcode di sini. Kurator mendaftarkannya setelah deploy.
@@ -76,6 +107,7 @@ contract Deploy is Script {
 
         console.log("FACT_REGISTRY_ADDRESS =", address(registry));
         console.log("CREDIT_GRAPH_ADDRESS =", address(graph));
+        console.log("PRICE_REGISTRY_ADDRESS =", address(prices));
         console.log("AAVE_V3_ADAPTER_ADDRESS =", address(aaveAdapter));
         console.log("SPARK_ADAPTER_ADDRESS =", address(sparkAdapter));
         console.log("MORPHO_BLUE_ADAPTER_ADDRESS =", address(morphoAdapter));

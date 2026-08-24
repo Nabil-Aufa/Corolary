@@ -273,7 +273,7 @@ bagi demo. Pemilik: Dev A.
 
 ---
 
-### T5 · Rotasi aggregator Chainlink 🟠
+### T5 · Rotasi aggregator Chainlink ✅ **SELESAI di kontrak**
 
 **Masalah.** Chainlink mengganti aggregator di balik proxy saat upgrade feed. Kalau
 kita hanya mempercayai satu alamat, feed **berhenti terbarui secara senyap** —
@@ -285,7 +285,16 @@ jenis kegagalan paling berbahaya karena tidak ada error yang muncul.
 - `maxPriceAge` (24 jam) memastikan feed yang mati **membekukan pasar**, bukan
   menjalankannya dengan harga basi. Kegagalan senyap berubah menjadi kegagalan berisik.
 
-**Aksi:** implementasi pemantauan. Pemilik: Dev A. Tenggat: M3.
+**Terimplementasi 2026-08-25 (sisi kontrak).** `PriceRegistry` menyimpan
+`assetOfAggregator` sebagai pemetaan **banyak-ke-satu**: beberapa aggregator boleh
+melayani aset yang sama, jadi aggregator pengganti bisa dipercayai **sebelum**
+Chainlink melakukan upgrade — tidak ada jeda di mana harga berhenti terbarui.
+`maxPriceAge` (24 jam) ditegakkan di titik BACA memakai `updatedAt` yang terbukti,
+sehingga feed yang mati membekukan penilaian alih-alih menjalankannya dengan harga
+basi. Dikunci sebagai `test_TwoAggregatorsCanServeTheSameAsset`.
+
+**Sisa aksi (off-chain):** indexer memanggil `aggregator()` pada proxy setiap N blok
+dan memberi alert saat berubah. Pemilik: Dev A.
 
 ---
 
@@ -346,7 +355,8 @@ untuk pembicaraan CEIP.
 | 🟠 Tinggi | **T3** batas batch verify | **di M1** |
 | 🟠 Tinggi | **B3** kunci rasio + masa tenggang | M3 |
 | 🟠 Tinggi | **B4** model bunga linear kink | M3 |
-| 🟠 Tinggi | **T5** pemantauan rotasi aggregator | M3 |
+| ✅ Selesai | **T5** himpunan aggregator + kesegaran di titik baca | 2026-08-25 |
+| 🟡 Sisa | **T5b** indexer memantau `aggregator()` proxy & alert | M3 |
 | ✅ Selesai | **T4** Morpho — tabel pasar via `setMarket` | 2026-08-25 |
 | 🟠 Sedang | **T8** Compound V3 — pinjam/lunas aset dasar tidak dipetakan (aman, tapi tidak lengkap) | opsional |
 | 🟡 Rendah | **T6, T7** finalized tag, alert saldo gas | M2 |

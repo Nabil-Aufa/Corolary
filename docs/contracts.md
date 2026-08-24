@@ -708,29 +708,68 @@ mapping(address => address)   public assetOfAggregator;// aggregator => asset
 uint64 public maxPriceAge;                             // default 24 jam
 ```
 
-### Fungsi
+### Fungsi (bentuk terimplementasi, 2026-08-25)
 ```solidity
-function recordPrice(ProofBundle calldata bundle, bytes calldata encodedTransaction, address aggregator)
-    external onlyRole(PRICE_RECORDER_ROLE);
+/// Tidak menerima parameter `aggregator` - aggregator ditentukan OLEH alamat
+/// pemancar log, alasan yang sama seperti di FactRegistry.
+function recordPrice(ProofBundle calldata bundle, bytes calldata encodedTransaction)
+    external onlyRole(PRICE_RECORDER_ROLE) nonReentrant returns (uint256 recorded);
 
 /// @notice Harga; revert bila basi atau tidak ada.
 function getPrice(address asset) external view returns (uint256 answer, uint8 decimals);
 
-/// @notice Varian non-revert untuk pemanggil yang menangani ketidaktersediaan sendiri.
+/// @notice Varian non-revert.
 function tryGetPrice(address asset) external view returns (bool ok, uint256 answer, uint8 decimals);
 
-/// @notice Nilai USD dalam WAD (1e18).
-function toUsd1e18(address asset, uint256 amount, uint8 assetDecimals)
-    external view returns (uint256);
+/// @notice Nilai USD dalam WAD. TIDAK PERNAH revert - lihat catatan keamanan.
+function tryToUsd1e18(address asset, uint256 amount) external view returns (uint256 usdWad, bool ok);
 
-function setAggregator(address asset, address aggregator, uint8 decimals) external onlyRole(CURATOR_ROLE);
+function registerAsset(address asset, uint8 decimals) external onlyRole(CURATOR_ROLE);
+function trustAggregator(address asset, address aggregator, uint8 feedDecimals) external onlyRole(CURATOR_ROLE);
+function untrustAggregator(address aggregator) external onlyRole(CURATOR_ROLE);
 function setMaxPriceAge(uint64 seconds_) external onlyRole(DEFAULT_ADMIN_ROLE);
 
 error PriceUnavailable(address asset);
-error PriceStale(address asset, uint64 recordedAt, uint64 maxAge);
+error PriceStale(address asset, uint64 updatedAt, uint64 maxAge);
 error AggregatorNotTrusted(address aggregator);
-error NegativeAnswer(int256 answer);
+error NonPositiveAnswer(int256 answer);
+error AssetNotRegistered(address asset);
+error NoPriceLogs();
 ```
+
+> **Perubahan dari spesifikasi awal, dan alasannya:**
+> - `toUsd1e18(asset, amount, assetDecimals)` → `tryToUsd1e18(asset, amount)`.
+>   Struct `Fact` on-chain **tidak memuat desimal aset**, jadi `CreditGraph` —
+>   satu-satunya pemanggil — tidak punya cara memasoknya. Registry menyimpannya
+>   sendiri lewat `registerAsset`. Ia juga mengembalikan flag ketersediaan, karena
+>   `CreditGraph` harus membedakan "harganya nol" dari "harganya tidak diketahui":
+>   asimetri di `scoring.md` §2 bergantung penuh pada perbedaan itu.
+> - `setAggregator` → `trustAggregator`/`untrustAggregator`. Namanya menyatakan
+>   yang sebenarnya terjadi: ini **himpunan** aggregator tepercaya, bukan satu
+>   slot per aset (T5).
+> - Parameter `aggregator` dihapus dari `recordPrice`, sehingga satu transaksi
+>   yang memperbarui beberapa feed tercakup sekaligus.
+
+### Layout event `AnswerUpdated` — jebakan tersendiri
+
+```solidity
+event AnswerUpdated(int256 indexed current, uint256 indexed roundId, uint256 updatedAt);
+```
+
+| Bagian | Isi |
+|---|---|
+| `topics[1]` | **`current` — HARGANYA** |
+| `topics[2]` | `roundId` |
+| `data[0]` | `updatedAt` |
+
+> ⚠️ **`current` adalah parameter INDEXED** — harganya ada di **topic**, bukan di
+> `data`. Ini kebalikan dari pola Aave/Morpho, di mana jumlah selalu non-indexed.
+>
+> Kalau seseorang membaca `data[0]` sebagai harga, yang ia dapat adalah
+> `updatedAt` — angka sekitar 1,8×10⁹. Pada feed berdesimal 8, itu terbaca sebagai
+> **$18**: harga yang sepenuhnya masuk akal untuk banyak token. **Kesalahannya
+> tidak akan terlihat seperti kesalahan.** Dikunci sebagai
+> `test_PriceComesFromTopicNotData`.
 
 ### Catatan keamanan
 
@@ -742,6 +781,21 @@ error NegativeAnswer(int256 answer);
 - **`answer` bertipe `int256`.** Tolak nilai negatif — jangan cast ke `uint256` begitu saja.
 - **Kesegaran wajib ditegakkan di titik baca**, bukan hanya saat tulis. Attestation lag
   ~8 menit dan indexer bisa mati; `EfficiencyMarket` harus membeku, bukan memakai harga basi.
+- **Kesegaran diukur dari `updatedAt` yang TERBUKTI, bukan `recordedAt`.** Berbeda
+  dari `Fact.observedAt`, `updatedAt` ada di dalam `data` log Chainlink sehingga ia
+  bagian dari yang dibuktikan Merkle proof. Kalau `recordedAt` yang dipakai, harga
+  berumur seminggu yang baru saja di-backfill akan terlihat **segar sempurna**.
+- **Monotonisitas ronde wajib.** Ronde lama yang di-prove belakangan tidak boleh
+  menimpa harga baru — dan indexer memang memproses backfill setelah data segar,
+  jadi ini bukan skenario teoretis.
+- **`tryToUsd1e18` TIDAK BOLEH revert, dan itu ditegakkan lewat batas kewarasan
+  jumlah (`1e60`).** Ia dipanggil dari `CreditGraph.applyFact`, yang dipanggil dari
+  `FactRegistry.recordFact`. Satu revert di sini = fakta sah **hilang permanen**,
+  karena `queryId`-nya sudah tertandai. Mengandalkan `try/catch` pemanggil saja
+  tidak cukup: janjinya harus dipegang di sini.
+- **Desimal token didaftarkan eksplisit, tidak pernah diasumsikan 18.** Aset tanpa
+  desimal terdaftar mengembalikan "tidak tersedia". Salah desimal membuat seluruh
+  nilai USD aset itu meleset 10⁶–10¹² kali tanpa gejala apa pun.
 
 ### Kasus uji
 | # | Skenario | Ekspektasi |

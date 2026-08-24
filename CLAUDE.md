@@ -217,6 +217,11 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   `SupplyCollateral`, `WithdrawCollateral`, dan `AbsorbDebt` yang tidak ambigu.
 - **Aggregator Chainlink bisa berganti** saat upgrade feed. Resolve `aggregator()`
   dari proxy secara berkala; simpan himpunan aggregator tepercaya, jangan hardcode satu.
+- **Di `AnswerUpdated`, harganya ada di TOPIC, bukan `data`.** `current` adalah
+  parameter indexed: `topics[1]` = harga, `topics[2]` = roundId, `data[0]` = updatedAt.
+  Membaca `data[0]` sebagai harga menghasilkan timestamp ~1,8e9, yang pada feed
+  berdesimal 8 terbaca sebagai **$18** — masuk akal, dan karena itu tidak akan
+  terlihat seperti kesalahan.
 - **Dokumentasi Creditcoin memakai path lama.** `docs.creditcoin.org/creditcoin-usc`
   sekarang 404. Pakai `docs.creditcoin.org/attestcoin-protocol`.
 - **Nama "USC" masih ada di mana-mana** (nama repo, paket npm, nama kontrak) meski
