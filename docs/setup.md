@@ -156,9 +156,24 @@ Untuk reset total (hapus data): `docker compose down -v`.
 
 ## 4. Variabel lingkungan
 
+**Satu file `.env` untuk seluruh repo** — kontrak, indexer, API, dan frontend semuanya
+membaca file yang sama di root. Tidak ada `.env` kedua di `apps/web` atau `services/*`.
+
 ```bash
 cp .env.example .env
 ```
+
+Next.js hanya membaca file env di dalam direktorinya sendiri, jadi `apps/web/.env.local`
+dibuat sebagai **symlink** ke `.env` root:
+
+```bash
+pnpm env:link      # dipanggil otomatis oleh `pnpm dev:web` dan `pnpm build:web`
+```
+
+Symlink, bukan salinan — supaya tetap satu file fisik dan tidak mungkin melenceng.
+Kalau `apps/web/.env.local` sudah terlanjur jadi file biasa, `pnpm env:link` akan
+menolak dan menyuruh kamu memindahkan isinya ke `.env` root dulu, bukan diam-diam
+menimpanya.
 
 Isi tiap variabel sesuai tabel berikut. Kolom "Dibutuhkan oleh" menandai siapa yang
 benar-benar memakainya — kalau kamu Dev B, boleh biarkan kosong variabel yang

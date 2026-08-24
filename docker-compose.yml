@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: corolary
-      POSTGRES_PASSWORD: corolary
+      POSTGRES_PASSWORD: corolary_dev
       POSTGRES_DB: corolary
     ports:
       - '5432:5432'
