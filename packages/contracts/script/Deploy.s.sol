@@ -44,7 +44,19 @@ contract Deploy is Script {
         address admin = vm.envAddress("DEPLOYER_ADDRESS");
         address recorder = vm.envAddress("SUBMITTER_ADDRESS");
 
-        vm.startBroadcast();
+        // Kunci dibaca dari .env oleh Foundry sendiri, BUKAN dioper lewat
+        // `--private-key` di baris perintah: argumen CLI terlihat di daftar
+        // proses seluruh mesin (`ps aux`), dan kunci deployer memegang seluruh
+        // ownership kontrak. Foundry memuat .env dari root proyek Foundry —
+        // `packages/contracts/.env`, yang `pnpm env:link` sambungkan ke .env root.
+        uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+
+        // Kalau kunci dan alamat tidak sepasang, seluruh grantRole di bawah akan
+        // revert satu per satu dengan pesan AccessControl yang membingungkan.
+        // Lebih baik gagal di sini, dengan sebabnya jelas.
+        require(vm.addr(deployerKey) == admin, "DEPLOYER_PRIVATE_KEY bukan milik DEPLOYER_ADDRESS");
+
+        vm.startBroadcast(deployerKey);
 
         FactRegistry registry = new FactRegistry(admin);
         CreditGraph graph = new CreditGraph(admin, address(registry));

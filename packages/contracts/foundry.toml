@@ -14,10 +14,20 @@ optimizer_runs = 200
 # Corolary, jadi via_ir tidak opsional di repo ini.
 via_ir = true
 
-# Konservatif sampai dukungan opcode CC3 Testnet diverifikasi langsung.
-# `paris` menghindari PUSH0/MCOPY/TSTORE. Naikkan ke shanghai/cancun hanya
-# setelah dibuktikan di chain, bukan berdasarkan asumsi.
-evm_version = "paris"
+# `london`, bukan `paris`, dan ini DIPAKSA OLEH CHAIN — bukan pilihan gaya.
+#
+# Blok CC3 Testnet tidak memuat `mixHash` sama sekali (diperiksa langsung ke
+# RPC: field-nya tidak ada, bukan bernilai nol). Pada EVM paris ke atas, revm
+# menurunkan `prevrandao` dari field itu, sehingga `forge script --rpc-url
+# cc3-testnet` berhenti sebelum menjalankan satu baris pun dengan
+# "header validation error: `prevrandao` not set". Menyetel `block_prevrandao`
+# di config TIDAK menolong — nilainya tetap diambil dari header fork.
+# `london` memakai `difficulty`, yang CC3 memang kembalikan (0x0).
+#
+# Aman untuk repo ini: tidak ada kontrak yang membaca `block.prevrandao` atau
+# `block.difficulty`, dan tidak ada yang memakai PUSH0/MCOPY/TSTORE — jadi
+# london justru lebih konservatif tanpa mengubah perilaku.
+evm_version = "london"
 
 # Test membaca proof Ethereum mainnet ASLI dari docs/samples — bukan fixture.
 fs_permissions = [{ access = "read", path = "../../docs/samples" }]
