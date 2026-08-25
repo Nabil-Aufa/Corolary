@@ -908,61 +908,78 @@ curl -s https://api.corolary.xyz/v1/market/positions/0x1234567890AbcdEF123456789
 
 ### Respons Sukses — `200`
 
-```json
-{
-  "ok": true,
-  "data": {
-    "subject": "0x1234567890AbcdEF1234567890aBcdef12345678",
-    "tier": 3,
-    "collateralRatioBps": 12000,
-    "totalCollateralUsd": "18500.40",
-    "totalDebtUsd": "12100.00",
-    "healthFactorBps": 15330,
-    "positions": [
-      {
-        "asset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-        "symbol": "WETH",
-        "decimals": 18,
-        "supplied": "6200000000000000000",
-        "borrowed": "0",
-        "collateralEnabled": true
-      },
-      {
-        "asset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-        "symbol": "USDC",
-        "decimals": 6,
-        "supplied": "0",
-        "borrowed": "12100000000",
-        "collateralEnabled": false
-      }
-    ],
-    "updatedAt": 1787399820,
-    "onChainBlock": 1284790
-  }
-}
-```
-
-### Contoh Respons — Alamat Tanpa Posisi
+Contoh nyata dari CC3 Testnet: dompet deployer, punya kolateral tapi nol utang.
 
 ```json
 {
-  "ok": true,
-  "data": {
-    "subject": "0x00000000000000000000000000000000dEaDBe",
-    "tier": 0,
-    "collateralRatioBps": 15000,
-    "totalCollateralUsd": "0.00",
-    "totalDebtUsd": "0.00",
-    "healthFactorBps": null,
-    "positions": [],
-    "updatedAt": 1787399820,
-    "onChainBlock": 1284790
-  }
+    "ok": true,
+    "data": {
+        "subject": "0x4e83Fa344E529f4c03948691BDD5A9A83384ED05",
+        "tier": 0,
+        "collateralRatioBps": 15000,
+        "totalCollateralUsd": "12284.96",
+        "totalDebtUsd": "0.00",
+        "healthFactorBps": null,
+        "capitalSavedUsd": "0.00",
+        "positions": [
+            {
+                "asset": "0x66f5F2C577ec38CE5bb7BCb7054a531a72004d19",
+                "symbol": "tUSDC",
+                "decimals": 6,
+                "supplied": "9999500274",
+                "borrowed": "0",
+                "collateralEnabled": false
+            },
+            {
+                "asset": "0x886E3d92314c037206bB789Ee3A9016EE67b661E",
+                "symbol": "tWETH",
+                "decimals": 18,
+                "supplied": "5000000000000000000",
+                "borrowed": "0",
+                "collateralEnabled": true
+            }
+        ],
+        "updatedAt": 1787679291,
+        "onChainBlock": 5372740
+    }
 }
 ```
 
-`healthFactorBps` bernilai `null` ketika `totalDebtUsd` adalah `"0.00"` (rasio
-tak terdefinisi saat tidak ada utang), bukan `Infinity` (tidak valid di JSON).
+### Contoh Respons — Dompet Berskor Tinggi Tanpa Posisi
+
+Dompet demo berskor 813 (tier 4). Perhatikan `collateralRatioBps` sudah **11000**
+walau ia belum meminjam apa pun.
+
+```json
+{
+    "ok": true,
+    "data": {
+        "subject": "0x94963B928498bE7f06637C3D57ea1E74D7f73423",
+        "tier": 4,
+        "collateralRatioBps": 11000,
+        "totalCollateralUsd": "0.00",
+        "totalDebtUsd": "0.00",
+        "healthFactorBps": null,
+        "capitalSavedUsd": "0.00",
+        "positions": [],
+        "updatedAt": 1787679296,
+        "onChainBlock": 5372740
+    }
+}
+```
+
+`healthFactorBps` bernilai `null` ketika tidak ada utang — rasionya memang tak
+terdefinisi, dan `Infinity` bukan JSON yang sah. Kontrak mengembalikan
+`type(uint256).max` untuk kasus ini; API **tidak** meneruskannya apa adanya,
+karena UI yang merendernya akan menampilkan health factor
+900.719.925.474.099.100%.
+
+`capitalSavedUsd` adalah modal yang tidak perlu dikunci berkat skor, dibanding
+baseline 150% — `debtUsd × (15000 − collateralRatioBps) / 10000`. Ia **nol**
+dalam dua keadaan yang sama-sama normal: dompet tanpa riwayat terbukti (rasionya
+masih baseline), dan dompet berskor tinggi yang belum meminjam apa pun.
+Penghematan dihitung terhadap utang yang benar-benar ada, bukan terhadap utang
+yang mungkin diambil.
 
 ### Respons Error
 

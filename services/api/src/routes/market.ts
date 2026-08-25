@@ -222,8 +222,15 @@ marketRoutes.get('/market/positions/:address', async (c) => {
     // healthFactor berskala WAD di kontrak; kontrak API memakai bps (10000 = 1.0).
     // Tanpa utang, kontrak mengembalikan nilai maksimum — dipotong supaya tidak
     // meluap saat dijadikan number.
+    // null, BUKAN MAX_SAFE_INTEGER. Kontrak mengembalikan type(uint256).max
+    // saat tidak ada utang; meneruskannya sebagai angka membuat UI menampilkan
+    // health factor 900.719.925.474.099.100%. docs/api.md sudah menjanjikan
+    // null sejak awal — kodenya yang menyimpang.
     healthFactorBps:
-      acct[3] >= 2n ** 200n ? Number.MAX_SAFE_INTEGER : Number((acct[3] * 10_000n) / 10n ** 18n),
+      acct[3] >= 2n ** 200n ? null : Number((acct[3] * 10_000n) / 10n ** 18n),
+    capitalSavedUsd: wadToUsd(
+      (await market.getFunction('capitalSavedUsdWad')(subject)) as bigint,
+    ),
     positions,
     updatedAt: Math.floor(Date.now() / 1000),
     onChainBlock: await creditcoin.getBlockNumber(),

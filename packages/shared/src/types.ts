@@ -243,8 +243,28 @@ export interface AccountPositions {
   collateralRatioBps: number;
   totalCollateralUsd: UsdAmount;
   totalDebtUsd: UsdAmount;
-  /** 10000 = 1.0. Di bawah 10000 berarti dapat dilikuidasi. */
-  healthFactorBps: number;
+  /**
+   * 10000 = 1.0. Di bawah 10000 berarti dapat dilikuidasi.
+   *
+   * `null` ketika tidak ada utang — rasionya memang tak terdefinisi, dan
+   * `Infinity` bukan JSON yang sah. JANGAN diganti dengan bilangan raksasa:
+   * kontrak mengembalikan `type(uint256).max` untuk kasus ini, dan meneruskannya
+   * apa adanya membuat UI menampilkan health factor 900.719.925.474.099.100%.
+   */
+  healthFactorBps: number | null;
+  /**
+   * Modal yang TIDAK perlu dikunci berkat skor, dibanding baseline 150%.
+   *
+   * Ini angka utama produk — seluruh pipeline bukti ada untuk menghasilkan
+   * satu bilangan ini. Rumusnya `debtUsd × (15000 − rasioEfektif) / 10000`,
+   * dibaca dari `EfficiencyMarket.capitalSavedUsdWad`.
+   *
+   * Bernilai `"0.00"` untuk dompet tanpa riwayat terbukti (rasionya masih
+   * baseline) DAN untuk dompet berskor tinggi yang belum meminjam apa pun —
+   * penghematan dihitung terhadap utang yang benar-benar ada, bukan terhadap
+   * utang yang mungkin diambil. Nol di sini normal, bukan tanda kerusakan.
+   */
+  capitalSavedUsd: UsdAmount;
   positions: PositionEntry[];
   updatedAt: UnixSeconds;
   onChainBlock: number;
