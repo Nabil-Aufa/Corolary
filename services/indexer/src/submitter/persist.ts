@@ -219,7 +219,7 @@ const ERC20_ABI = [
  * berubah, dan memanggilnya ke RPC Ethereum di setiap permintaan halaman API
  * akan membuat daftar fakta bergantung pada RPC pihak ketiga.
  */
-async function ensureAsset(asset: string): Promise<void> {
+export async function ensureAsset(asset: string): Promise<void> {
   const address = ethers.getAddress(asset);
   const existing = await sql`SELECT 1 FROM assets WHERE address = ${address}`;
   if (existing.length > 0) return;

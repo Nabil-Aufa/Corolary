@@ -16,7 +16,7 @@ prices.get('/prices', async (c) => {
     {
       asset: string; aggregator: string; answer: string; decimals: number;
       round_id: string; updated_at: string; source_block: string;
-      fact_id: string | null; symbol: string | null;
+      source_tx_hash: string; pair: string | null; symbol: string | null;
     }[]
   >`
     SELECT p.*, a.symbol FROM prices p
@@ -28,13 +28,16 @@ prices.get('/prices', async (c) => {
   const data: PriceEntry[] = rows.map((r) => ({
     asset: r.asset as Address,
     assetSymbol: r.symbol ?? '',
-    pair: `${r.symbol ?? '?'}/USD`,
+    // Label feed datang dari kolomnya sendiri, bukan disusun dari simbol aset:
+    // WBTC dihargai feed BTC/USD, dan "WBTC/USD" adalah feed lain yang tidak
+    // pernah kita baca.
+    pair: r.pair ?? '',
     aggregator: r.aggregator as Address,
     answer: r.answer,
     decimals: r.decimals,
     roundId: r.round_id,
     sourceBlock: Number(r.source_block),
-    factId: (r.fact_id ?? '0x') as Hex,
+    sourceTxHash: r.source_tx_hash as Hex,
     updatedAt: Number(r.updated_at),
     // Melewati maxPriceAge (24 jam) membuat pasar membeku untuk operasi yang
     // menambah risiko. Diekspos supaya UI bisa memperingatkan sebelum itu.

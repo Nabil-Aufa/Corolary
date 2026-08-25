@@ -31,13 +31,20 @@ Semua path di dokumen ini ditulis relatif terhadap `/v1`, mis. `GET /v1/health` 
 - Semua timestamp adalah **unix seconds** (`number`), bukan ISO string, bukan milidetik.
 - Semua alamat Ethereum/Creditcoin adalah string heksadesimal checksum-case
   `0x`-prefixed, 42 karakter (`Address` type di `packages/shared`).
-- Semua hash (`txHash`, `factId`, `creditcoinTxHash`) adalah string heksadesimal
-  `0x`-prefixed, 66 karakter (32 byte).
+- Semua hash (`txHash`, `factId`, `creditcoinTxHash`, `sourceTxHash`) adalah string
+  heksadesimal `0x`-prefixed, 66 karakter (32 byte).
 
 ### 0.2b Field yang bisa `null`, dan kenapa
 
-`amountUsd`, `priceUsd`, dan `priceFactId` bernilai `null` selama belum ada
+`amountUsd`, `priceUsd`, dan `priceSourceTxHash` bernilai `null` selama belum ada
 **harga terbukti** untuk aset tersebut di `PriceRegistry`.
+
+Sejak 2026-08-25 jalur harga Chainlink hidup dan tiga aset punya harga terbukti:
+**WETH** (feed ETH/USD), **WBTC** (feed BTC/USD), dan **USDC** (feed USDC/USD).
+Aset lain yang muncul di fakta — USDT, USDe, sUSDe, USDS, cbBTC — belum punya
+aggregator tepercaya, jadi `amountUsd` untuk fakta beraset itu tetap `null`.
+Ini keadaan permanen sampai kurator memanggil `trustAggregator`, bukan antrean
+yang sedang jalan.
 
 Ini bukan bug dan bukan data yang belum sempat diisi. Setiap angka USD di API
 ini harus bisa ditelusuri ke satu event `AnswerUpdated` Chainlink yang dibuktikan
@@ -826,45 +833,44 @@ curl -s https://api.corolary.xyz/v1/market/reserves
   "ok": true,
   "data": [
     {
-      "asset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-      "symbol": "USDC",
+      "asset": "0x66f5F2C577ec38CE5bb7BCb7054a531a72004d19",
+      "symbol": "tUSDC",
       "decimals": 6,
-      "totalSupplied": "3200000000000",
-      "totalBorrowed": "1450000000000",
-      "supplyApyBps": 412,
-      "borrowApyBps": 687,
-      "utilizationBps": 4531,
-      "priceUsd": "1.00006",
-      "priceFactId": "0x402b65a5f621ecfa2c726ae7e396fc2791df6ed060de6bef8d4d3df57b1d1815"
+      "totalSupplied": "0",
+      "totalBorrowed": "0",
+      "supplyApyBps": 0,
+      "borrowApyBps": 0,
+      "utilizationBps": 0,
+      "priceUsd": "0.99",
+      "priceSourceTxHash": "0x25466b36fdf34cfe1b767e4a64b7389cd96b32ec80a1d3d105d1560c5525321c"
     },
     {
-      "asset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-      "symbol": "WETH",
+      "asset": "0x886E3d92314c037206bB789Ee3A9016EE67b661E",
+      "symbol": "tWETH",
       "decimals": 18,
-      "totalSupplied": "820500000000000000000",
-      "totalBorrowed": "310200000000000000000",
-      "supplyApyBps": 195,
-      "borrowApyBps": 340,
-      "utilizationBps": 3781,
-      "priceUsd": "2429.33",
-      "priceFactId": "0x402b65a5f621ecfa2c726ae7e396fc2791df6ed060de6bef8d4d3df57b1d1815"
-    },
-    {
-      "asset": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-      "symbol": "WBTC",
-      "decimals": 8,
-      "totalSupplied": "1850000000",
-      "totalBorrowed": "622000000",
-      "supplyApyBps": 88,
-      "borrowApyBps": 210,
-      "utilizationBps": 3362,
-      "priceUsd": "77261.82",
-      "priceFactId": "0x402b65a5f621ecfa2c726ae7e396fc2791df6ed060de6bef8d4d3df57b1d1815"
+      "totalSupplied": "0",
+      "totalBorrowed": "0",
+      "supplyApyBps": 0,
+      "borrowApyBps": 0,
+      "utilizationBps": 0,
+      "priceUsd": "2511.24",
+      "priceSourceTxHash": "0x7f4c377c94034e24d8c9f49f579581ba8b1087605a6f6f319ba68f29ef18b659"
     }
   ],
-  "meta": { "total": 3 }
+  "meta": { "total": 2 }
 }
 ```
+
+Contoh di atas adalah respons SUNGGUHAN dari CC3 Testnet (2026-08-25). Reserve-nya
+adalah token testnet karena `EfficiencyMarket` berjalan di CC3, di mana USDC/WETH
+sungguhan tidak ada (open-issues B2). **Harganya tidak testnet**: `priceSourceTxHash`
+menunjuk ke transaksi Ethereum mainnet yang sungguhan, lewat
+`PriceRegistry.setPriceAlias` yang memetakan tUSDC→USDC dan tWETH→WETH. Alias itu
+di-resolve dari KONTRAK saat permintaan, bukan disalin ke SQL — aturan aliasnya
+milik kontrak, dan salinan kedua adalah salinan yang akan menyimpang.
+
+Saldo nol karena belum ada yang meminjam di pasar testnet; itu state sungguhan,
+bukan placeholder.
 
 > **Catatan `priceUsd`:** desimal string non-integer, **bukan** uint256 mentah —
 > ini nilai yang sudah dibagi `decimals` feed (8) untuk keterbacaan UI. Nilai
@@ -974,7 +980,17 @@ tak terdefinisi saat tidak ada utang), bukan `Infinity` (tidak valid di JSON).
 
 Harga terbukti terbaru per aset, dari `PriceRegistry` (di-mirror ke tabel `prices`),
 beserta umur bukti — menegakkan prinsip "nol oracle terpusat" (§2 `architecture.md`):
-tiap harga menunjuk ke `factId` event Chainlink `AnswerUpdated` yang membuktikannya.
+tiap harga menunjuk ke `sourceTxHash`, yaitu transaksi Ethereum yang memuat event
+`AnswerUpdated` yang membuktikannya.
+
+> **Kenapa bukan `factId`.** Harga bukan Fact. `PriceRegistry` menyimpan ronde
+> TERBARU per aset — bukan catatan permanen ber-ID seperti `FactRegistry` — jadi
+> tidak ada `factId` untuk ditunjuk. Artefak yang benar-benar bisa ditelusuri
+> adalah transaksi Ethereum-nya, dan itulah yang dikembalikan.
+
+> **`pair` adalah nama feed Chainlink, bukan simbol aset + "/USD".** WBTC dihargai
+> oleh feed **BTC/USD**; "WBTC/USD" adalah feed Chainlink yang berbeda (WBTC/BTC
+> dikali BTC/USD) yang tidak pernah kita baca. Sama untuk WETH ↔ ETH/USD.
 
 ### Parameter
 
@@ -993,47 +1009,53 @@ curl -s https://api.corolary.xyz/v1/prices
   "ok": true,
   "data": [
     {
-      "asset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-      "assetSymbol": "WETH",
-      "pair": "ETH / USD",
-      "aggregator": "0x7d4E742018fb52E48b08BE73d041C18B21de6Fb5",
-      "answer": "242933000000",
+      "asset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "assetSymbol": "USDC",
+      "pair": "USDC/USD",
+      "aggregator": "0xc9E1a09622afdB659913fefE800fEaE5DBbFe9d7",
+      "answer": "99993882",
       "decimals": 8,
-      "roundId": "18446744073709562841",
-      "sourceBlock": 25808301,
-      "factId": "0x402b65a5f621ecfa2c726ae7e396fc2791df6ed060de6bef8d4d3df57b1d1815",
-      "updatedAt": 1787392500,
-      "ageSeconds": 7500
+      "roundId": "1151",
+      "sourceBlock": 25830582,
+      "sourceTxHash": "0x25466b36fdf34cfe1b767e4a64b7389cd96b32ec80a1d3d105d1560c5525321c",
+      "updatedAt": 1787641259,
+      "ageSeconds": 2204
     },
     {
       "asset": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
       "assetSymbol": "WBTC",
-      "pair": "BTC / USD",
+      "pair": "BTC/USD",
       "aggregator": "0x4a3411ac2948B33c69666B35cc6d055B27Ea84f1",
-      "answer": "7726182000000",
+      "answer": "8071083412016",
       "decimals": 8,
-      "roundId": "18446744073709561902",
-      "sourceBlock": 25807912,
-      "factId": "0x402b65a5f621ecfa2c726ae7e396fc2791df6ed060de6bef8d4d3df57b1d1815",
-      "updatedAt": 1787389800,
-      "ageSeconds": 10200
+      "roundId": "23682",
+      "sourceBlock": 25830441,
+      "sourceTxHash": "0x57863a8ec71d04d0fe4928dbd9e3bfa97878e632aab9351b472f4f8909910806",
+      "updatedAt": 1787639555,
+      "ageSeconds": 3908
     },
     {
-      "asset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-      "assetSymbol": "USDC",
-      "pair": "USDC / USD",
-      "aggregator": "0xc9E1a09622afdB659913fefE800fEaE5DBbFe9d7",
-      "answer": "99994251",
+      "asset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "assetSymbol": "WETH",
+      "pair": "ETH/USD",
+      "aggregator": "0x7d4E742018fb52E48b08BE73d041C18B21de6Fb5",
+      "answer": "251124360000",
       "decimals": 8,
-      "roundId": "18446744073709560117",
-      "sourceBlock": 25806540,
-      "factId": "0x402b65a5f621ecfa2c726ae7e396fc2791df6ed060de6bef8d4d3df57b1d1815",
-      "updatedAt": 1787381220,
-      "ageSeconds": 18780
+      "roundId": "32938",
+      "sourceBlock": 25830607,
+      "sourceTxHash": "0x7f4c377c94034e24d8c9f49f579581ba8b1087605a6f6f319ba68f29ef18b659",
+      "updatedAt": 1787641559,
+      "ageSeconds": 1904
     }
-  ]
+  ],
+  "meta": { "total": 3 }
 }
 ```
+
+Contoh di atas adalah respons SUNGGUHAN dari jalur yang berjalan (2026-08-25),
+bukan angka ilustrasi. `roundId` di sini kecil karena ia nomor ronde milik
+**aggregator**, bukan `roundId` gabungan berfase yang dikembalikan proxy — event
+`AnswerUpdated` dipancarkan aggregator, jadi itulah yang terbukti.
 
 `roundId` adalah `uint80` di Chainlink — juga selalu string. `ageSeconds` dihitung
 server-side (`now - updatedAt`) saat respons dibentuk, bukan disimpan di DB.

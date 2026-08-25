@@ -9,7 +9,8 @@
     "backfill": "tsx src/backfill.ts",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/db/migrate.ts",
-    "mirror:rebuild": "tsx src/mirror-rebuild.ts"
+    "mirror:rebuild": "tsx src/mirror-rebuild.ts",
+    "prices:once": "tsx src/prices/once.ts"
   },
   "dependencies": {
     "@corolary/shared": "workspace:*",

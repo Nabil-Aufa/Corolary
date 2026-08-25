@@ -319,7 +319,7 @@ bagi demo. Pemilik: Dev A.
 
 ---
 
-### T5 · Rotasi aggregator Chainlink ✅ **SELESAI di kontrak**
+### T5 · Rotasi aggregator Chainlink ✅ **SELESAI**
 
 **Masalah.** Chainlink mengganti aggregator di balik proxy saat upgrade feed. Kalau
 kita hanya mempercayai satu alamat, feed **berhenti terbarui secara senyap** —
@@ -339,8 +339,68 @@ Chainlink melakukan upgrade — tidak ada jeda di mana harga berhenti terbarui.
 sehingga feed yang mati membekukan penilaian alih-alih menjalankannya dengan harga
 basi. Dikunci sebagai `test_TwoAggregatorsCanServeTheSameAsset`.
 
-**Sisa aksi (off-chain):** indexer memanggil `aggregator()` pada proxy setiap N blok
-dan memberi alert saat berubah. Pemilik: Dev A.
+**Terimplementasi 2026-08-25 (sisi indexer).** `initPrices()` di
+`services/indexer/src/prices/run.ts` memeriksa TIGA hal sekali per start, dan
+ketiganya gagal secara senyap kalau tidak diperiksa:
+
+1. aggregator di `feeds.ts` benar-benar dipercaya kontrak — kalau tidak,
+   `recordPrice` melewatinya **tanpa revert**, jadi biaya proof terbayar dan nol
+   harga tercatat;
+2. aggregator dipetakan ke aset yang kita kira — salah petakan berarti harga
+   benar disimpan di aset yang salah;
+3. `proxy.aggregator()` masih sama dengan yang dikonfigurasi — inilah deteksi
+   rotasinya.
+
+Ketiganya di-log pada level **error** dan menyebutkan panggilan kurator yang
+harus dijalankan. Diverifikasi live 2026-08-25: ketiga aggregator
+(`0x7d4E…6Fb5`, `0x4a34…84f1`, `0xc9E1…e9d7`) masih cocok dengan yang di-deploy.
+
+Pemeriksaan dilakukan per start, bukan "setiap N blok": rotasi aggregator adalah
+peristiwa berskala bulan, dan indexer di-restart jauh lebih sering daripada itu.
+
+---
+
+### T5b · Jalur harga Chainlink di indexer ✅ **SELESAI**
+
+**Masalah.** Kontrak `PriceRegistry` siap sejak deploy, tapi tidak ada yang
+mengisinya. Akibatnya `amountUsd`, `priceUsd`, dan `priceSourceTxHash` bernilai
+`null` di SELURUH API, dan `EfficiencyMarket` tidak bisa menilai kolateral —
+punchline "150% → 110%" tidak punya angka untuk ditampilkan.
+
+**Solusi yang dipilih: loop terpisah, bukan pipeline fakta.** Dua alasan yang
+masing-masing sudah cukup:
+
+- **Bentuk datanya berbeda.** `observed_events` mengejar KELENGKAPAN; harga hanya
+  butuh ronde TERBARU per aset, dan kontrak sendiri membuang `roundId` yang lebih
+  kecil. Mengalirkan harga lewat pipeline fakta berarti membeli proof untuk setiap
+  ronde setiap feed selamanya — terukur ~18 ronde ETH/USD per 3.000 blok — lalu
+  membuang hampir semuanya di kontrak.
+- **Tujuannya kontrak lain.** `recordPrice` ada di `PriceRegistry` dan hanya punya
+  varian tunggal; submitter fakta memanggil `recordFactBatch` di `FactRegistry`.
+
+Karena hanya ronde terbaru yang penting, loop ini **tanpa state**: tidak ada cursor,
+tidak ada antrean. Tiap putaran bertanya ke chain "ronde apa yang sudah kupunya?",
+lalu memindai mundur dari `finalized`. Restart di titik mana pun aman.
+
+**Ambang yang dipakai dan alasannya:**
+
+| Konstanta | Nilai | Kenapa |
+|---|---|---|
+| `REFRESH_AFTER_SECONDS` | 3.600 | jauh di bawah `maxPriceAge` 86.400, jadi kegagalan sementara punya 23 jam untuk pulih sebelum pasar membeku |
+| `MAX_LOOKBACK_BLOCKS` | 6.000 (~20 jam) | menjaga seluruh jalur harga di dalam jendela eager-proving 24 jam (2,59×10⁻⁵ vs 3,13×10⁻⁴ CTC) |
+| `SCAN_CHUNK_BLOCKS` | 3.000 | aggregator adalah kontrak yang jarang memancarkan log; terukur <500 ms per 3.000 blok di drpc, berbeda jauh dari Aave yang harus dipotong ke 500 |
+| `STALE_CONCERN_SECONDS` | 43.200 | di bawah ini, tidak adanya ronde baru adalah keadaan NORMAL — menaikkannya jadi `warn` akan menenggelamkan alarm sungguhan |
+
+**Terverifikasi live 2026-08-25.** Ketiga harga tercatat on-chain pada percobaan
+pertama: ETH/USD $2.511,24 (261.548 gas), BTC/USD $80.710,83 (286.636 gas),
+USDC/USD $0,99993882 (249.452 gas). Setelahnya 26 dari 40 fakta terbaru punya
+`amountUsd`, dan `tryToUsd1e18` untuk token alias mengembalikan nilai benar
+(1.000 tUSDC = $999,94; 1 tWETH = $2.511,24).
+
+**Yang masih terbuka:** hanya WETH/WBTC/USDC yang punya aggregator tepercaya.
+USDT, USDe, sUSDe, USDS, dan cbBTC muncul di fakta tanpa harga, jadi `amountUsd`
+untuk fakta beraset itu tetap `null`. Menambahkannya adalah panggilan
+`registerAsset` + `trustAggregator` oleh kurator, bukan pekerjaan kode.
 
 ---
 
@@ -402,7 +462,7 @@ untuk pembicaraan CEIP.
 | ✅ Selesai | **B3** kunci rasio + masa tenggang 7 hari | 2026-08-25 |
 | ✅ Selesai | **B4** model bunga linear kink | 2026-08-25 |
 | ✅ Selesai | **T5** himpunan aggregator + kesegaran di titik baca | 2026-08-25 |
-| 🟡 Sisa | **T5b** indexer memantau `aggregator()` proxy & alert | M3 |
+| ✅ Selesai | **T5b** jalur harga di indexer + deteksi rotasi aggregator | 2026-08-25 |
 | ✅ Selesai | **T4** Morpho — tabel pasar via `setMarket` | 2026-08-25 |
 | 🟠 Sedang | **T8** Compound V3 — pinjam/lunas aset dasar tidak dipetakan (aman, tapi tidak lengkap) | opsional |
 | 🟡 Rendah | **T6, T7** finalized tag, alert saldo gas | M2 |

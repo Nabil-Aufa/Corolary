@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import { sql } from '../lib/db.js';
 import { ok } from '../lib/envelope.js';
 import { parseAddress } from '../lib/validate.js';
-import { market, creditGraph, creditcoin, scaledToActual, wadToUsd, ensureCreditcoinAsset } from '../lib/chain.js';
+import { market, creditGraph, creditcoin, priceRegistry, scaledToActual, wadToUsd, ensureCreditcoinAsset } from '../lib/chain.js';
+import { ethers } from 'ethers';
 import type {
   AccountPositions, Address, Hex, MarketSummary, PositionEntry, Reserve, Tier,
 } from '@corolary/shared';
@@ -34,7 +35,7 @@ async function listReserves(): Promise<
   return out;
 }
 
-interface AssetMeta { symbol: string; decimals: number; answer: string | null; priceDecimals: number | null; factId: string | null }
+interface AssetMeta { symbol: string; decimals: number; answer: string | null; priceDecimals: number | null; sourceTxHash: string | null }
 
 async function assetMeta(addresses: string[]): Promise<Map<string, AssetMeta>> {
   if (addresses.length === 0) return new Map();
@@ -57,20 +58,61 @@ async function assetMeta(addresses: string[]): Promise<Map<string, AssetMeta>> {
 
   const rows = await sql<
     { address: string; symbol: string; decimals: number;
-      answer: string | null; price_decimals: number | null; fact_id: string | null }[]
+      answer: string | null; price_decimals: number | null; source_tx_hash: string | null }[]
   >`
     SELECT a.address, a.symbol, a.decimals,
-           p.answer, p.decimals AS price_decimals, p.fact_id
+           p.answer, p.decimals AS price_decimals, p.source_tx_hash
     FROM assets a LEFT JOIN prices p ON p.asset = a.address
     WHERE a.address = ANY(${addresses})
   `;
-  return new Map(
+  const meta = new Map(
     rows.map((r) => [
       r.address.toLowerCase(),
       { symbol: r.symbol, decimals: r.decimals, answer: r.answer,
-        priceDecimals: r.price_decimals, factId: r.fact_id },
+        priceDecimals: r.price_decimals, sourceTxHash: r.source_tx_hash },
     ]),
   );
+
+  await resolveAliasPrices(meta);
+  return meta;
+}
+
+/**
+ * Token pasar testnet (tUSDC/tWETH) tidak punya feed sendiri; mereka memakai
+ * harga aset mainnet lewat `PriceRegistry.setPriceAlias`. Pemetaan itu dibaca
+ * dari KONTRAK, bukan disalin ke SQL: aturan aliasnya milik kontrak, dan
+ * salinan kedua di query adalah salinan yang akan menyimpang.
+ *
+ * DESIMAL tetap milik token alias itu sendiri — hanya harganya yang dipinjam.
+ */
+const aliasCache = new Map<string, string | null>();
+
+async function resolveAliasPrices(meta: Map<string, AssetMeta>): Promise<void> {
+  for (const [address, m] of meta) {
+    if (m.answer !== null) continue;
+
+    let canonical = aliasCache.get(address);
+    if (canonical === undefined) {
+      try {
+        const resolved = (await priceRegistry.getFunction('priceAliasOf')(address)) as string;
+        canonical = resolved === ethers.ZeroAddress ? null : ethers.getAddress(resolved);
+      } catch {
+        canonical = null;
+      }
+      aliasCache.set(address, canonical);
+    }
+    if (!canonical) continue;
+
+    const rows = await sql<{ answer: string; price_decimals: number; source_tx_hash: string | null }[]>`
+      SELECT answer, decimals AS price_decimals, source_tx_hash
+      FROM prices WHERE asset = ${canonical}
+    `;
+    const p = rows[0];
+    if (!p) continue;
+    m.answer = p.answer;
+    m.priceDecimals = p.price_decimals;
+    m.sourceTxHash = p.source_tx_hash;
+  }
 }
 
 function usdOf(amount: bigint, decimals: number, m: AssetMeta | undefined): bigint {
@@ -138,7 +180,7 @@ marketRoutes.get('/market/reserves', async (c) => {
       priceUsd: m?.answer && m.priceDecimals !== null
         ? wadToUsd((BigInt(m.answer) * 10n ** 18n) / 10n ** BigInt(m.priceDecimals))
         : null,
-      priceFactId: (m?.factId ?? null) as Hex | null,
+      priceSourceTxHash: (m?.sourceTxHash ?? null) as Hex | null,
     };
   });
 

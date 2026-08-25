@@ -221,8 +221,11 @@ export interface Reserve {
   borrowApyBps: number;
   utilizationBps: number;
   priceUsd: UsdAmount | null;
-  /** Fakta harga yang menjadi dasar priceUsd — null bila harga tak tersedia. */
-  priceFactId: Hex | null;
+  /**
+   * Transaksi Ethereum yang membuktikan `priceUsd` — null bila harga tak
+   * tersedia. Lihat PriceEntry.sourceTxHash: harga tidak punya factId.
+   */
+  priceSourceTxHash: Hex | null;
 }
 
 export interface PositionEntry {
@@ -261,7 +264,12 @@ export interface PriceEntry {
   decimals: number;
   roundId: TokenAmount;
   sourceBlock: number;
-  factId: Hex;
+  /**
+   * Transaksi Ethereum yang memuat log `AnswerUpdated` ini — artefak yang
+   * dibuktikan. Harga bukan Fact: PriceRegistry menyimpan ronde terbaru per
+   * aset, bukan catatan permanen ber-ID, jadi tidak ada factId untuk ditunjuk.
+   */
+  sourceTxHash: Hex;
   updatedAt: UnixSeconds;
   /** Melewati maxPriceAge (24 jam) → pasar membeku. */
   ageSeconds: number;

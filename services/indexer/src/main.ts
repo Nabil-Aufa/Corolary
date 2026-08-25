@@ -8,6 +8,7 @@ import { waitOnce } from './attestation/waiter.js';
 import { proveOnce } from './prover/run.js';
 import { runEagerProveJobs } from './jobs/eagerProve.js';
 import { initSubmitter, submitOnce } from './submitter/submit.js';
+import { initPrices, refreshPricesOnce } from './prices/run.js';
 import {
   oldestUnprovenAgeSeconds,
   queueSizes,
@@ -28,6 +29,9 @@ const WAIT_INTERVAL_MS = 15_000; // ~1 blok Creditcoin
 const PROVE_INTERVAL_MS = 5_000;
 const SUBMIT_INTERVAL_MS = 5_000;
 const METRICS_INTERVAL_MS = 60_000;
+// Harga tidak butuh putaran cepat: ambang penyegarannya satu jam, dan tiap
+// putaran hanya satu eth_call per feed untuk memastikan.
+const PRICE_INTERVAL_MS = 120_000;
 
 let stopping = false;
 
@@ -85,10 +89,16 @@ async function main(): Promise<void> {
   try {
     await initSubmitter();
     loop('submitter', SUBMIT_INTERVAL_MS, submitOnce);
+
+    // Jalur harga berbagi kunci submitter, jadi ia berbagi urutan nonce dan
+    // HARUS hidup di proses yang sama: dua proses yang mengklaim nonce dari
+    // kunci yang sama akan saling menimpa transaksi.
+    await initPrices();
+    loop('prices', PRICE_INTERVAL_MS, refreshPricesOnce);
   } catch (err) {
     logger.warn(
       { err: String(err) },
-      'submitter tidak aktif — pipeline berhenti di status submitting',
+      'submitter/harga tidak aktif — pipeline berhenti di status submitting',
     );
   }
 

@@ -993,6 +993,98 @@ diperlukan untuk manajemen nonce yang tahan-restart.
 
 ---
 
+## 14b. Jalur Harga Chainlink (`prices` loop)
+
+Diimplementasikan 2026-08-25 di `services/indexer/src/prices/`. Loop **kelima**,
+dan satu-satunya yang tidak memakai `observed_events`.
+
+### 14b.1 Kenapa terpisah dari pipeline fakta
+
+| | Pipeline fakta | Jalur harga |
+|---|---|---|
+| Tujuan | KELENGKAPAN — tiap log harus tercatat, skor dihitung dari himpunan penuh | KESEGARAN — hanya ronde terbaru per aset yang berlaku |
+| Kontrak | `FactRegistry.recordFactBatch` (≤10 tx) | `PriceRegistry.recordPrice` (tunggal) |
+| State | `observed_events` + `proof_batches` + cursor | **tidak ada** |
+
+Mengalirkan harga lewat pipeline fakta berarti membeli proof untuk **setiap ronde
+setiap feed selamanya** — terukur ~18 ronde ETH/USD per 3.000 blok — lalu membuang
+hampir semuanya, karena `recordPrice` sendiri melewati `roundId <= p.roundId`.
+
+Karena hanya ronde terbaru yang penting, loop ini tanpa state: tiap putaran
+membaca `priceDataOf(asset)` dari chain, lalu memindai mundur dari `finalized`
+untuk ronde yang lebih baru. Restart di titik mana pun aman, dan database yang
+di-reset disamakan lagi dengan chain saat `initPrices()`.
+
+### 14b.2 Konstanta
+
+| Konstanta | Nilai | Kenapa |
+|---|---|---|
+| `REFRESH_AFTER_SECONDS` | 3.600 | jauh di bawah `maxPriceAge` on-chain (86.400), memberi 23 jam ruang pemulihan sebelum pasar membeku |
+| `MAX_LOOKBACK_BLOCKS` | 6.000 (~20 jam) | menjaga seluruh jalur harga di dalam jendela eager-proving 24 jam |
+| `SCAN_CHUNK_BLOCKS` | 3.000 | aggregator jarang memancarkan log; terukur <500 ms per 3.000 blok di drpc — bandingkan Aave yang harus dipotong ke 500 |
+| `STALE_CONCERN_SECONDS` | 43.200 | di bawah ini "tidak ada ronde baru" adalah keadaan NORMAL, bukan alarm |
+| `PRICE_INTERVAL_MS` | 120.000 | satu `eth_call` per feed per putaran; tidak ada gunanya lebih cepat dari ambang 1 jam |
+
+### 14b.3 Nonce dipakai bersama submitter fakta
+
+Loop harga memakai kunci yang **sama** dengan submitter fakta, jadi ia mengklaim
+nonce dari `submitter_state` yang sama dan **wajib hidup di proses yang sama**.
+Dua proses yang mengklaim nonce dari satu kunci akan saling menimpa transaksi.
+Karena itu `initPrices()` dipanggil di blok `try` yang sama dengan
+`initSubmitter()` di `main.ts` — kalau alamat kontrak belum ada, keduanya mati
+bersama, bukan salah satu saja.
+
+Diverifikasi live: setelah 25 batch fakta dan 3 harga, nonce on-chain (36) sama
+persis dengan `submitter_state.next_nonce` (36).
+
+### 14b.4 Tiga pemeriksaan saat start
+
+`initPrices()` memeriksa hal yang semuanya gagal **secara senyap**:
+
+1. **aggregator dipercaya kontrak?** Kalau tidak, `recordPrice` melewatinya tanpa
+   revert — biaya proof terbayar, nol harga tercatat, nol error.
+2. **dipetakan ke aset yang benar?** Salah petakan = harga benar di aset salah.
+3. **`proxy.aggregator()` masih sama?** Ini deteksi rotasi feed (T5).
+
+Ketiganya di-log level `error` dan menyebutkan panggilan kurator yang diperlukan.
+
+### 14b.5 Tabel `prices`
+
+```sql
+-- migrasi 0004, diubah oleh 0006 dan 0007
+CREATE TABLE prices (
+  asset              TEXT PRIMARY KEY,
+  aggregator         TEXT NOT NULL,
+  pair               TEXT,             -- nama feed Chainlink, BUKAN simbol+"/USD"
+  answer             NUMERIC(78,0) NOT NULL,
+  decimals           SMALLINT NOT NULL,
+  round_id           NUMERIC(78,0) NOT NULL,
+  updated_at         BIGINT NOT NULL,  -- waktu Ethereum, TERBUKTI
+  source_block       BIGINT NOT NULL,
+  source_tx_hash     TEXT,             -- transaksi Ethereum pemuat AnswerUpdated
+  creditcoin_tx_hash TEXT,             -- transaksi recordPrice
+  recorded_at        BIGINT
+);
+```
+
+`fact_id` di migrasi `0004` **diganti nama** jadi `source_tx_hash` oleh `0006`:
+harga bukan Fact, `PriceRegistry` tidak menurunkan `factId`, dan kolom itu
+menjanjikan sesuatu yang tidak pernah ada.
+
+`pair` disimpan, tidak disusun dari simbol aset: WBTC dihargai feed **BTC/USD**,
+dan "WBTC/USD" adalah feed Chainlink lain yang tidak pernah kita baca.
+
+### 14b.6 Menjalankan satu putaran manual
+
+```bash
+pnpm --filter @corolary/indexer prices:once
+```
+
+Mengisi harga pertama kali tanpa menjalankan seluruh indexer. **Jangan** dijalankan
+bersamaan dengan indexer — keduanya mengklaim nonce dari kunci yang sama.
+
+---
+
 ## 15. Mode Kegagalan & Penanganan
 
 | Mode kegagalan | Deteksi | Penanganan |

@@ -299,6 +299,35 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   setiap iterasi warp ke detik yang SAMA dan loopnya diam-diam tidak memajukan
   waktu sama sekali — tesnya tetap hijau sambil menguji hal yang salah. Lacak
   waktu di variabel lokal (`t += 1 days; vm.warp(t);`).
+- **`roundId` proxy Chainlink ≠ `roundId` di event `AnswerUpdated`.** Proxy
+  mengembalikan roundId gabungan berfase (`phaseId << 64 | aggregatorRound`,
+  angka ~1,8e19), sementara event dipancarkan **aggregator** dan membawa nomor
+  ronde miliknya sendiri — ETH/USD ada di 32.938, USDC/USD di 1.151. Karena
+  monotonisitas `PriceRegistry` diperiksa terhadap nilai dari event, mencampur
+  keduanya sekali saja akan menyimpan roundId raksasa yang membuat **setiap
+  ronde berikutnya ditolak diam-diam** lewat `roundId <= p.roundId`, dan harga
+  membeku permanen tanpa satu pun error.
+- **Aggregator Chainlink adalah kontrak yang JARANG memancarkan log, jadi
+  `eth_getLogs` rentang lebar di sana murah.** Terukur di drpc 2026-08-25:
+  3.000 blok selesai <500 ms untuk ketiga feed, padahal Aave di rentang yang
+  sama harus dipotong ke 500. Batas chunk memang harus per-kontrak, bukan
+  global — dan arahnya bisa ke DUA sisi, tidak selalu mengecil.
+- **Jangan susun label pasangan harga dari simbol aset.** WBTC dihargai oleh feed
+  **BTC/USD**; "WBTC/USD" adalah feed Chainlink yang benar-benar berbeda
+  (WBTC/BTC dikali BTC/USD). Menyusunnya dari simbol membuat API mengaku membaca
+  feed yang tidak pernah disentuh. Sama untuk WETH ↔ ETH/USD.
+- **Harga TIDAK boleh lewat pipeline fakta.** Pipeline fakta mengejar
+  kelengkapan; harga hanya butuh ronde terbaru, dan `recordPrice` sendiri
+  membuang `roundId` yang lebih kecil. Mengalirkannya ke sana berarti membeli
+  proof untuk ~18 ronde ETH/USD per 3.000 blok lalu membuang hampir semuanya.
+  Loop harga terpisah dan tanpa state.
+- **Loop harga WAJIB satu proses dengan submitter fakta.** Keduanya memakai kunci
+  submitter yang sama, jadi keduanya mengklaim nonce dari baris
+  `submitter_state` yang sama. Dua proses = nonce saling menimpa.
+- **`PriceRegistry.setPriceAlias` di-resolve dari KONTRAK di sisi API, bukan
+  disalin ke SQL.** Join `prices` per alamat akan mengembalikan `null` untuk
+  tUSDC/tWETH walaupun `tryToUsd1e18` on-chain menjawab benar — dan itu terlihat
+  seperti "harga belum ada", bukan seperti join yang salah.
 - **Token testnet dinilai lewat `PriceRegistry.setPriceAlias`.** `tUSDC`/`tWETH`
   tidak punya feed Chainlink sendiri, dan satu aggregator hanya bisa menunjuk satu
   aset. Alias membuat mereka memakai harga mainnet yang benar-benar dibuktikan —
