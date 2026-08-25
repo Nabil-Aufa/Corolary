@@ -604,95 +604,148 @@ curl -s https://api.corolary.xyz/v1/score/0x1234567890AbcdEF1234567890aBcdef1234
 
 ### Respons Sukses — `200`
 
+Contoh nyata: dompet demo, skor 813 (tier 4).
+
 ```json
 {
-  "ok": true,
-  "data": {
-    "subject": "0x1234567890AbcdEF1234567890aBcdef12345678",
-    "score": 742,
-    "tier": 3,
-    "collateralRatioBps": 12000,
-    "components": [
-      {
-        "key": "repaymentVolume",
-        "label": "Volume pelunasan",
-        "points": 265,
-        "maxPoints": 300,
-        "factCount": 14,
-        "factIds": [
-          "0xa680d3c5d1d79302e99566b95840e65404eb025789d38d0008ac879a93ceb975",
-          "0x7ce0d37c06f0059c0aace8ea5991503c32de87a9140e4bbf237705352928e16a"
-        ]
-      },
-      {
-        "key": "repaymentCount",
-        "label": "Jumlah pelunasan tepat waktu",
-        "points": 180,
-        "maxPoints": 200,
-        "factCount": 14,
-        "factIds": [
-          "0xa680d3c5d1d79302e99566b95840e65404eb025789d38d0008ac879a93ceb975"
-        ]
-      },
-      {
-        "key": "historyDuration",
-        "label": "Durasi riwayat",
-        "points": 140,
-        "maxPoints": 200,
-        "factCount": 22,
-        "factIds": []
-      },
-      {
-        "key": "liquidationPenalty",
-        "label": "Penalti likuidasi",
-        "points": 0,
-        "maxPoints": 0,
-        "factCount": 0,
-        "factIds": []
-      },
-      {
-        "key": "protocolDiversity",
-        "label": "Diversitas protokol",
-        "points": 97,
-        "maxPoints": 100,
-        "factCount": 22,
-        "factIds": []
-      },
-      {
-        "key": "activeStanding",
-        "label": "Status aktif saat ini",
-        "points": 60,
-        "maxPoints": 200,
-        "factCount": 22,
-        "factIds": []
-      }
-    ],
-    "factCount": 22,
-    "firstFactAt": 1774310400,
-    "lastFactAt": 1787396040,
-    "computedAt": 1787399700,
-    "onChainBlock": 1284790
-  }
+    "ok": true,
+    "data": {
+        "subject": "0x94963B928498bE7f06637C3D57ea1E74D7f73423",
+        "score": 813,
+        "tier": 4,
+        "collateralRatioBps": 11000,
+        "components": [
+            {
+                "key": "repaymentVolume",
+                "label": "Volume pelunasan",
+                "points": 297,
+                "maxPoints": 300,
+                "factCount": 72,
+                "factIds": [
+                    "0x1eaf52b3798479582a00254c835f0bd394fb703e63683c7528598bda7ec6a43d",
+                    "0xd082a1e76fc34c3fabf37c7a4a2af485a3d6fe0a8039786ffe8cf5cf3feca281",
+                    "0x721b3f4246795a21e652d9fadd9843c660112a8a51ec5b7a9b32f23783b7ebf8",
+                    "0x3865076f4ad395ecb311db5ce5ceec8d4607a7a782be29ed06a8b3668cdd7264",
+                    "0x1b6d488789af73ff364715f6426c51b190be12806a621a0ded9b84f184b06152",
+                    "0x3988e969891d80292fdd3faa8715110fddb8b0372579353df9b9881a542b5482",
+                    "0x668a682fdb7c0dfd8c771df41ab47b07849f798359c2d3045991d0050ad57e20",
+                    "0xe0e67d37e8b8266ec5ba34947b9429c8aacf262991612bb7c8b5df6620b9ea1c",
+                    "0x373bdb9422556307d2c06191953d8a88e76c47d419d40487454f213b2851f738",
+                    "0xd28b68f0f4de1d9e2a4e7b4b4d0eca8d6053aec59b12840fe98ca93a587245a5"
+                ]
+            },
+            {
+                "key": "repaymentCount",
+                "label": "Jumlah pelunasan",
+                "points": 171,
+                "maxPoints": 200,
+                "factCount": 72,
+                "factIds": [
+                    "0x1eaf52b3798479582a00254c835f0bd394fb703e63683c7528598bda7ec6a43d",
+                    "0xd082a1e76fc34c3fabf37c7a4a2af485a3d6fe0a8039786ffe8cf5cf3feca281",
+                    "0x721b3f4246795a21e652d9fadd9843c660112a8a51ec5b7a9b32f23783b7ebf8",
+                    "0x3865076f4ad395ecb311db5ce5ceec8d4607a7a782be29ed06a8b3668cdd7264",
+                    "0x1b6d488789af73ff364715f6426c51b190be12806a621a0ded9b84f184b06152",
+                    "0x3988e969891d80292fdd3faa8715110fddb8b0372579353df9b9881a542b5482",
+                    "0x668a682fdb7c0dfd8c771df41ab47b07849f798359c2d3045991d0050ad57e20",
+                    "0xe0e67d37e8b8266ec5ba34947b9429c8aacf262991612bb7c8b5df6620b9ea1c",
+                    "0x373bdb9422556307d2c06191953d8a88e76c47d419d40487454f213b2851f738",
+                    "0xd28b68f0f4de1d9e2a4e7b4b4d0eca8d6053aec59b12840fe98ca93a587245a5"
+                ]
+            },
+            {
+                "key": "historyDuration",
+                "label": "Lama riwayat",
+                "points": 95,
+                "maxPoints": 200,
+                "factCount": 0,
+                "factIds": []
+            },
+            {
+                "key": "liquidationPenalty",
+                "label": "Penalti likuidasi",
+                "points": 0,
+                "maxPoints": 300,
+                "factCount": 0,
+                "factIds": []
+            },
+            {
+                "key": "protocolDiversity",
+                "label": "Diversitas protokol",
+                "points": 50,
+                "maxPoints": 100,
+                "factCount": 139,
+                "factIds": [
+                    "0x1eaf52b3798479582a00254c835f0bd394fb703e63683c7528598bda7ec6a43d",
+                    "0xd082a1e76fc34c3fabf37c7a4a2af485a3d6fe0a8039786ffe8cf5cf3feca281",
+                    "0x721b3f4246795a21e652d9fadd9843c660112a8a51ec5b7a9b32f23783b7ebf8",
+                    "0x3865076f4ad395ecb311db5ce5ceec8d4607a7a782be29ed06a8b3668cdd7264",
+                    "0x1b6d488789af73ff364715f6426c51b190be12806a621a0ded9b84f184b06152",
+                    "0xbe1004a9d8c8390bef2bf2c74b28eb20e2073ada57bfb4dcf10c8a5ddf4245f9",
+                    "0xcd49039ef07248ffe6637057359fdd22566b3ae6c349f9dec97ef76b0081b385",
+                    "0xa49efaf3a0d997f1133366e3e3b8aa04c36167b471d658e718a8dd3fbe29bfdf",
+                    "0x3988e969891d80292fdd3faa8715110fddb8b0372579353df9b9881a542b5482",
+                    "0x668a682fdb7c0dfd8c771df41ab47b07849f798359c2d3045991d0050ad57e20"
+                ]
+            },
+            {
+                "key": "activeStanding",
+                "label": "Status aktif",
+                "points": 200,
+                "maxPoints": 200,
+                "factCount": 129,
+                "factIds": [
+                    "0x1eaf52b3798479582a00254c835f0bd394fb703e63683c7528598bda7ec6a43d",
+                    "0xd082a1e76fc34c3fabf37c7a4a2af485a3d6fe0a8039786ffe8cf5cf3feca281",
+                    "0x721b3f4246795a21e652d9fadd9843c660112a8a51ec5b7a9b32f23783b7ebf8",
+                    "0x3865076f4ad395ecb311db5ce5ceec8d4607a7a782be29ed06a8b3668cdd7264",
+                    "0x1b6d488789af73ff364715f6426c51b190be12806a621a0ded9b84f184b06152",
+                    "0xb5423aada02c813a051329269a54e4d00f96e51253d935d620f5a5c51b65caad",
+                    "0x3988e969891d80292fdd3faa8715110fddb8b0372579353df9b9881a542b5482",
+                    "0x668a682fdb7c0dfd8c771df41ab47b07849f798359c2d3045991d0050ad57e20",
+                    "0xe0e67d37e8b8266ec5ba34947b9429c8aacf262991612bb7c8b5df6620b9ea1c",
+                    "0x105058c791fdd3c20e8b48c64b86a38ae2354ca0cd88da4bed138a92e80f0870"
+                ]
+            }
+        ],
+        "factCount": 264,
+        "firstFactAt": 1758648299,
+        "lastFactAt": 1787630591,
+        "computedAt": 1787675436,
+        "onChainBlock": 5372485
+    }
 }
 ```
 
+**`factIds` dipotong ke 10 terbaru, `factCount` tidak.** Di respons di atas
+`repaymentVolume` menunjuk `factCount: 72` tapi hanya membawa 10 id. UI yang
+menganggap `factIds.length === factCount` akan mengaku menampilkan seluruh bukti
+padahal tidak. Untuk daftar penuh, pakai `GET /v1/facts?subject=…`.
+
+`liquidationPenalty` punya `maxPoints: 300` dan `points` yang **boleh negatif**;
+komponen lain selalu nol atau positif. `historyDuration` selalu
+`factIds: []` karena ia diturunkan dari `firstFactAt`, bukan dari satu fakta
+tertentu.
+
 ### Contoh Respons — Alamat Tanpa Riwayat
+
+`components` adalah array KOSONG, bukan enam komponen bernilai nol.
 
 ```json
 {
-  "ok": true,
-  "data": {
-    "subject": "0x00000000000000000000000000000000dEaDBe",
-    "score": 0,
-    "tier": 0,
-    "collateralRatioBps": 15000,
-    "components": [],
-    "factCount": 0,
-    "firstFactAt": null,
-    "lastFactAt": null,
-    "computedAt": 1787399700,
-    "onChainBlock": 1284790
-  }
+    "ok": true,
+    "data": {
+        "subject": "0x000000000000000000000000000000000000dEaD",
+        "score": 0,
+        "tier": 0,
+        "collateralRatioBps": 15000,
+        "components": [],
+        "factCount": 0,
+        "firstFactAt": null,
+        "lastFactAt": null,
+        "computedAt": 1787679517,
+        "onChainBlock": 5372755
+    }
 }
 ```
 

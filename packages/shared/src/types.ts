@@ -110,7 +110,16 @@ export interface ScoreComponent {
   points: number;
   maxPoints: number;
   factCount: number;
-  /** Bukti pendukung. Bisa kosong untuk komponen turunan (mis. historyDuration). */
+  /**
+   * Bukti pendukung — **paling banyak 10**, yang terbaru lebih dulu.
+   *
+   * `factIds.length` BUKAN `factCount`. Untuk dompet demo, `factCount` 72
+   * sementara `factIds` hanya 10; menganggap keduanya sama membuat UI mengaku
+   * menampilkan seluruh bukti padahal tidak.
+   *
+   * Kosong untuk komponen turunan yang tidak ditopang fakta tertentu
+   * (`historyDuration` dihitung dari `firstFactAt`, bukan dari satu fakta).
+   */
   factIds: Hex[];
 }
 
