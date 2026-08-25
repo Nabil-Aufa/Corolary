@@ -220,7 +220,38 @@ batch gagal (kemungkinan besar ya, karena mengembalikan satu `bool`).
 terbukti sebaliknya. Indexer harus bisa jatuh ke mode per-transaksi saat satu batch
 gagal, agar satu transaksi buruk tidak memblokir sembilan yang sehat.
 
-**Aksi:** uji + implementasi fallback. Pemilik: Dev A.
+**Diuji live 2026-08-25 di CC3 Testnet** terhadap precompile asli, memakai proof
+transaksi Ethereum mainnet sungguhan. 25 batch berukuran 1-10 transaksi lolos
+`verifyAndEmit`, menghasilkan 150 fakta dari 59 dompet, nol kegagalan.
+
+Terukur, dan inilah pembenaran strategi batching:
+
+| Ukuran batch | Gas |
+|---|---|
+| 10 transaksi | 4.198.654 |
+| 1 transaksi | 1.314.292 |
+
+Sepuluh pengiriman tunggal akan menghabiskan ~13,1 juta gas; satu batch berisi
+sepuluh menghabiskan 4,2 juta. **~3x lebih murah**, di atas penghematan biaya proof
+yang sudah ada karena satu continuity proof dibagi bersama.
+
+**Yang BELUM terbukti, dan jangan dianggap terjawab:**
+
+- Perilaku semua-atau-tidak-sama-sekali **tidak pernah teramati**, karena tidak ada
+  satu pun batch yang gagal. Asumsinya tetap berlaku dan fallback per-transaksi tetap
+  wajib ada.
+- Apakah tinggi blok harus menaik: seluruh batch uji kebetulan sudah terurut menaik.
+- Batas rentang di perbatasan (span tepat 999 vs 1000) tidak diuji di chain; yang
+  ditegakkan adalah `_verifyBatch` kita sendiri, yang menolak `span >= 1000`.
+
+**Fallback per-transaksi sudah diimplementasikan** di `services/indexer/src/submitter/
+submit.ts`: batch yang revert dipecah menjadi pengiriman tunggal, dan tiap kegagalan
+tunggal diklasifikasikan sendiri (`skip` untuk tx sumber yang revert atau duplikat,
+`fatal` untuk dompet kosong). Jalurnya ada dan bertipe benar, tapi **belum pernah
+dieksekusi di chain** karena belum ada batch yang gagal.
+
+**Aksi tersisa:** picu satu batch gagal secara sengaja untuk mengeksekusi jalur
+fallback. Pemilik: Dev A.
 
 ---
 
