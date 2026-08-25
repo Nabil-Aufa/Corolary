@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/db/migrate.ts",
     "mirror:rebuild": "tsx src/mirror-rebuild.ts",
-    "prices:once": "tsx src/prices/once.ts"
+    "prices:once": "tsx src/prices/once.ts",
+    "test": "tsx --test"
   },
   "dependencies": {
     "@corolary/shared": "workspace:*",
