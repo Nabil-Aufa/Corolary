@@ -415,7 +415,7 @@ me-resolve token, lalu memicu alert supaya kurator mendaftarkan pasar baru.
 
 ---
 
-### T8 · Compound V3: pinjam/lunas aset dasar tidak bisa dibedakan dari satu log 🟠
+### T8 · Compound V3: pinjam/lunas aset dasar tidak bisa dibedakan dari satu log ✅ **DIPUTUSKAN — biarkan**
 
 **Masalah.** Saldo aset dasar Comet **bertanda** — positif menyuplai, negatif meminjam.
 `supplyBase` memecah jumlahnya jadi porsi *repay* + porsi *supply*; `withdrawBase`
@@ -449,8 +449,37 @@ Biayanya: seluruh array log harus di-ABI-encode ulang untuk **setiap** panggilan
 adapter — kira-kira O(n²) terhadap ukuran log. Ukur dulu sebelum berkomitmen; anggaran
 gas `recordFact` sudah didominasi decode receipt (T2).
 
-**Aksi:** biarkan seperti sekarang kecuali volume pelunasan Compound terbukti penting
-bagi demo. Pemilik: Dev A.
+**Diputuskan 2026-08-25 dengan data produksi.** Kriterianya — "kecuali volume
+pelunasan Compound terbukti penting bagi demo" — sekarang bisa diukur, dan
+jawabannya tidak.
+
+| Protokol | Fakta | Dompet | % registry |
+|---|---|---|---|
+| Aave V3 | 3.479 | 844 | **78,7** |
+| Morpho Blue | 753 | 121 | 17,0 |
+| Spark | 169 | 41 | 3,8 |
+| **Compound V3** | **20** | 13 | **0,5** |
+
+Compound menyumbang **0,5%** seluruh registry, dan dompet demo
+`0x94963B928498bE7f06637C3D57ea1E74D7f73423` punya **nol** fakta Compound. Kedua puluh
+faktanya `CollateralSupplied` (9) dan `CollateralWithdrawn` (11) — tidak satu pun
+jenis yang ambigu, jadi tidak ada yang hilang karena keputusan ini.
+
+Mengejar fidelitas penuh berarti mengubah `IProtocolAdapter.decodeLog` menerima
+seluruh array log — biaya O(n²) terhadap jumlah log, pada anggaran gas yang **sudah**
+didominasi decode receipt (T2: 47,4 gas/byte, dan decode adalah mayoritasnya).
+Membayar itu untuk 0,5% registry yang tidak menyentuh dompet demo adalah pertukaran
+yang jelas buruk.
+
+**Penjagaannya ada di level FILTER, bukan adapter.** `services/indexer/src/watcher/
+protocols.ts` tidak memantau topic `Supply`/`Withdraw` aset dasar sama sekali, jadi
+log ambigu itu tidak pernah masuk pipeline — bukan disaring belakangan. Ongkos
+keamanannya nol, dan tidak ada jalur kode yang bisa keliru memetakannya nanti.
+
+**Tinjau ulang HANYA kalau** Compound naik jauh di atas 0,5%, atau kalau dompet demo
+berpindah ke dompet yang riwayat Compound-nya nyata. Sampai itu terjadi: biarkan.
+Pemilik: Dev A.
+
 
 ---
 
@@ -600,7 +629,7 @@ untuk pembicaraan CEIP.
 | ✅ Selesai | **T5** himpunan aggregator + kesegaran di titik baca | 2026-08-25 |
 | ✅ Selesai | **T5b** jalur harga di indexer + deteksi rotasi aggregator | 2026-08-25 |
 | ✅ Selesai | **T4** Morpho — tabel pasar via `setMarket` | 2026-08-25 |
-| 🟠 Sedang | **T8** Compound V3 — pinjam/lunas aset dasar tidak dipetakan (aman, tapi tidak lengkap) | opsional |
+| ✅ Diputuskan | **T8** Compound V3 — biarkan tidak dipetakan; 0,5% registry, nol di dompet demo | 2026-08-25 |
 | 🟡 Rendah | **T6, T7** finalized tag, alert saldo gas | M2 |
 | 🟢 Pantau | **O1** kesiapan writability | berkala |
 
