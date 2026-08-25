@@ -1211,3 +1211,69 @@ bersamaan dengan indexer — keduanya mengklaim nonce dari kunci yang sama.
 | Dua instance indexer berjalan bersamaan (mis. deploy ganda) | `indexer_submitter_nonce_gap` tidak nol/naik aneh, error nonce di log | Lapis dedup §7 (DB unique constraint + `processedQueries` on-chain) mencegah duplikasi data; tapi ini kondisi yang harus diperbaiki di level deploy (pastikan `replicas: 1`), bukan sesuatu yang didesain untuk ditoleransi permanen |
 | Chainlink aggregator berganti di balik proxy | Event `AnswerUpdated` datang dari alamat baru yang belum ada di himpunan tepercaya | `ChainlinkAdapter` (`packages/contracts`) me-resolve `aggregator()` dari proxy secara berkala dan memperbarui himpunan tepercaya — sisi indexer memantau event dari **kedua** aggregator (lama & baru) selama masa transisi supaya tidak ada gap harga (lihat `architecture.md` §11) |
 | Adapter decode gagal (ABI mismatch/bug) | Exception saat decode log jenis event yang seharusnya dikenali | Non-retryable → `failed`, alert kritikal — ini bug kode, retry tidak akan memperbaikinya |
+
+---
+
+## 16. Dompet Demo (terverifikasi on-chain 2026-08-25)
+
+Dompet yang dipakai untuk demo skor dan efisiensi kolateral:
+
+**`0x94963B928498bE7f06637C3D57ea1E74D7f73423`**
+
+| Komponen | Poin | Maks |
+|---|---|---|
+| repaymentVolume | 297 | 300 |
+| repaymentCount | 171 | 200 |
+| historyDuration | 95 | 200 |
+| liquidationPenalty | 0 | −300 |
+| protocolDiversity | 50 | 100 |
+| activeStanding | 200 | 200 |
+| **Skor** | **813** | 1000 |
+
+Tier **4**, `collateralRatioBpsOf` = **11000** (110%). Dibaca dari
+`CreditGraph.componentsOf` / `scoreOf` di CC3 Testnet, bukan dihitung off-chain.
+
+### Bagaimana ia sampai ke sana
+
+| Langkah | Skor | Tier |
+|---|---|---|
+| Riwayat live saja | 763 | 3 |
+| + 127 tx Aave (24→6 bulan) | 797 | 3 |
+| + 2 tx Morpho (24→9 bulan) | **813** | **4** |
+
+Perhatikan langkah terakhir: **dua** transaksi, 0,000626 CTC, memindahkan 16 poin
+dan menembus ambang tier 4. Bukan karena volumenya, melainkan karena keduanya
+tertanggal **2025-09-23** — lebih tua dari fakta Aave mana pun yang kita punya —
+sehingga `firstFactAt` mundur 91 hari dan `historyDuration` naik 80 → 95.
+
+### Kenapa dompet ini, bukan yang lebih besar
+
+Kandidat pembanding `0x65c4C0517025Ec0843C9146aF266A2C5a2D148A2` punya riwayat
+jauh lebih panjang (`historyDuration` 133) dan ribuan transaksi, tapi hanya aktif
+di **satu** protokol. Karena `protocolDiversity` linear —
+`popcount(bitmap) * 100 / 4`, tepat 25 poin per protokol — plafonnya bisa dihitung
+tanpa memindai apa pun: **759**, bahkan bila ketiga protokol sisanya terisi penuh.
+
+Pelajaran yang lebih umum: **riwayat panjang dihargai paling sedikit.**
+`historyDuration` hanya bernilai 200 poin dan setengah-jenuh di 365 hari, jadi
+menggandakan kedalaman waktu memberi jauh lebih sedikit daripada yang terlihat.
+Yang menentukan adalah `repaymentVolume` (300 poin) dan cakupan protokol.
+
+### Reproduksi
+
+```bash
+pnpm --filter @corolary/indexer backfill -- \
+  --subject 0x94963B928498bE7f06637C3D57ea1E74D7f73423 \
+  --months 24 --until-months 6 --protocol aave-v3 --priority 10
+
+pnpm --filter @corolary/indexer backfill -- \
+  --subject 0x94963B928498bE7f06637C3D57ea1E74D7f73423 \
+  --months 24 --until-months 9 --protocol morpho-blue --priority 10
+```
+
+`--priority 10` menaruhnya di depan antrean latar; tanpa itu hasilnya baru
+terbaca berjam-jam kemudian. Exit code **2** berarti ada rentang yang tidak
+terbaca — riwayatnya berlubang, jalankan ulang perintah yang sama.
+
+Spark dan Compound V3 **kosong** untuk dompet ini (dipindai 9 bulan, nol log),
+jadi `protocolDiversity` 50 adalah plafonnya. Tidak perlu dipindai ulang.
