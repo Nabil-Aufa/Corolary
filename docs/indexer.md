@@ -936,11 +936,20 @@ yang benar. Yang terjadi lebih halus: filter memanen log milik dompet LAIN (mis.
 drpc free menolak rentang > **10.000 blok**, bahkan dengan filter topic — jadi
 `CHUNK = 10_000`, dan enam bulan = ~130 potongan × 2 filter per protokol.
 
-Jeda `PACE_MS = 250` bukan kehati-hatian berlebihan: 780 panggilan paralel
-membuat drpc membalas **HTTP 403 untuk semua permintaan rentang lebar** selama
-beberapa menit. Karena watcher live memakai RPC yang sama, backfill yang rakus
-bisa menjatuhkan indexer produksi. **Jangan jalankan backfill bersamaan dengan
-indexer.**
+Jeda `PACE_MS = 250` dipertahankan sebagai kehati-hatian, bukan sebagai
+tanggapan atas ban yang terbukti.
+
+> **Koreksi 2026-08-25.** Versi awal paragraf ini menyatakan bahwa 780 panggilan
+> paralel memicu ban 403 dari drpc, dan menyimpulkan backfill tidak boleh jalan
+> bersamaan dengan indexer. **Keduanya keliru.** 403 itu ternyata blokir
+> **User-Agent**: permintaan yang identik dijawab 403 untuk UA `Python-urllib`,
+> 429 untuk `curl`, dan dilayani normal untuk `Mozilla/5.0`. Skrip pengukuran
+> yang dipakai saat itu memakai Python tanpa UA eksplisit, jadi ia tidak pernah
+> berhasil sekali pun — dan nolnya terbaca seperti akibat beban.
+>
+> Yang benar-benar terukur soal beban hanyalah `"Request timeout on the free
+> plan"` untuk rentang lebar dan `"Batch of more than 3 requests"` untuk batch
+> JSON-RPC. Klaim "jangan jalankan bersamaan" tidak punya bukti dan dicabut.
 
 #### `--dry-run` menghitung batch SUNGGUHAN
 

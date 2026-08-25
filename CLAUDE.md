@@ -327,12 +327,19 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   Terukur atas 66 transaksi Aave sepanjang 180 hari: **27 batch**, bukan 7 —
   sepuluh di antaranya berisi satu transaksi. Efisiensi batching, inti model
   biaya untuk lalu lintas live, praktis hilang di backfill.
-- **drpc free menolak `eth_getLogs` rentang > 10.000 blok, bahkan dengan filter
-  topic** — dan burst permintaan rentang lebar memicu **HTTP 403 untuk SEMUA**
-  permintaan semacam itu selama beberapa menit. Terukur: 780 panggilan paralel
-  = ban sementara. Lalu lintas normal watcher (2.000 blok) tidak terpengaruh,
-  sehingga bannya mudah tidak terdeteksi. Karena watcher live memakai RPC yang
-  sama, **jangan jalankan backfill bersamaan dengan indexer**.
+- **drpc memblokir berdasarkan User-Agent, dan hasilnya terlihat seperti rate
+  limit.** Terukur pada permintaan yang IDENTIK: UA `Python-urllib` dijawab
+  **403 Forbidden**, `curl/8.7.1` dijawab **429**, dan `Mozilla/5.0` dilayani
+  normal. Skrip Python tanpa UA eksplisit karena itu **tidak akan pernah
+  berhasil sekali pun**, dan 403-nya sangat mudah salah didiagnosis sebagai ban
+  akibat terlalu banyak permintaan — kesimpulan itu sempat ditulis di sini dan
+  keliru. Setiap klien HTTP mentah ke RPC publik wajib memasang User-Agent.
+- **drpc free menolak `eth_getLogs` rentang > 10.000 blok** bahkan dengan filter
+  topic, dan batas itu **menyusut seiring umur blok**: pada blok ~20,57 juta
+  (≈24 bulan lalu) rentang 10.000 dijawab `"Request timeout on the free plan"`
+  sementara rentang 1.000 dilayani normal. Backfill bergerak MUNDUR, jadi
+  rentangnya harus adaptif — ukuran yang terbukti berhasil diingat untuk
+  potongan berikutnya, bukan direset tiap kali.
 - **Skor `historyDuration` memakai half-saturation, bukan linear.**
   `saturating(days, 365, 200)` berarti 365 hari hanya memberi 100 dari 200 poin,
   dan 730 hari memberi 133. Menggandakan jendela backfill dari 6 ke 12 bulan

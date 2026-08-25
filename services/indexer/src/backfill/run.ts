@@ -31,8 +31,23 @@ const log = stageLogger('backfill');
  * ditemukan, dan bendera `backfill = true`.
  */
 
-/** Batas keras drpc free plan: rentang > 10.000 blok ditolak, bahkan dengan filter topic. */
-const CHUNK = 10_000;
+/**
+ * Rentang AWAL per permintaan. Menyusut sendiri kalau provider menolak.
+ *
+ * 10.000 adalah batas keras drpc free untuk blok baru, bahkan dengan filter
+ * topic. Tapi batas itu tidak tetap: untuk blok tua, permintaan yang sama
+ * habis waktu. Terukur pada blok ~20,57 juta (≈24 bulan lalu), rentang 10.000
+ * dijawab `"Request timeout on the free plan"` sementara rentang 1.000 dilayani
+ * normal dengan 81 log.
+ *
+ * Artinya biaya per blok naik seiring umur — dan backfill justru bergerak
+ * MUNDUR, makin lama makin tua. Karena itu rentangnya harus adaptif, bukan
+ * konstan.
+ */
+const INITIAL_CHUNK = 10_000;
+
+/** Di bawah ini menyusut lagi tidak menolong; providernya yang tidak sanggup. */
+const MIN_CHUNK = 500;
 
 /**
  * Jeda antar panggilan RPC.
@@ -51,7 +66,23 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 
 export interface BackfillOptions {
   subject: string;
+  /** Batas TERTUA yang dipindai, dalam bulan ke belakang dari head. */
   months: number;
+  /**
+   * Batas TERMUDA yang dipindai, dalam bulan ke belakang. 0 = sampai head.
+   *
+   * Ada karena skor tidak butuh riwayat yang LENGKAP, ia butuh riwayat yang
+   * PANJANG. `repaymentCount` jenuh sekitar 40 pelunasan dan `repaymentVolume`
+   * di 50 ribu USD; satu-satunya komponen yang benar-benar menuntut data lama
+   * adalah `historyDuration`, dan itu ditentukan oleh satu angka saja —
+   * `firstFactAt`.
+   *
+   * Terukur pada dompet nyata: 10% pertama dari rentang 24 bulan sudah
+   * menghasilkan 1.277 transaksi, memproyeksikan ~3.200 batch atau ~23 jam
+   * pengiriman CC3 untuk riwayat penuh. Memindai irisan tertua saja memberi
+   * kenaikan skor yang sama dengan biaya sepersekian.
+   */
+  untilMonths: number;
   protocols: string[] | null;
   dryRun: boolean;
 }
@@ -70,14 +101,17 @@ export async function backfillSubject(opts: BackfillOptions): Promise<void> {
   if (!head) throw new Error('RPC Ethereum tidak mengembalikan blok finalized');
 
   const blocks = Math.round((opts.months * 30.44 * 24 * 3600) / 12);
+  const skip = Math.round((opts.untilMonths * 30.44 * 24 * 3600) / 12);
   const floor = Math.max(0, head.number - blocks);
+  const ceiling = Math.max(floor, head.number - skip);
+  if (ceiling <= floor) throw new Error('--until-months harus lebih kecil dari --months');
 
   log.info(
     {
       subject,
       months: opts.months,
       fromBlock: floor,
-      toBlock: head.number,
+      toBlock: ceiling,
       protocols: targets.map((t) => t.protocol.name),
       dryRun: opts.dryRun,
     },
@@ -116,7 +150,7 @@ export async function backfillSubject(opts: BackfillOptions): Promise<void> {
           });
         };
 
-    const logs = await scanProtocol(target, subject, floor, head.number, onChunk, failures);
+    const logs = await scanProtocol(target, subject, floor, ceiling, onChunk, failures);
     found.push({
       protocolName: target.protocol.name,
       protocolAddress: target.protocol.address,
@@ -182,8 +216,14 @@ async function scanProtocol(
   const startedAt = Date.now();
   let calls = 0;
 
-  for (let to = head; to >= floor; to -= CHUNK) {
-    const from = Math.max(floor, to - CHUNK + 1);
+  // Ukuran yang sudah terbukti dipakai ulang untuk potongan berikutnya, bukan
+  // direset ke 10.000 tiap kali. Tanpa ini setiap potongan mengulang kegagalan
+  // yang sama dari awal: gagal di 10.000, gagal di 5.000, baru berhasil — tiga
+  // kali lipat panggilan untuk setiap potongan sepanjang sisa pemindaian.
+  let chunk = INITIAL_CHUNK;
+
+  for (let to = head; to >= floor; to -= chunk) {
+    const from = Math.max(floor, to - chunk + 1);
     const chunkLogs: ethers.Log[] = [];
 
     for (const filter of target.filters) {
@@ -192,7 +232,7 @@ async function scanProtocol(
       topics[filter.position] = padded;
       const shape = topics.slice(0, filter.position + 1);
 
-      const { logs, rpcCalls } = await fetchRange(
+      const { logs, rpcCalls, workedAt } = await fetchRange(
         target.protocol.address,
         shape,
         from,
@@ -201,6 +241,13 @@ async function scanProtocol(
         failures,
       );
       calls += rpcCalls;
+      if (workedAt !== null && workedAt < chunk) {
+        log.info(
+          { protocol: target.protocol.name, from: chunk, to: workedAt, block: from },
+          'rentang dikecilkan untuk blok yang lebih tua',
+        );
+        chunk = Math.max(MIN_CHUNK, workedAt);
+      }
 
       // Satu log bisa cocok dua filter kalau posisinya kebetulan sama-sama
       // memuat subjek (mis. dompet melunasi utangnya sendiri di Morpho, di mana
@@ -250,22 +297,32 @@ async function fetchRange(
   to: number,
   protocolName: string,
   failures: FailedRange[],
-): Promise<{ logs: ethers.Log[]; rpcCalls: number }> {
+): Promise<{ logs: ethers.Log[]; rpcCalls: number; workedAt: number | null }> {
+  const width = to - from + 1;
   try {
     const logs = await getLogsWithRetry({ address, topics, fromBlock: from, toBlock: to });
     await sleep(PACE_MS);
-    return { logs, rpcCalls: 1 };
+    return { logs, rpcCalls: 1, workedAt: width };
   } catch (err) {
-    if (to - from + 1 <= MIN_SPLIT) {
+    if (width <= MIN_SPLIT) {
       log.error({ protocol: protocolName, from, to, err: String(err) }, 'rentang menyerah');
       failures.push({ protocol: protocolName, from, to, reason: String(err) });
-      return { logs: [], rpcCalls: 1 };
+      return { logs: [], rpcCalls: 1, workedAt: null };
     }
     const mid = Math.floor((from + to) / 2);
-    log.warn({ protocol: protocolName, from, to }, 'rentang gagal, dipecah dua');
+    log.warn({ protocol: protocolName, from, to, width }, 'rentang gagal, dipecah dua');
     const lo = await fetchRange(address, topics, from, mid, protocolName, failures);
     const hi = await fetchRange(address, topics, mid + 1, to, protocolName, failures);
-    return { logs: [...lo.logs, ...hi.logs], rpcCalls: lo.rpcCalls + hi.rpcCalls };
+    return {
+      logs: [...lo.logs, ...hi.logs],
+      rpcCalls: lo.rpcCalls + hi.rpcCalls,
+      // Ukuran terkecil yang berhasil di antara kedua belahan — itulah yang
+      // sanggup dilayani provider di wilayah blok ini.
+      workedAt:
+        lo.workedAt === null ? hi.workedAt
+        : hi.workedAt === null ? lo.workedAt
+        : Math.min(lo.workedAt, hi.workedAt),
+    };
   }
 }
 

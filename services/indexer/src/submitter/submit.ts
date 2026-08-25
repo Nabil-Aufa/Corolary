@@ -22,8 +22,9 @@ export async function initSubmitter(): Promise<void> {
   factRegistry = new ethers.Contract(address, loadAbi('FactRegistry'), submitter);
   const nonce = await reconcileNonce();
   const reclaimed = await reclaimOrphanedBatches();
+  const requeued = await requeueOrphanedEvents();
   log.info(
-    { submitter: submitter.address, nonce, factRegistry: address, reclaimed },
+    { submitter: submitter.address, nonce, factRegistry: address, reclaimed, requeued },
     'submitter siap',
   );
 }
@@ -231,6 +232,36 @@ async function submitBatch(row: BatchRow): Promise<void> {
       WHERE batch_id = ${batchId}
     `;
   }
+}
+
+/**
+ * Event yang menggantung di belakang batch yang sudah tidak aktif.
+ *
+ * `reclaimOrphanedBatches` menyelamatkan BATCH-nya, tapi event bisa yatim
+ * dengan cara lain: batch-nya ditandai `stale` atau `failed` sementara
+ * event-nya tertinggal berstatus `submitting`. Tidak ada satu pun loop yang
+ * memilih event dalam keadaan itu — mereka berhenti selamanya, dan satu-satunya
+ * gejalanya adalah antrean yang tidak pernah benar-benar habis.
+ *
+ * Terukur 2026-08-25: 57 event tertinggal begini setelah pemulihan proof
+ * kedaluwarsa. Dikembalikan ke `proving` supaya proof baru dibeli.
+ */
+async function requeueOrphanedEvents(): Promise<number> {
+  const rows = await sql`
+    UPDATE observed_events oe
+    SET status = 'proving', batch_id = NULL, run_after = NULL,
+        last_error = 'dipulihkan: batch induk tidak aktif lagi'
+    WHERE oe.status = 'submitting'
+      AND NOT EXISTS (
+        SELECT 1 FROM proof_batches pb
+        WHERE pb.batch_id = oe.batch_id AND pb.status IN ('ready', 'submitting')
+      )
+    RETURNING 1
+  `;
+  if (rows.count > 0) {
+    log.warn({ events: rows.count }, 'event yatim dikembalikan ke antrean proving');
+  }
+  return rows.count;
 }
 
 /**

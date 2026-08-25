@@ -32,11 +32,19 @@ if (!Number.isFinite(months) || months <= 0) {
   process.exit(1);
 }
 
+const untilRaw = arg('until-months');
+const untilMonths = untilRaw === null ? 0 : Number(untilRaw);
+if (!Number.isFinite(untilMonths) || untilMonths < 0) {
+  logger.error({ untilRaw }, '--until-months harus angka >= 0');
+  process.exit(1);
+}
+
 const protocolRaw = arg('protocol');
 
 await backfillSubject({
   subject,
   months,
+  untilMonths,
   protocols: protocolRaw === null ? null : protocolRaw.split(',').map((s) => s.trim()),
   dryRun: process.argv.includes('--dry-run'),
 })
