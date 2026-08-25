@@ -35,7 +35,11 @@ jobs:
           # checkout yang tidak lengkap.
           submodules: recursive
 
-      - uses: pnpm/action-setup@v4.2.0
+      # corepack, bukan pnpm/action-setup: action itu masih menargetkan Node 20
+      # dan runner memaksanya ke 24 sambil memberi anotasi deprecation. corepack
+      # membaca `packageManager` dari package.json, jadi versinya tetap terkunci
+      # ke sumber yang sama.
+      - run: corepack enable
 
       - uses: actions/setup-node@v5
         with:
