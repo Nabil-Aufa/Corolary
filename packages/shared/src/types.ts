@@ -333,9 +333,16 @@ export interface ProveJob {
 
 /** Respons POST /v1/prove (202 Accepted) — subset ProveJob. */
 export interface ProveJobAccepted {
-  jobId: string;
+  /**
+   * `null` ketika transaksinya sudah tercatat sebagai Fact tanpa pernah lewat
+   * antrean job — jalur biasa untuk apa pun yang ditemukan watcher live.
+   * Tidak ada job untuk ditanyakan; `factId` yang membawa jawabannya.
+   */
+  jobId: string | null;
   status: ProveJobStatus;
   txHash: Hex;
   chainKey: number;
   createdAt: UnixSeconds;
+  /** Terisi begitu faktanya ada, entah lewat job ini atau lewat watcher. */
+  factId?: Hex;
 }

@@ -1181,21 +1181,32 @@ curl -s -X POST https://api.corolary.xyz/v1/prove \
 }
 ```
 
-Kalau `txHash` yang sama sudah pernah diminta dan masih ada di antrean/tersimpan
-sebagai `Fact` (dedup, lihat `docs/indexer.md` §7), API mengembalikan job/fact yang
-sudah ada alih-alih membuat duplikat:
+Kalau `txHash` yang sama sudah pernah diminta dan masih ada di antrean, API
+mengembalikan job yang sudah ada alih-alih membuat duplikat.
+
+Kalau transaksinya **sudah tercatat sebagai `Fact`**, API tidak membuat job sama
+sekali dan langsung menjawab dengan `factId`-nya. `jobId` bernilai `null` di
+kasus ini: fakta yang ditemukan watcher live tidak pernah lewat tabel `jobs`,
+jadi tidak ada apa pun untuk ditanyakan lewat `GET /v1/prove/:jobId`.
+
+Pemeriksaan itu **wajib ada**, bukan optimasi. Tanpanya setiap permintaan untuk
+transaksi yang sudah tercatat tetap membeli proof, membayarnya, lalu ditolak
+on-chain dengan `QueryAlreadyProcessed` dan diklasifikasi `skip` — biaya CTC
+nyata untuk hasil nol, dalam batas rate limit yang sah.
+
+Contoh nyata dari CC3 Testnet:
 
 ```json
 {
-  "ok": true,
-  "data": {
-    "jobId": "b2f1a6c4-8e3d-4f7a-9c1e-5d8b3f2a7c94",
-    "status": "recorded",
-    "txHash": "0x38e9d082a240e6bffdaf1591a753de71ce386ab30bbe1ad338de5edb6f92e939",
-    "chainKey": 3,
-    "createdAt": 1787396000,
-    "factId": "0xa680d3c5d1d79302e99566b95840e65404eb025789d38d0008ac879a93ceb975"
-  }
+    "ok": true,
+    "data": {
+        "jobId": null,
+        "status": "recorded",
+        "txHash": "0x9a0043b1188571c6ca69b1c93c0ae61b8e33e831a742b13ec74ea9f1d9b9b3bb",
+        "chainKey": 3,
+        "createdAt": 1787680140,
+        "factId": "0x05e9d1ab86d63b902696051bcb8b5582c0008ec9344a9990b383b62ba8e64e13"
+    }
 }
 ```
 

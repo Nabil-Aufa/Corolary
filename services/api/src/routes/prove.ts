@@ -34,6 +34,32 @@ prove.post('/prove', rateLimit({ perMinute: 10, burst: 5 }), async (c) => {
     invalidParam(`chainKey ${chainKey} tidak dilayani; hanya ${config.ETHEREUM_CHAIN_KEY}`);
   }
 
+  // Fakta yang SUDAH tercatat tidak boleh memicu job baru.
+  //
+  // Dedupe di bawah hanya melihat tabel `jobs`, jadi transaksi yang sudah lama
+  // masuk registry lewat watcher tetap diterima di sini: prover membeli proof,
+  // membayarnya, lalu submit-nya ditolak `QueryAlreadyProcessed` dan diklasifikasi
+  // `skip`. Biayanya nyata, hasilnya nol. Dengan rate limit 10/menit/IP, siapa pun
+  // bisa membakar CTC kita tanpa melanggar batas apa pun.
+  const already = await sql<{ fact_id: string; recorded_at: string }[]>`
+    SELECT fact_id, recorded_at FROM facts WHERE tx_hash = ${txHash} LIMIT 1
+  `;
+  const done = already[0];
+  if (done) {
+    const settled: ProveJobAccepted = {
+      // null, bukan fact_id: fakta ini tidak pernah punya job, dan menaruh
+      // factId di sini membuat GET /v1/prove/:jobId dipanggil dengan id yang
+      // tidak akan pernah ditemukan.
+      jobId: null,
+      status: 'recorded',
+      txHash,
+      chainKey,
+      createdAt: Number(done.recorded_at),
+      factId: done.fact_id as Hex,
+    };
+    return ok(c, settled, undefined, 202);
+  }
+
   const existing = await sql<{ id: string; status: string; created_at: Date }[]>`
     SELECT id, status, created_at FROM jobs
     WHERE kind = 'eager_prove' AND payload->>'txHash' = ${txHash}
