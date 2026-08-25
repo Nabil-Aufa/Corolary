@@ -329,6 +329,7 @@ async function report(
         blockHeight: l.blockNumber,
         txIndex: l.transactionIndex,
         observedAt: 0,
+        priority: 0,
       });
     }
   }

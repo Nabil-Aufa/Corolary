@@ -7,12 +7,13 @@
  *   skip         -> hasil sudah pasti dan BENAR (tx sumber revert, duplikat)
  *   fatal        -> butuh manusia (dompet kosong, bug, alamat salah)
  *   splitBatch   -> batch gagal utuh, coba anggotanya satu per satu
+ *   staleProof   -> proof-nya kedaluwarsa; harus dibeli ULANG, bukan dikirim ulang
  *
  * `skip` bukan kegagalan. Ia berarti sistem menolak sesuatu yang memang
  * seharusnya ditolak, dan mencampurnya dengan `fatal` membuat dashboard tidak
  * bisa membedakan "semua normal" dari "butuh perhatian sekarang".
  */
-export type SubmitVerdict = 'retryable' | 'skip' | 'fatal' | 'splitBatch';
+export type SubmitVerdict = 'retryable' | 'skip' | 'fatal' | 'splitBatch' | 'staleProof';
 
 export interface Classified {
   verdict: SubmitVerdict;
@@ -41,16 +42,48 @@ const SPLIT_ERRORS = new Set([
 const FATAL_ERRORS = new Set(['ChainKeyNotAllowed', 'TxIndexOutOfRange']);
 
 interface EthersLikeError {
-  revert?: { name?: string } | null;
+  revert?: { name?: string; args?: unknown[] } | null;
   shortMessage?: string;
   message?: string;
   code?: string;
 }
 
+/**
+ * Revert string yang berarti proof-nya KEDALUWARSA, bukan salah.
+ *
+ * Precompile menganggarkan continuity proof pada checkpoint tertentu. Checkpoint
+ * Creditcoin terus maju, jadi proof yang menganggur cukup lama berhenti cocok —
+ * meski isinya tidak pernah salah dan sudah dibayar.
+ *
+ * Ini menyanggah asumsi di docs/indexer.md §14 bahwa proof yang sudah dibayar
+ * "selamat dari restart". Ia selamat dari restart yang CEPAT. Terukur: 21 batch
+ * yang menganggur ~45 menit sementara submitter mati semuanya revert dengan
+ * pesan ini.
+ */
+const STALE_PROOF_MESSAGES = [
+  'continuity proof does not match',
+  'checkpoint',
+];
+
 export function classifySubmitError(err: unknown, isBatch: boolean): Classified {
   const e = (err ?? {}) as EthersLikeError;
   const revertName = e.revert?.name;
   const text = (e.shortMessage ?? e.message ?? String(err)).toLowerCase();
+
+  // `Error(string)` adalah revert BERPESAN standar Solidity, bukan custom error
+  // tak dikenal. Namanya selalu 'Error'; yang membawa informasi adalah args[0].
+  // Memperlakukannya sebagai "tak dikenal -> fatal" membuang satu-satunya
+  // petunjuk yang ada, dan menandai batch gagal permanen tanpa sebab tercatat.
+  if (revertName === 'Error') {
+    const reason = String(e.revert?.args?.[0] ?? '').trim();
+    const lower = reason.toLowerCase();
+    if (STALE_PROOF_MESSAGES.some((m) => lower.includes(m))) {
+      return { verdict: 'staleProof', reason: reason || 'continuity proof kedaluwarsa', revertName };
+    }
+    // Revert berpesan lain: sementara sampai terbukti sebaliknya, dan PESANNYA
+    // ikut dibawa supaya tidak hilang seperti sebelumnya.
+    return { verdict: 'retryable', reason: reason || 'revert tanpa pesan', revertName };
+  }
 
   if (revertName) {
     if (SKIP_ERRORS.has(revertName)) {

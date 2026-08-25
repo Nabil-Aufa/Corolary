@@ -1,5 +1,8 @@
 import { sql } from '../db/client.js';
 import { creditcoin, submitter } from '../chain/providers.js';
+import { stageLogger } from '../logger.js';
+
+const log = stageLogger('submitter');
 
 /**
  * Nonce dikelola eksplisit di aplikasi, bukan dari getTransactionCount('pending')
@@ -7,21 +10,44 @@ import { creditcoin, submitter } from '../chain/providers.js';
  * balancer, dan submitter adalah satu-satunya penulis dari kunci ini.
  */
 export async function reconcileNonce(): Promise<number> {
-  const onChain = await creditcoin.getTransactionCount(submitter.address, 'latest');
+  const [latest, pending] = await Promise.all([
+    creditcoin.getTransactionCount(submitter.address, 'latest'),
+    creditcoin.getTransactionCount(submitter.address, 'pending'),
+  ]);
   const rows = await sql<{ next_nonce: string }[]>`
     SELECT next_nonce FROM submitter_state WHERE id = 1
   `;
   const stored = rows[0] ? Number(rows[0].next_nonce) : 0;
 
-  // Ambil yang LEBIH BESAR. On-chain 'latest' adalah batas bawah yang pasti
-  // benar; nilai tersimpan melindungi dari mundur ke nonce yang sudah terpakai
-  // kalau ada tx yang belum ter-mine.
-  const next = Math.max(onChain, stored);
+  // LUBANG NONCE: nonce diklaim tapi transaksinya tidak pernah tersiar.
+  //
+  // Terjadi kalau proses mati di antara `claimNextNonce()` dan `send` — dan itu
+  // persis yang terjadi setiap kali indexer di-kill di tengah pengiriman.
+  // Akibatnya fatal dan senyap: setiap transaksi berikutnya memakai nonce di
+  // ATAS lubang, jadi tidak satu pun bisa masuk blok. Submitter tampak jalan,
+  // batch tampak terkirim, dan tidak ada yang pernah tercatat.
+  //
+  // `max(onChain, stored)` sendirian TIDAK bisa menyembuhkannya — ia justru
+  // mempertahankan lubangnya selamanya. Yang membedakan "ada tx menggantung di
+  // mempool" dari "nonce hangus" adalah selisih pending vs latest: kalau
+  // keduanya sama, tidak ada apa pun yang menggantung, sehingga nilai tersimpan
+  // yang lebih tinggi hanya bisa berarti lubang.
+  let next: number;
+  if (pending === latest && stored > latest) {
+    next = latest;
+  } else {
+    next = Math.max(pending, stored);
+  }
 
   await sql`
     INSERT INTO submitter_state ${sql({ id: 1, next_nonce: next })}
     ON CONFLICT (id) DO UPDATE SET next_nonce = ${next}
   `;
+  if (next !== stored) {
+    // Dicatat eksplisit: menggeser nonce adalah tindakan yang harus terlihat di
+    // log, bukan penyesuaian diam-diam.
+    log.warn({ latest, pending, stored, next }, 'nonce direkonsiliasi');
+  }
   return next;
 }
 

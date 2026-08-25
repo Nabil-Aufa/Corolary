@@ -169,3 +169,40 @@ export function splitToSingles(bundle: BatchBundleJson): SingleBundleJson[] {
     };
   });
 }
+
+/**
+ * Membungkus proof TUNGGAL menjadi bundle batch beranggota satu.
+ *
+ * Dibutuhkan karena endpoint batch Proof Builder menolak sebagian rentang blok
+ * lama dengan HTTP 500 dalam ~300 ms — bukan timeout, dan bukan karena proof-nya
+ * tidak ada: endpoint TUNGGAL melayani transaksi yang sama dengan sukses.
+ * Terukur pada tiga batch backfill dengan span 385, 392, dan 867 blok.
+ *
+ * Bentuk batch dipertahankan (bukan SingleBundleJson) supaya sisa pipeline —
+ * tabel proof_batches, submitter, pemulihan yatim — tidak perlu tahu bedanya.
+ * `sharedContinuityProof` milik transaksi itu sendiri; dengan satu anggota,
+ * "bersama" dan "milik sendiri" adalah hal yang sama.
+ */
+export function singleAsBatchBundle(
+  chainKey: number,
+  member: BatchMember,
+  data: {
+    headerNumber: number;
+    merkleProof: Merkle;
+    continuityProof: { lowerEndpointDigest: string; roots: string[] };
+    txBytes: string;
+  },
+): BatchBundleJson {
+  return {
+    chainKey,
+    heights: [data.headerNumber],
+    merkleProofs: [toMerkleJson(data.merkleProof)],
+    sharedContinuityProof: {
+      lowerEndpointDigest: data.continuityProof.lowerEndpointDigest,
+      roots: data.continuityProof.roots,
+    },
+    encodedTransactions: [data.txBytes],
+    observedAts: [member.observedAt],
+    txHashes: [member.txHash],
+  };
+}

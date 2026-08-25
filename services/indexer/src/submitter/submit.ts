@@ -4,7 +4,7 @@ import { submitter, ETH_CHAIN_KEY } from '../chain/providers.js';
 import { loadAbi } from '../chain/abi.js';
 import { requireContracts } from '../config.js';
 import { stageLogger } from '../logger.js';
-import { claimNextNonce, releaseNonce, reconcileNonce } from './nonce.js';
+import { claimNextNonce, reconcileNonce } from './nonce.js';
 import { classifySubmitError } from './errors.js';
 import { proofBuilder } from '../prover/client.js';
 import { splitToSingles, type BatchBundleJson, type SingleBundleJson } from '../prover/bundle.js';
@@ -21,7 +21,37 @@ export async function initSubmitter(): Promise<void> {
   const { factRegistry: address } = requireContracts();
   factRegistry = new ethers.Contract(address, loadAbi('FactRegistry'), submitter);
   const nonce = await reconcileNonce();
-  log.info({ submitter: submitter.address, nonce, factRegistry: address }, 'submitter siap');
+  const reclaimed = await reclaimOrphanedBatches();
+  log.info(
+    { submitter: submitter.address, nonce, factRegistry: address, reclaimed },
+    'submitter siap',
+  );
+}
+
+/**
+ * Batch yang ditinggalkan dalam status `submitting`.
+ *
+ * `submitOnce` hanya memilih batch berstatus `ready`, jadi batch yang prosesnya
+ * mati setelah ditandai `submitting` tidak akan pernah disentuh lagi — proof-nya
+ * sudah dibayar dan hilang begitu saja. Terukur: satu batch tersangkut sejak
+ * pukul 05:19 dan baru ketahuan empat jam kemudian, karena tidak ada gejala
+ * apa pun selain antrean yang tidak pernah habis.
+ *
+ * Aman dikirim ulang: kalau transaksinya ternyata SUDAH masuk chain,
+ * `_markProcessed` menolaknya dengan `QueryAlreadyProcessed`, yang
+ * diklasifikasikan sebagai `skip` — bukan kegagalan.
+ */
+async function reclaimOrphanedBatches(): Promise<number> {
+  const rows = await sql`
+    UPDATE proof_batches
+    SET status = 'ready', updated_at = now()
+    WHERE status = 'submitting'
+    RETURNING batch_id
+  `;
+  if (rows.count > 0) {
+    log.warn({ batches: rows.count }, 'batch yatim dikembalikan ke antrean');
+  }
+  return rows.count;
 }
 
 function registry(): ethers.Contract {
@@ -42,7 +72,7 @@ export async function submitOnce(): Promise<void> {
     WHERE batch_id = (
       SELECT batch_id FROM proof_batches
       WHERE status = 'ready' AND (run_after IS NULL OR run_after <= now())
-      ORDER BY created_at ASC
+      ORDER BY priority DESC, created_at ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED
     )
@@ -112,9 +142,59 @@ async function submitBatch(row: BatchRow): Promise<void> {
       'batch tercatat',
     );
   } catch (err) {
-    await releaseNonce(nonce);
+    // JANGAN sekadar `releaseNonce`. Melepas nonce mengandaikan transaksinya
+    // tidak pernah tersiar — dan pada RPC yang berkedip, andaian itu salah:
+    // transaksi SUDAH masuk blok sementara RPC membalas error yang tidak bisa
+    // diurai ("could not coalesce error"). Nonce yang dilepas lalu dipakai
+    // ulang menghasilkan "nonce has already been used", berulang tanpa henti —
+    // terukur 90 kali dalam setengah jam.
+    //
+    // Rekonsiliasi membaca kebenaran dari CHAIN, jadi ia menyembuhkan dua arah
+    // sekaligus: lubang nonce (klaim yang tidak pernah tersiar) maupun nonce
+    // yang telanjur terpakai.
+    await reconcileNonce();
     const verdict = classifySubmitError(err, true);
     log.warn({ batchId, verdict: verdict.verdict, reason: verdict.reason }, 'submit batch gagal');
+
+    // Proof kedaluwarsa TIDAK boleh dikirim ulang — isinya tidak akan pernah
+    // cocok lagi. Batch dibubarkan dan anggotanya dikembalikan ke tahap
+    // proving, supaya prover membeli proof BARU dan menyusun batch baru.
+    // Biaya proof-nya memang terbayar dua kali; tidak ada jalan lain.
+    if (verdict.verdict === 'staleProof') {
+      await sql.begin(async (t) => {
+        await t`
+          UPDATE proof_batches
+          SET status = 'stale', last_error = ${verdict.reason}, updated_at = now()
+          WHERE batch_id = ${batchId}
+        `;
+        await t`
+          UPDATE observed_events
+          SET status = 'proving', batch_id = NULL, last_error = ${verdict.reason},
+              attempts = attempts + 1, run_after = NULL
+          WHERE batch_id = ${batchId} AND status = 'submitting'
+        `;
+      });
+      log.warn({ batchId, reason: verdict.reason }, 'proof kedaluwarsa, dijadwalkan proving ulang');
+      return;
+    }
+
+    // Sudah tercatat on-chain — bisa terjadi pada batch yatim yang transaksinya
+    // ternyata berhasil. Bukan kegagalan; jangan diulang selamanya.
+    if (verdict.verdict === 'skip') {
+      await sql.begin(async (t) => {
+        await t`
+          UPDATE proof_batches SET status = 'done', last_error = ${verdict.reason},
+                 updated_at = now()
+          WHERE batch_id = ${batchId}
+        `;
+        await t`
+          UPDATE observed_events SET status = 'recorded', last_error = ${verdict.reason}
+          WHERE batch_id = ${batchId} AND status = 'submitting'
+        `;
+      });
+      log.info({ batchId, reason: verdict.reason }, 'batch sudah tercatat sebelumnya');
+      return;
+    }
 
     if (verdict.verdict === 'splitBatch') {
       await sql`
@@ -201,7 +281,17 @@ async function submitSingle(
     }
     log.info({ batchId, txHash: tx.hash, sourceTx: bundle.txHash }, 'fakta tercatat (tunggal)');
   } catch (err) {
-    await releaseNonce(nonce);
+    // JANGAN sekadar `releaseNonce`. Melepas nonce mengandaikan transaksinya
+    // tidak pernah tersiar — dan pada RPC yang berkedip, andaian itu salah:
+    // transaksi SUDAH masuk blok sementara RPC membalas error yang tidak bisa
+    // diurai ("could not coalesce error"). Nonce yang dilepas lalu dipakai
+    // ulang menghasilkan "nonce has already been used", berulang tanpa henti —
+    // terukur 90 kali dalam setengah jam.
+    //
+    // Rekonsiliasi membaca kebenaran dari CHAIN, jadi ia menyembuhkan dua arah
+    // sekaligus: lubang nonce (klaim yang tidak pernah tersiar) maupun nonce
+    // yang telanjur terpakai.
+    await reconcileNonce();
     const verdict = classifySubmitError(err, false);
 
     if (verdict.verdict === 'skip') {
@@ -214,8 +304,12 @@ async function submitSingle(
     }
 
     // Proof yang dipakai ulang dari batch mungkin memang tidak sah untuk
-    // panggilan tunggal. Beli proof tunggal sekali, lalu coba lagi.
-    if (verdict.verdict === 'retryable' && !isRetryWithFreshProof) {
+    // panggilan tunggal, dan proof yang kedaluwarsa pasti tidak. Keduanya
+    // sembuh dengan cara yang sama: beli proof baru sekali, lalu coba lagi.
+    if (
+      (verdict.verdict === 'retryable' || verdict.verdict === 'staleProof') &&
+      !isRetryWithFreshProof
+    ) {
       const fresh = await freshSingleBundle(bundle);
       if (fresh) {
         await submitSingle(batchId, fresh, true);

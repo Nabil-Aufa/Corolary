@@ -20,6 +20,8 @@ export interface ProvableTx {
   blockHeight: number;
   txIndex: number;
   observedAt: number;
+  /** 0 = latar. Lebih besar = didahulukan (permintaan pengguna). */
+  priority: number;
 }
 
 /**
