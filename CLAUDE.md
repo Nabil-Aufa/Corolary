@@ -98,8 +98,10 @@ uint256 melebihi `Number.MAX_SAFE_INTEGER`.
 tidak boleh pakai mock data. CC3 Testnet bisa membaca Ethereum **mainnet** asli — jadi
 kedua syarat terpenuhi sekaligus. Peserta lain akan pakai Sepolia dan token karangan.
 
-**RPC Ethereum harus archive-capable** (Alchemy/Infura/QuickNode). RPC publik menolak
-query log historis — sudah diuji dan gagal.
+**RPC Ethereum harus archive-capable DAN sanggup `eth_getLogs` 2000 blok.** Dua syarat
+terpisah. Diuji live 2026-08-25: **drpc** (`https://eth.drpc.org`) lulus keduanya tanpa
+perlu daftar; **Alchemy free tier lulus archive tapi membatasi `eth_getLogs` ke 10 blok**,
+jadi `CHUNK_SIZE = 2000` mustahil di sana.
 
 ---
 
@@ -229,6 +231,44 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
 - **Backend pakai ethers v6, frontend pakai viem/wagmi.** Disengaja — SDK Attestcoin
   memaksa ethers. Jangan diseragamkan; keduanya tak pernah bertemu di satu file.
 - **Kolom `amount` di Postgres harus `NUMERIC(78,0)`**, bukan `BIGINT`.
+- **`llamarpc` mengembalikan `eth_getLogs` KOSONG tanpa error.** Untuk rentang yang
+  benar-benar berisi 711 log Aave, ia menjawab `result: []` dengan status sukses. Tidak
+  ada exception, tidak ada retry yang terpicu — indexer akan menyimpulkan Aave sepi dan
+  melewatkan seluruh riwayat secara diam-diam. Karena itu RPC baru **wajib dicocokkan
+  hasilnya dengan provider kedua**, bukan sekadar dicek "tidak error".
+- **Jangan `JSON.stringify()` untuk kolom `jsonb` di postgres.js.** Driver-nya
+  sudah menserialisasi objek sendiri, jadi men-stringify lebih dulu menyimpan
+  nilainya sebagai **string JSON**, bukan objek: `jsonb_typeof` mengembalikan
+  `'string'` dan setiap operator `->` mengembalikan `NULL` **tanpa error**.
+  Terjadi di `proof_batches.payload` — submitter membaca `payload.heights` sebagai
+  `undefined`, dan itu baru ketahuan saat pengiriman pertama. Pakai objek polos
+  atau `sql.json(obj)`.
+- **`pkill -f 'tsx src/main.ts'` TIDAK mematikan indexer.** Command line aslinya
+  memuat path lengkap tsx cli, bukan string itu. Empat instance sempat berjalan
+  bersamaan tanpa disadari dan menghasilkan persis pola kerusakan di
+  `docs/indexer.md` §15: batch yatim tanpa event, dan campuran hasil dari dua
+  versi kode. Pakai `pkill -f 'Corolary/services/indexer'`, lalu verifikasi
+  dengan `pgrep` — jangan diasumsikan berhasil.
+- **ethers v6 diam-diam menggabungkan permintaan bersamaan jadi JSON-RPC batch.**
+  Begitu `getBlock` dijalankan paralel, ethers mengirim satu batch berisi 12
+  permintaan, dan drpc free plan menolak **seluruh batch** dengan HTTP 500
+  "Batch of more than 3 requests are not allowed". Yang gagal bukan satu
+  permintaan melainkan semuanya, dan errornya muncul sebagai server error
+  alih-alih rate limit sehingga mudah salah didiagnosis. Perbaikannya
+  `batchMaxCount: 3` di opsi provider, bukan membatalkan paralelisme —
+  paralelisme itu yang memangkas satu chunk Aave dari 39,6 detik ke 4,17 detik.
+- **Batas span batch adalah 999, bukan 1000.** `AttestcoinReader._verifyBatch`
+  menolak `span >= MAX_BATCH_BLOCK_RANGE`, jadi rentang tepat 1000 blok revert.
+  `docs/indexer.md` §10.4 menulis `span > 1000` dan itu off-by-one: batch dengan
+  span tepat 1000 lolos pemeriksaan sisi indexer lalu revert on-chain **setelah
+  proof-nya dibayar**.
+- **Biaya watcher ditentukan jumlah BLOK UNIK, bukan lebar rentang.** Chunk Aave
+  500 blok berisi 321 log tersebar di ~300 blok, dan tiap blok butuh satu
+  `getBlock` untuk timestamp. Compound dengan 1 log di rentang yang sama selesai
+  80x lebih cepat. Karena itu `chunkSize` diatur per protokol, bukan global.
+- **Di zsh, `set -- $VAR` TIDAK memecah kata.** Berbeda dari bash. Skrip verifikasi RPC
+  sempat mengirim `toBlock` kosong karena ini, dan kedua provider menjawab 0 log —
+  terlihat seperti temuan nyata padahal query-nya yang cacat.
 - **Di tes Foundry, jangan pakai `vm.warp(block.timestamp + X)` di dalam LOOP.**
   Dengan `via_ir`, optimizer meng-hoist `TIMESTAMP` keluar dari loop, sehingga
   setiap iterasi warp ke detik yang SAMA dan loopnya diam-diam tidak memajukan

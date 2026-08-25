@@ -594,9 +594,13 @@ export const ETH_CHAIN_KEY = 3; // Ethereum mainnet, architecture.md §3
 
 export const creditcoinRpc = new ethers.JsonRpcProvider(process.env.CREDITCOIN_RPC_URL);
 
-export const proofBuilder = new proofProvider.service.ProofBuilder({
-  baseUrl: process.env.PROOF_BUILDER_URL!, // https://prover.cc3-testnet.creditcoin.network
-});
+// KOREKSI (diverifikasi terhadap dist/proof-provider/service/index.d.ts SDK
+// v0.18.0 yang benar-benar terpasang): konstruktornya POSISIONAL, bukan objek
+// opsi — ProofBuilder(chainKey, builderUrl, timeout?).
+export const proofBuilder = new proofProvider.service.ProofBuilder(
+  ETH_CHAIN_KEY,
+  process.env.PROOF_BUILDER_URL!, // https://prover.cc3-testnet.creditcoin.network
+);
 ```
 
 ### 10.2 `waitUntilHeightAttested` — Tahap `attestation-waiter`
@@ -676,8 +680,11 @@ export async function getBatchProof(batch: ProvableEvent[]): Promise<BatchProofR
   }
   const minHeight = Math.min(...batch.map((e) => e.blockHeight));
   const maxHeight = Math.max(...batch.map((e) => e.blockHeight));
-  if (maxHeight - minHeight > 1000) {
-    throw new Error(`batch block span ${maxHeight - minHeight} exceeds 1000-block limit`);
+  // KOREKSI: kontrak menolak `span >= 1000`, jadi span maksimum yang aman 999.
+  // `> 1000` di sini akan meloloskan batch yang kemudian revert on-chain SETELAH
+  // proof-nya dibayar.
+  if (maxHeight - minHeight > 999) {
+    throw new Error(`batch block span ${maxHeight - minHeight} exceeds 999-block limit`);
   }
 
   return proofBuilder.getBatchProof({
@@ -703,12 +710,26 @@ const factRegistry = new ethers.Contract(process.env.FACT_REGISTRY_ADDRESS!, fac
 export async function submitFact(proof: FetchedProof, adapterKey: string): Promise<ethers.TransactionReceipt> {
   const nonce = await claimNextNonce();
 
+  // KOREKSI: signature ini sudah basi. FactRegistry yang benar-benar dibangun
+  // menerima ProofBundle pipih + observedAt, dan TIDAK menerima adapterKey —
+  // adapter dipilih ON-CHAIN berdasarkan alamat pemancar tiap log, karena
+  // memilihnya dari sisi indexer berarti mempercayai indexer soal protokol
+  // mana yang memancarkan log, dan itu persis yang harus dibuktikan.
+  //
+  //   recordFact(ProofBundle bundle, bytes encodedTransaction, uint64 observedAt)
+  //   ProofBundle { chainKey, blockHeight, merkleRoot, siblings[],
+  //                 lowerEndpointDigest, continuityRoots[] }
   const tx = await factRegistry.recordFact(
-    proof.headerNumber,
+    {
+      chainKey: ETH_CHAIN_KEY,
+      blockHeight: proof.headerNumber,
+      merkleRoot: proof.merkleProof.root,
+      siblings: proof.merkleProof.siblings,
+      lowerEndpointDigest: proof.continuityProof.lowerEndpointDigest,
+      continuityRoots: proof.continuityProof.roots,
+    },
     proof.encodedTransaction,
-    proof.merkleProof,
-    proof.continuityProof,
-    adapterKey,
+    observedAt,
     { nonce },
   );
 
@@ -891,7 +912,18 @@ protokol (Aave V3 sudah berjalan sejak 2023).
 ## 14. Skema Database Relevan
 
 Tiga tabel inti dari `architecture.md` §10, dengan DDL lengkap untuk kebutuhan
-indexer (Drizzle-style, cocok untuk `services/indexer/src/db/schema.ts`):
+indexer.
+
+> **Implementasi memakai `postgres.js` + SQL mentah, bukan Drizzle.** DDL di
+> bawah sudah mengunci skemanya, sehingga ORM hanya menambah `drizzle-kit`
+> untuk migrasi plus satu lapis API yang bisa bergeser antar versi tanpa
+> memberi manfaat nyata di sini. Migrasi dijalankan dari file `.sql` berurutan
+> di `services/indexer/src/db/migrations/`, dicatat di tabel `schema_migrations`.
+>
+> Implementasi menambah satu tabel yang tidak ada di daftar ini: **`proof_batches`**
+> (migrasi `0003`). Alasannya: proof yang sudah DIBAYAR harus selamat dari
+> restart. Kalau prover menyerahkan proof ke submitter hanya lewat memori,
+> proses yang mati di antara keduanya membuang CTC dan memaksa proving ulang.
 
 ```sql
 CREATE TABLE source_cursors (

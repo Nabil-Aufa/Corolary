@@ -1,0 +1,27 @@
+{
+  "name": "@corolary/indexer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "backfill": "tsx src/backfill.ts",
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@corolary/shared": "workspace:*",
+    "@gluwa/usc-sdk": "0.18.0",
+    "dotenv": "^17.2.3",
+    "ethers": "^6.15.0",
+    "pino": "^9.13.1",
+    "postgres": "^3.4.7",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "@types/node": "^24.0.0"
+  }
+}
