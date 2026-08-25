@@ -75,6 +75,7 @@ export async function insertLogs(
   logs: ethers.Log[],
   timestamps: Map<number, number>,
   backfill: boolean,
+  priority = 0,
 ): Promise<number> {
   let inserted = 0;
   for (const l of logs) {
@@ -105,6 +106,7 @@ export async function insertLogs(
         status: 'pending',
         attempts: 0,
         backfill,
+        priority,
         observed_at: observedAt,
       })}
       ON CONFLICT (chain_key, block_height, tx_index, log_index) DO NOTHING

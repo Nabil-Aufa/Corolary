@@ -85,6 +85,11 @@ export interface BackfillOptions {
   untilMonths: number;
   protocols: string[] | null;
   dryRun: boolean;
+  /**
+   * Didahulukan di antrean proving. Backfill demo berjalan di belakang ribuan
+   * event latar, dan tanpa ini hasilnya baru terbaca berjam-jam kemudian.
+   */
+  priority: number;
 }
 
 interface Found {
@@ -114,6 +119,7 @@ export async function backfillSubject(opts: BackfillOptions): Promise<void> {
       toBlock: ceiling,
       protocols: targets.map((t) => t.protocol.name),
       dryRun: opts.dryRun,
+      priority: opts.priority,
     },
     'backfill mulai',
   );
@@ -146,7 +152,14 @@ export async function backfillSubject(opts: BackfillOptions): Promise<void> {
 
           const timestamps = await blockTimestamps(new Set(logs.map((l) => l.blockNumber)));
           await sql.begin(async (tx) => {
-            inserted += await insertLogs(tx, target.protocol.address, logs, timestamps, true);
+            inserted += await insertLogs(
+              tx,
+              target.protocol.address,
+              logs,
+              timestamps,
+              true,
+              opts.priority,
+            );
           });
         };
 
