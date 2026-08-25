@@ -1,0 +1,64 @@
+# Gerbang mutu Corolary.
+#
+# Ada terutama untuk `check:no-mocks`. Aturan nomor satu proyek ini — nol mock
+# data di produk akhir — sampai sekarang dijaga oleh sesuatu yang bergantung
+# pada seseorang mengingat menjalankannya sebelum push. Itu sudah gagal sekali:
+# tes baru menembus gerbang dan hanya ketahuan karena kebetulan dijalankan
+# manual.
+#
+# Docs SENGAJA tidak diperiksa dan tidak memicu CI. Bahasanya Indonesia,
+# formatnya prosa, dan pada saat submit docs diabaikan seluruhnya — menjalankan
+# CI untuk perubahan prosa cuma memperlambat tanpa menjaga apa pun.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**/*.md']
+  pull_request:
+    paths-ignore: ['docs/**', '**/*.md']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # forge-std adalah submodule. Tanpa ini `forge test` gagal dengan
+          # "source not found" yang terbaca seperti kode rusak, bukan seperti
+          # checkout yang tidak lengkap.
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Dependensi Solidity dipasang lewat pnpm, BUKAN `forge install` —
+      # `.gitignore` mengabaikan lib/, jadi remappings.txt menunjuk node_modules.
+      - run: pnpm install --frozen-lockfile
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - run: pnpm typecheck
+
+      # `forge build` lebih dulu: ABI di packages/shared/src/abis dipakai runtime
+      # (submitter me-resolve selector error dari sana), jadi kompilasi yang
+      # gagal harus menggagalkan CI di sini, bukan diam-diam lolos ke tes.
+      - run: pnpm contracts:build
+
+      - run: pnpm test
+
+      # Terakhir, dan tanpa --require-web: apps/web belum ada dan itu milik
+      # Dev B. Naikkan ke `check:no-mocks:submit` begitu frontend masuk —
+      # sampai saat itu gerbang ini hanya memeriksa separuh permukaan, dan
+      # keluarannya mengatakan begitu.
+      - run: pnpm check:no-mocks
