@@ -306,7 +306,7 @@ async function findNewerRound(
   for (let to = head; to > floor; to -= SCAN_CHUNK_BLOCKS) {
     const from = Math.max(floor, to - SCAN_CHUNK_BLOCKS + 1);
 
-    const logs = await ethereum.getLogs({
+    const logs = await getLogsWithRetry({
       address: feed.aggregator,
       topics: [ANSWER_UPDATED_TOPIC],
       fromBlock: from,
@@ -327,6 +327,31 @@ async function findNewerRound(
   }
 
   return null;
+}
+
+/**
+ * Retry pendek untuk kedipan provider.
+ *
+ * drpc membalas `"Can't route your request to suitable provider"` (code 12,
+ * HTTP 400) saat sedang dibebani — dan jalur harga berbagi RPC dengan watcher
+ * serta submitter, jadi kedipan itu wajar terjadi. Tanpa retry, tiap kedipan
+ * muncul sebagai `warn` setiap dua menit; log yang penuh peringatan yang
+ * sembuh sendiri adalah log yang berhenti dibaca.
+ *
+ * Sengaja pendek: harga punya 24 jam sebelum basi, jadi menyerah cepat lalu
+ * mencoba lagi di putaran berikutnya lebih baik daripada menahan loop.
+ */
+async function getLogsWithRetry(filter: ethers.Filter): Promise<ethers.Log[]> {
+  let delay = 1_500;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await ethereum.getLogs(filter);
+    } catch (err) {
+      if (attempt >= 2) throw err;
+      await new Promise((r) => setTimeout(r, delay));
+      delay *= 2;
+    }
+  }
 }
 
 /**

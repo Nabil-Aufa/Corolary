@@ -15,6 +15,7 @@ interface TxRow {
   tx_index: number;
   tx_hash: string;
   observed_at: string;
+  is_backfill: boolean;
 }
 
 /**
@@ -27,14 +28,27 @@ interface TxRow {
  * setelah proof-nya dibayar.
  */
 async function claimCandidates(): Promise<ProvableTx[]> {
+  // Event BACKFILL diurutkan paling belakang, bukan paling depan.
+  //
+  // Urutan `observed_at ASC` sendirian benar selama hanya ada lalu lintas live:
+  // yang tertua paling dekat ke tebing 24 jam, jadi ia harus didahulukan.
+  // Begitu backfill masuk, aturan yang sama berbalik jadi merusak — event
+  // backfill berumur BULANAN, jadi ia selalu menyalip, dan antrean backfill
+  // yang panjang akan mendorong event segar melewati 24 jam. Ongkosnya nyata:
+  // yang segar naik 12x lipat, sementara yang backfill sudah kena tarif itu
+  // dan tidak rugi apa pun kalau menunggu.
+  //
+  // `bool_or` karena pengelompokannya per transaksi: satu transaksi yang punya
+  // log backfill dan log live diperlakukan sebagai live.
   const rows = await sql<TxRow[]>`
-    SELECT block_height, tx_index, min(tx_hash) AS tx_hash, min(observed_at) AS observed_at
+    SELECT block_height, tx_index, min(tx_hash) AS tx_hash, min(observed_at) AS observed_at,
+           bool_or(backfill) AS is_backfill
     FROM observed_events
     WHERE chain_key = ${ETH_CHAIN_KEY}
       AND status = 'proving'
       AND (run_after IS NULL OR run_after <= now())
     GROUP BY block_height, tx_index
-    ORDER BY min(observed_at) ASC
+    ORDER BY bool_or(backfill) ASC, min(observed_at) ASC
     LIMIT ${CANDIDATE_LIMIT}
   `;
 
@@ -130,6 +144,7 @@ const MAX_ATTEMPTS = 8;
 /** Full jitter, dijadwalkan di DB supaya selamat dari restart proses. */
 export function nextRetryDelayMs(attempts: number): number {
   const exp = Math.min(BASE_DELAY_MS * 2 ** attempts, MAX_DELAY_MS);
+  // check-no-mocks: allow jitter retry — mengacak JADWAL, bukan angka yang ditampilkan
   return Math.round(exp * (0.5 + Math.random() * 0.5));
 }
 

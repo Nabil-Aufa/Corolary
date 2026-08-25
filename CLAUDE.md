@@ -299,6 +299,46 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   setiap iterasi warp ke detik yang SAMA dan loopnya diam-diam tidak memajukan
   waktu sama sekali — tesnya tetap hijau sambil menguji hal yang salah. Lacak
   waktu di variabel lokal (`t += 1 days; vm.warp(t);`).
+- **Backfill WAJIB di-scope per subjek, bukan per rentang blok.** Subjek adalah
+  parameter ber-`indexed` di keempat protokol, jadi RPC menyaringnya di sisi
+  server: riwayat 6 bulan satu dompet = 69 log. Memindai rentang yang sama tanpa
+  filter subjek menghasilkan ratusan ribu log, dan tiap transaksinya dibayar pada
+  tarif lazy 3,13×10⁻⁴ CTC. `docs/indexer.md` §13.2 menjelaskan mode rentang —
+  itu benar untuk menambah protokol baru, bukan untuk memberi kedalaman riwayat.
+- **drpc bisa membalas `-32000 "method handler crashed"`** pada `eth_getLogs`
+  rentang lebar — bukan 403, bukan 429, bukan timeout. Klasifikasi retry berbasis
+  kata kunci sempit akan melewatkannya, dan satu kegagalan menjatuhkan seluruh
+  run backfill 20 menit. Perlakukan SEMUA error RPC sebagai transien; kegagalan
+  struktural ditangani dengan memecah rentang, bukan dengan daftar kata kunci.
+- **Pekerjaan pemindaian panjang harus menulis per potongan, bukan di akhir.**
+  Backfill 12 bulan × 4 protokol = ~2.100 panggilan RPC, ~20 menit. Mengumpulkan
+  semuanya di memori lalu insert di akhir berarti satu kegagalan membuang
+  segalanya — dan itu benar-benar terjadi di percobaan pertama.
+- **Posisi subjek di `topics` BERBEDA antar event, bahkan di satu protokol.**
+  Aave: `topics[2]` untuk Borrow/Repay/Supply/Withdraw tapi `topics[3]` untuk
+  LiquidationCall. Morpho: `topics[2]` untuk Borrow/WithdrawCollateral,
+  `topics[3]` untuk Repay/Liquidate/SupplyCollateral. Compound: `topics[1]`
+  untuk WithdrawCollateral, `topics[2]` untuk SupplyCollateral/AbsorbDebt.
+  Salah posisi **tidak** menghasilkan data salah — adapter tetap mencatat subjek
+  yang benar. Yang terjadi: filter memanen log dompet LAIN, dan kita membayar
+  proof untuk riwayat orang lain.
+- **`ceil(tx / 10)` adalah perkiraan batch yang SALAH untuk backfill.** Batas span
+  999 blok berarti transaksi yang terpisah berbulan-bulan tidak bisa satu batch.
+  Terukur atas 66 transaksi Aave sepanjang 180 hari: **27 batch**, bukan 7 —
+  sepuluh di antaranya berisi satu transaksi. Efisiensi batching, inti model
+  biaya untuk lalu lintas live, praktis hilang di backfill.
+- **drpc free menolak `eth_getLogs` rentang > 10.000 blok, bahkan dengan filter
+  topic** — dan burst permintaan rentang lebar memicu **HTTP 403 untuk SEMUA**
+  permintaan semacam itu selama beberapa menit. Terukur: 780 panggilan paralel
+  = ban sementara. Lalu lintas normal watcher (2.000 blok) tidak terpengaruh,
+  sehingga bannya mudah tidak terdeteksi. Karena watcher live memakai RPC yang
+  sama, **jangan jalankan backfill bersamaan dengan indexer**.
+- **Skor `historyDuration` memakai half-saturation, bukan linear.**
+  `saturating(days, 365, 200)` berarti 365 hari hanya memberi 100 dari 200 poin,
+  dan 730 hari memberi 133. Menggandakan jendela backfill dari 6 ke 12 bulan
+  hanya menambah ~34 poin; memindai keempat protokol menambah 75 lewat
+  `protocolDiversity`. Tuas biayanya ada di cakupan protokol, bukan di kedalaman
+  waktu.
 - **`roundId` proxy Chainlink ≠ `roundId` di event `AnswerUpdated`.** Proxy
   mengembalikan roundId gabungan berfase (`phaseId << 64 | aggregatorRound`,
   angka ~1,8e19), sementara event dipancarkan **aggregator** dan membawa nomor

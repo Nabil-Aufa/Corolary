@@ -27,7 +27,7 @@
 
 ## 2. Blocker Produk — butuh keputusan sebelum M3
 
-### B1 · Cold start: fakta lama tidak tertangkap eager proving 🔴
+### B1 · Cold start: fakta lama tidak tertangkap eager proving 🟡 **CLI selesai, produk belum**
 
 **Masalah.** Eager proving hanya menangkap event **baru**. Tapi seluruh nilai Corolary
 ada pada riwayat yang **sudah** terjadi — peminjam yang melunasi 40 pinjaman Aave
@@ -46,15 +46,42 @@ Ini bukan detail teknis. Ini **risiko eksistensial produk** dan pasti ditanya ju
 4. Fakta tercatat, skor terbentuk, pengguna langsung punya tier.
 
 **Biayanya jujur:** proof historis ~**3,13×10⁻⁴ CTC** (12x lipat dari yang segar).
-Peminjam aktif dengan 200 event → 20 batch → masih di orde **10⁻³ CTC**. Praktis nol.
-**Jadi mahalnya proof historis TIDAK menghalangi backfill** — ia hanya melarang
-backfill *buta seluruh chain*. Backfill per-alamat atas permintaan sepenuhnya layak.
+**Mahalnya proof historis TIDAK menghalangi backfill** — ia hanya melarang backfill
+*buta seluruh chain*. Backfill per-alamat atas permintaan sepenuhnya layak.
+
+> **Koreksi 2026-08-25.** Versi awal paragraf ini menulis "200 event → 20 batch",
+> memakai `ceil(n / 10)`. Itu **salah**, dan salahnya ke arah yang berbahaya.
+> Batas span 999 blok berarti transaksi yang terpisah berbulan-bulan tidak bisa
+> satu batch. Terukur atas riwayat Aave nyata (66 transaksi sepanjang 180 hari):
+> **27 batch**, bukan 7 — sepuluh di antaranya berisi satu transaksi.
+> Efisiensi batching praktis hilang di backfill.
+>
+> Kesimpulannya tidak berubah, karena biaya dominannya ternyata bukan proof
+> melainkan gas CC3, dan keduanya tetap kecil: **0,021 CTC proof + 0,025 CTC gas
+> = 0,046 CTC** untuk 180 hari riwayat satu dompet. Yang berubah: perkiraan
+> apa pun yang memakai `ceil(n/10)` harus diganti dengan `buildBatches()` atas
+> tinggi blok yang sungguhan — dan itulah yang dilakukan `--dry-run`.
+
+**Terimplementasi 2026-08-25 (sisi indexer).** `services/indexer/src/backfill/`,
+dijalankan lewat:
+
+```bash
+pnpm --filter @corolary/indexer backfill --subject 0x… [--months 12] [--dry-run]
+```
+
+Kunci kelayakannya: subjek adalah parameter ber-`indexed` di keempat protokol,
+jadi RPC menyaringnya di sisi server dan riwayat setahun satu dompet menyusut
+jadi puluhan log. Jalur INSERT-nya sama persis dengan watcher live
+(`insertLogs()`), jadi tidak ada jalur kedua yang bisa menyimpang.
+Detail lengkap di `docs/indexer.md` §13.2b.
 
 **Konsekuensi:** ini juga jadi mekanik akuisisi yang bagus — pengguna datang untuk
 mengklaim riwayat, dan tindakan itu sendiri yang mengisi registry.
 
-**Aksi:** rancang sebagai fitur produk kelas satu, bukan skrip admin.
-Pemilik: Dev A (indexer + endpoint) & Dev B (alur UI). Tenggat: sebelum M3.
+**Sisa aksi:** membungkusnya jadi fitur produk, bukan CLI admin — endpoint
+`POST /v1/prove` sudah ada tapi hanya menerima satu transaksi, belum satu alamat;
+dan alur UI *"Claim your history"*. Pemilik: Dev A (endpoint) & Dev B (UI).
+Tenggat: sebelum M3.
 
 ---
 
@@ -454,7 +481,7 @@ untuk pembicaraan CEIP.
 
 | Prioritas | Item | Kapan |
 |---|---|---|
-| 🔴 Kritis | **B1** backfill on-demand — tanpa ini produk tidak punya cerita | sebelum M3 |
+| 🟡 Sisa | **B1** backfill — CLI per-subjek ✅ 2026-08-25; endpoint per-alamat & UI belum | sebelum M3 |
 | 🔴 Kritis | **B2** posisi jujur soal token testnet — masukkan ke deck & video (kontrak ✅, komunikasi belum) | sebelum M5 |
 | ✅ Selesai | **T1** tipe transaksi — jalur receipt agnostik tipe | 2026-08-25 |
 | 🟠 Tinggi | **T2** anggaran batch berbasis BYTE (bukan jumlah log) | terukur; batas blok CC3 masih perlu diukur |

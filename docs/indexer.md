@@ -887,6 +887,110 @@ berulang dalam skrip terpisah dari daemon utama, dengan `CHUNK_SIZE` yang sama �
 tidak ada jalur kode kedua untuk "mengambil log", hanya orkestrasi start/stop
 berbeda. Ini mencegah drift logika antara mode live dan backfill.
 
+### 13.2b Mode Backfill per-SUBJEK (yang sebenarnya dipakai)
+
+Diimplementasikan 2026-08-25 di `services/indexer/src/backfill/`.
+
+```bash
+pnpm --filter @corolary/indexer backfill --subject 0x… [--months 6] \
+     [--protocol aave-v3,spark] [--dry-run]
+```
+
+**Kenapa bukan mode rentang blok di §13.2.** Aritmetika, bukan selera. Riwayat
+enam bulan adalah ~1,3 juta blok. Dipindai tanpa filter subjek, Aave saja
+menghasilkan ratusan ribu log, dan **setiap** transaksi di dalamnya akan
+dibuktikan pada tarif lazy 3,13×10⁻⁴ CTC — puluhan ribu CTC untuk riwayat yang
+99,99%-nya milik dompet yang tidak ditampilkan di mana pun.
+
+Yang membuat mode per-subjek mungkin: **subjek adalah parameter ber-`indexed` di
+keempat protokol**, jadi RPC bisa menyaringnya di sisi server. Riwayat enam bulan
+satu dompet menyusut jadi beberapa puluh log, dan biayanya sebanding dengan
+aktivitas dompet itu — bukan dengan aktivitas seluruh chain.
+
+Mode §13.2 tetap benar untuk tujuan aslinya (menambahkan protokol baru). Yang
+dilakukan di sini tujuannya berbeda: memberi kedalaman `historyDuration` pada
+dompet demo.
+
+**Jalur insert-nya sama persis dengan watcher live.** `watchOnce` dan backfill
+sama-sama memanggil `insertLogs()` di `watcher/watch.ts`; yang berbeda hanya cara
+log ditemukan dan bendera `backfill = true`. Tidak ada jalur kode kedua yang bisa
+menyimpang — dan kalau ada, yang menyimpang selalu jalur yang lebih jarang dipakai.
+
+#### Posisi subjek di `topics` (wajib cocok dengan adapter)
+
+| Protokol | Event | Subjek |
+|---|---|---|
+| Aave V3 / Spark | Borrow, Repay, Supply, Withdraw | `topics[2]` |
+| Aave V3 / Spark | LiquidationCall | `topics[3]` |
+| Morpho Blue | Borrow, WithdrawCollateral | `topics[2]` |
+| Morpho Blue | Repay, Liquidate, SupplyCollateral | `topics[3]` |
+| Compound V3 | WithdrawCollateral | `topics[1]` |
+| Compound V3 | SupplyCollateral, AbsorbDebt | `topics[2]` |
+
+Salah posisi **tidak** menghasilkan data salah — adapter tetap mencatat subjek
+yang benar. Yang terjadi lebih halus: filter memanen log milik dompet LAIN (mis.
+`repayer` alih-alih `user`), lalu kita **membayar proof untuk riwayat orang lain**.
+
+#### Batas RPC
+
+drpc free menolak rentang > **10.000 blok**, bahkan dengan filter topic — jadi
+`CHUNK = 10_000`, dan enam bulan = ~130 potongan × 2 filter per protokol.
+
+Jeda `PACE_MS = 250` bukan kehati-hatian berlebihan: 780 panggilan paralel
+membuat drpc membalas **HTTP 403 untuk semua permintaan rentang lebar** selama
+beberapa menit. Karena watcher live memakai RPC yang sama, backfill yang rakus
+bisa menjatuhkan indexer produksi. **Jangan jalankan backfill bersamaan dengan
+indexer.**
+
+#### `--dry-run` menghitung batch SUNGGUHAN
+
+Perkiraan biaya tidak memakai `ceil(tx / 10)`. Batas span 999 blok berarti
+transaksi yang terpisah berbulan-bulan **tidak bisa** satu batch: riwayat 20
+transaksi yang tersebar merata membentuk ~20 batch berisi satu, bukan 2 batch
+berisi sepuluh. Efisiensi batching — inti model biaya untuk lalu lintas live —
+praktis **hilang** di backfill, dan perkiraan `ceil(tx/10)` meleset sepuluh kali
+lipat ke arah yang salah. Karena itu `--dry-run` menjalankan `buildBatches()`
+yang sama dengan prover, atas tinggi blok yang sungguhan.
+
+`--dry-run` juga mengecualikan transaksi yang sudah ada di `observed_events`:
+keduanya tidak akan dibayar dua kali (`observed_events_unique_log` di sisi DB,
+`_markProcessed` di sisi kontrak), jadi memasukkannya ke perkiraan akan
+melebih-lebihkan biaya.
+
+#### Ketahanan: tulis per potongan, pecah rentang saat gagal
+
+Percobaan pertama menjalankan pemindaian 12 bulan × 4 protokol dan **gagal total
+di menit ke-3**, kehilangan seluruh pekerjaan. Penyebabnya dua hal yang keduanya
+salah desain, bukan nasib buruk:
+
+1. **Penulisan menunggu akhir.** Seluruh log dikumpulkan lebih dulu lalu di-insert
+   setelah keempat protokol selesai. Pemindaian setahun adalah ~2.100 panggilan
+   RPC dan ~20 menit; satu kegagalan di protokol keempat membuang semuanya.
+   Sekarang insert terjadi **per potongan 10.000 blok**. Idempoten lewat
+   `observed_events_unique_log`, jadi menjalankan ulang melanjutkan, bukan
+   menduplikasi.
+
+2. **Klasifikasi retry terlalu sempit.** drpc membalas
+   `-32000 "method handler crashed"` — bukan 403, bukan 429, bukan timeout —
+   sehingga daftar kata kunci melewatkannya dan error dilempar sampai atas.
+   Sekarang **semua** error RPC diperlakukan transien di `getLogsWithRetry`, dan
+   kegagalan struktural (rentang terlalu lebar) ditangani terpisah dengan
+   **memecah rentang jadi dua** sampai batas bawah 500 blok.
+
+Rentang yang tetap gagal setelah dipecah **tidak dilewati diam-diam**: ia dicatat
+dan dilaporkan di akhir pada level `error` dengan instruksi menjalankan ulang.
+Riwayat tidak lengkap tanpa ada yang tahu adalah kegagalan terburuk di sini —
+skornya akan tampak sah, hanya lebih rendah dari seharusnya.
+
+#### Cursor tidak disentuh
+
+Backfill **tidak** memundurkan `source_cursors`. Cursor menandai sampai mana
+watcher live sudah memindai MAJU; memundurkannya akan membuat watcher memindai
+ulang berbulan-bulan sebagai lalu lintas live, pada tarif eager, untuk seluruh
+chain.
+
+---
+
 ### 13.3 Trade-off Biaya
 
 Backfill **secara inheren melanggar jendela eager-proving** untuk data lama —

@@ -22,6 +22,8 @@
     "contracts:abi": "pnpm --filter @corolary/contracts abi",
     "contracts:deploy:testnet": "pnpm --filter @corolary/contracts deploy:testnet",
     "env:link": "node scripts/link-env.mjs",
+    "check:no-mocks": "node scripts/check-no-mocks.mjs",
+    "check:no-mocks:submit": "node scripts/check-no-mocks.mjs --require-web",
     "build:web": "node scripts/link-env.mjs && pnpm --filter @corolary/web build",
     "mirror:rebuild": "pnpm --filter @corolary/indexer mirror:rebuild"
   },

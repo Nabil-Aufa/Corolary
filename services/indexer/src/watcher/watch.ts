@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import type { TransactionSql } from 'postgres';
 import { sql } from '../db/client.js';
 import { ethereum, ETH_CHAIN_KEY } from '../chain/providers.js';
 import { stageLogger } from '../logger.js';
@@ -59,6 +60,61 @@ async function readCursor(protocol: string): Promise<number | null> {
   return row ? Number(row.last_scanned_block) : null;
 }
 
+
+/**
+ * Satu-satunya jalur yang menulis ke `observed_events`.
+ *
+ * Watcher live dan backfill memakai fungsi yang sama persis — hanya bendera
+ * `backfill` yang berbeda. Dua jalur insert terpisah akan menyimpang diam-diam
+ * (bentuk `raw_log`, kolom yang diisi, aturan konflik), dan yang menyimpang
+ * selalu jalur yang lebih jarang dipakai.
+ */
+export async function insertLogs(
+  tx: TransactionSql<{ bigint: bigint }>,
+  protocolAddress: string,
+  logs: ethers.Log[],
+  timestamps: Map<number, number>,
+  backfill: boolean,
+): Promise<number> {
+  let inserted = 0;
+  for (const l of logs) {
+    const observedAt = timestamps.get(l.blockNumber);
+    if (observedAt === undefined) continue; // blok hilang dari RPC; dipungut putaran berikutnya
+    const rows = await tx`
+      INSERT INTO observed_events ${tx({
+        chain_key: ETH_CHAIN_KEY,
+        block_height: l.blockNumber,
+        tx_hash: l.transactionHash,
+        tx_index: l.transactionIndex,
+        log_index: l.index,
+        topic0: l.topics[0] ?? '',
+        protocol: protocolAddress,
+        // JANGAN JSON.stringify di sini: postgres.js sudah menserialisasi
+        // objek untuk kolom jsonb. Men-stringify lebih dulu menyimpannya
+        // sebagai STRING JSON, bukan objek — jsonb_typeof mengembalikan
+        // 'string' dan setiap operator -> mengembalikan NULL tanpa error.
+        raw_log: sql.json({
+          address: l.address,
+          topics: l.topics,
+          data: l.data,
+          blockNumber: l.blockNumber,
+          transactionHash: l.transactionHash,
+          transactionIndex: l.transactionIndex,
+          logIndex: l.index,
+        }),
+        status: 'pending',
+        attempts: 0,
+        backfill,
+        observed_at: observedAt,
+      })}
+      ON CONFLICT (chain_key, block_height, tx_index, log_index) DO NOTHING
+      RETURNING 1 AS ok
+    `;
+    if (rows.length > 0) inserted++;
+  }
+  return inserted;
+}
+
 /**
  * Satu putaran pemindaian untuk satu protokol.
  *
@@ -107,38 +163,7 @@ export async function watchOnce(cfg: ProtocolWatchConfig): Promise<void> {
   const timestamps = await blockTimestamps(new Set(logs.map((l) => l.blockNumber)));
 
   await sql.begin(async (tx) => {
-    for (const l of logs) {
-      const observedAt = timestamps.get(l.blockNumber);
-      if (observedAt === undefined) continue; // blok hilang dari RPC; dipungut putaran berikutnya
-      await tx`
-        INSERT INTO observed_events ${tx({
-          chain_key: ETH_CHAIN_KEY,
-          block_height: l.blockNumber,
-          tx_hash: l.transactionHash,
-          tx_index: l.transactionIndex,
-          log_index: l.index,
-          topic0: l.topics[0] ?? '',
-          protocol: cfg.address,
-          // JANGAN JSON.stringify di sini: postgres.js sudah menserialisasi
-          // objek untuk kolom jsonb. Men-stringify lebih dulu menyimpannya
-          // sebagai STRING JSON, bukan objek — jsonb_typeof mengembalikan
-          // 'string' dan setiap operator -> mengembalikan NULL tanpa error.
-          raw_log: sql.json({
-            address: l.address,
-            topics: l.topics,
-            data: l.data,
-            blockNumber: l.blockNumber,
-            transactionHash: l.transactionHash,
-            transactionIndex: l.transactionIndex,
-            logIndex: l.index,
-          }),
-          status: 'pending',
-          attempts: 0,
-          observed_at: observedAt,
-        })}
-        ON CONFLICT (chain_key, block_height, tx_index, log_index) DO NOTHING
-      `;
-    }
+    await insertLogs(tx, cfg.address, logs, timestamps, false);
 
     await tx`
       INSERT INTO source_cursors ${tx({
@@ -178,7 +203,7 @@ export async function watchOnce(cfg: ProtocolWatchConfig): Promise<void> {
  */
 const TIMESTAMP_CONCURRENCY = 12;
 
-async function blockTimestamps(heights: Set<number>): Promise<Map<number, number>> {
+export async function blockTimestamps(heights: Set<number>): Promise<Map<number, number>> {
   const out = new Map<number, number>();
   const queue = [...heights];
 
