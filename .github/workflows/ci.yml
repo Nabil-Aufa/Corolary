@@ -28,16 +28,16 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # forge-std adalah submodule. Tanpa ini `forge test` gagal dengan
           # "source not found" yang terbaca seperti kode rusak, bukan seperti
           # checkout yang tidak lengkap.
           submodules: recursive
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4.2.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
