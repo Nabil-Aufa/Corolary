@@ -34,6 +34,22 @@ Semua path di dokumen ini ditulis relatif terhadap `/v1`, mis. `GET /v1/health` 
 - Semua hash (`txHash`, `factId`, `creditcoinTxHash`) adalah string heksadesimal
   `0x`-prefixed, 66 karakter (32 byte).
 
+### 0.2b Field yang bisa `null`, dan kenapa
+
+`amountUsd`, `priceUsd`, dan `priceFactId` bernilai `null` selama belum ada
+**harga terbukti** untuk aset tersebut di `PriceRegistry`.
+
+Ini bukan bug dan bukan data yang belum sempat diisi. Setiap angka USD di API
+ini harus bisa ditelusuri ke satu event `AnswerUpdated` Chainlink yang dibuktikan
+lewat Attestcoin. Membaca feed harga langsung akan mengisi kolom itu dengan
+angka yang tampak benar tapi tidak punya bukti — dan itu merusak satu-satunya
+klaim yang membedakan produk ini, tanpa terlihat sama sekali di UI.
+
+Frontend harus menampilkan keadaan ini apa adanya (mis. "harga belum
+dibuktikan"), bukan menggantinya dengan nol atau menyembunyikan barisnya.
+
+---
+
 ### 0.3 Amplop Respons (Response Envelope)
 
 Setiap respons — sukses maupun gagal — mengikuti bentuk seragam ini

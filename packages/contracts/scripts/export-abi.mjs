@@ -50,7 +50,7 @@ for (const name of CONTRACTS) {
     continue;
   }
   await writeFile(join(DEST, `${name}.json`), `${JSON.stringify(abi, null, 2)}\n`);
-  exported.push(name);
+  exported.push({ name, abi });
 }
 
 if (missing.length > 0) {
@@ -59,17 +59,24 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-// `as const` supaya viem bisa menurunkan tipe argumen dari ABI. Tanpa itu
-// frontend kehilangan seluruh type-safety pemanggilan kontrak.
-const index = [
+// ABI di-INLINE sebagai literal TypeScript, bukan di-import dari JSON.
+//
+// viem menurunkan tipe argumen dan hasil pemanggilan kontrak dari ABI, dan itu
+// hanya bekerja kalau ABI-nya literal ber-`as const`. `import x from './x.json'`
+// lalu `x as const` GAGAL compile (TS1355: const assertion hanya untuk literal),
+// dan menghapus `as const` diam-diam membuang seluruh type-safety frontend.
+//
+// File .json tetap ditulis: indexer dan API membacanya saat runtime lewat fs,
+// karena ethers hanya butuh nilainya dan tidak butuh tipe literal.
+const chunks = [
   '// DIHASILKAN OTOMATIS oleh packages/contracts/scripts/export-abi.mjs',
   '// Jangan diedit manual — jalankan `pnpm contracts:abi`.',
   '',
-  ...exported.map((n) => `import ${n} from './${n}.json' with { type: 'json' };`),
-  '',
-  ...exported.map((n) => `export const ${n}Abi = ${n} as const;`),
-  '',
-].join('\n');
+];
 
-await writeFile(join(DEST, 'index.ts'), index);
-console.log(`ABI diekspor (${exported.length}): ${exported.join(', ')}`);
+for (const { name, abi } of exported) {
+  chunks.push(`export const ${name}Abi = ${JSON.stringify(abi, null, 2)} as const;`, '');
+}
+
+await writeFile(join(DEST, 'index.ts'), chunks.join('\n'));
+console.log(`ABI diekspor (${exported.length}): ${exported.map((e) => e.name).join(', ')}`);

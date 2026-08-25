@@ -9,6 +9,7 @@ import { classifySubmitError } from './errors.js';
 import { proofBuilder } from '../prover/client.js';
 import { splitToSingles, type BatchBundleJson, type SingleBundleJson } from '../prover/bundle.js';
 import { nextRetryDelayMs } from '../prover/run.js';
+import { persistReceipt } from './persist.js';
 
 const log = stageLogger('submitter');
 
@@ -89,6 +90,16 @@ async function submitBatch(row: BatchRow): Promise<void> {
         WHERE batch_id = ${batchId} AND status = 'submitting'
       `;
     });
+
+    // Mirror dibangun SETELAH status ditandai, dan kegagalannya tidak boleh
+    // membatalkan pencatatan: faktanya sudah permanen di chain. Mirror yang
+    // tertinggal bisa dibangun ulang dari chain; status yang salah tidak.
+    try {
+      const facts = await persistReceipt(receipt, batchId);
+      log.info({ batchId, facts }, 'fakta disalin ke mirror');
+    } catch (err) {
+      log.error({ batchId, err: String(err) }, 'gagal menyalin fakta ke mirror');
+    }
 
     log.info(
       {
@@ -183,6 +194,11 @@ async function submitSingle(
     }
 
     await markTx(bundle, 'recorded', null);
+    try {
+      await persistReceipt(receipt, batchId);
+    } catch (err) {
+      log.error({ sourceTx: bundle.txHash, err: String(err) }, 'gagal menyalin fakta ke mirror');
+    }
     log.info({ batchId, txHash: tx.hash, sourceTx: bundle.txHash }, 'fakta tercatat (tunggal)');
   } catch (err) {
     await releaseNonce(nonce);

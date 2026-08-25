@@ -6,6 +6,7 @@ import { PROTOCOLS } from './watcher/protocols.js';
 import { watchOnce } from './watcher/watch.js';
 import { waitOnce } from './attestation/waiter.js';
 import { proveOnce } from './prover/run.js';
+import { runEagerProveJobs } from './jobs/eagerProve.js';
 import { initSubmitter, submitOnce } from './submitter/submit.js';
 import {
   oldestUnprovenAgeSeconds,
@@ -73,6 +74,11 @@ async function main(): Promise<void> {
 
   loop('attestation-waiter', WAIT_INTERVAL_MS, waitOnce);
   loop('prover', PROVE_INTERVAL_MS, proveOnce);
+
+  // Permintaan eksplisit dari POST /v1/prove. Tanpa loop ini endpoint itu
+  // menerima job yang tidak pernah dikerjakan siapa pun — fitur yang tampak
+  // hidup padahal tidak, yang persis dilarang aturan nol-mock.
+  loop('prove-jobs', PROVE_INTERVAL_MS, runEagerProveJobs);
 
   // Submitter hanya menyala kalau alamat kontraknya sudah ada. Sebelum deploy,
   // tiga tahap di atas tetap bekerja dan menumpuk antrean yang siap dikirim.

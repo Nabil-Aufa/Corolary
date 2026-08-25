@@ -71,7 +71,7 @@ export async function watchOnce(cfg: ProtocolWatchConfig): Promise<void> {
   const head = await ethereum.getBlock(FINALIZED);
   if (!head) return; // RPC belum siap; coba lagi di iterasi berikutnya
 
-  const stored = await readCursor(cfg.name);
+  const stored = await readCursor(cfg.address);
   const fromBlock =
     stored !== null ? stored + 1 : Math.max(0, head.number - LIVE_START_LOOKBACK_BLOCKS);
 
@@ -118,7 +118,7 @@ export async function watchOnce(cfg: ProtocolWatchConfig): Promise<void> {
           tx_index: l.transactionIndex,
           log_index: l.index,
           topic0: l.topics[0] ?? '',
-          protocol: cfg.name,
+          protocol: cfg.address,
           // JANGAN JSON.stringify di sini: postgres.js sudah menserialisasi
           // objek untuk kolom jsonb. Men-stringify lebih dulu menyimpannya
           // sebagai STRING JSON, bukan objek — jsonb_typeof mengembalikan
@@ -143,7 +143,7 @@ export async function watchOnce(cfg: ProtocolWatchConfig): Promise<void> {
     await tx`
       INSERT INTO source_cursors ${tx({
         chain_key: ETH_CHAIN_KEY,
-        protocol: cfg.name,
+        protocol: cfg.address,
         last_scanned_block: toBlock,
       })}
       ON CONFLICT (chain_key, protocol)

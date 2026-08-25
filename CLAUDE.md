@@ -236,6 +236,13 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   ada exception, tidak ada retry yang terpicu — indexer akan menyimpulkan Aave sepi dan
   melewatkan seluruh riwayat secara diam-diam. Karena itu RPC baru **wajib dicocokkan
   hasilnya dengan provider kedua**, bukan sekadar dicek "tidak error".
+- **Pola `lib/` di `.gitignore` menelan `services/api/src/lib/`.** Pola tanpa
+  garis miring di depan cocok dengan direktori bernama `lib` **di mana pun**,
+  bukan hanya milik Foundry. Tujuh file sumber API tidak ikut ter-commit tanpa
+  satu pun peringatan — `git status` bersih, build lokal jalan, dan repo hasil
+  clone gagal. Sudah dijangkar jadi `/packages/contracts/lib/`. Aturan praktis:
+  setelah menambah direktori baru, jalankan `git status --short | wc -l` dan
+  cocokkan dengan jumlah file yang kamu buat.
 - **CC3 Testnet menagih ~3,5x lipat gas simulasi lokal untuk operasi
   penyimpanan.** Terukur: `grantRole` = **203.235** gas menurut `eth_estimateGas`
   CC3, sementara simulasi forge memperkirakan ~57.000. Deployment tanpa

@@ -16,13 +16,14 @@
     "dev:indexer": "pnpm --filter @corolary/indexer dev",
     "dev:api": "pnpm --filter @corolary/api dev",
     "dev:web": "node scripts/link-env.mjs && pnpm --filter @corolary/web dev",
-    "db:migrate": "pnpm --filter @corolary/api db:migrate",
+    "db:migrate": "pnpm --filter @corolary/indexer migrate",
     "contracts:build": "pnpm --filter @corolary/contracts build",
     "contracts:test": "pnpm --filter @corolary/contracts test",
     "contracts:abi": "pnpm --filter @corolary/contracts abi",
     "contracts:deploy:testnet": "pnpm --filter @corolary/contracts deploy:testnet",
     "env:link": "node scripts/link-env.mjs",
-    "build:web": "node scripts/link-env.mjs && pnpm --filter @corolary/web build"
+    "build:web": "node scripts/link-env.mjs && pnpm --filter @corolary/web build",
+    "mirror:rebuild": "pnpm --filter @corolary/indexer mirror:rebuild"
   },
   "devDependencies": {
     "turbo": "^2.5.6",

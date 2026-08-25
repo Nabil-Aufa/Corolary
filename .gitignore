@@ -24,7 +24,11 @@ coverage/
 .turbo/
 
 # ── Foundry ───────────────────────────────────────────────────────────
-lib/
+# Dijangkar ke direktori Foundry. Pola `lib/` telanjang cocok dengan
+# direktori bernama `lib` DI MANA PUN — dan sempat menelan
+# services/api/src/lib/ tanpa satu pun peringatan, yang berarti enam file
+# sumber tidak ikut ter-commit dan repo hasil clone gagal build.
+/packages/contracts/lib/
 # forge-std adalah git submodule — gitlink-nya HARUS ikut ter-commit, kalau
 # tidak `forge build` gagal di mesin lain. Clone: git submodule update --init
 !packages/contracts/lib/forge-std
