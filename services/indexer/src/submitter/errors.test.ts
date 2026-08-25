@@ -54,9 +54,12 @@ test('nama dari ethers dipakai kalau ada', () => {
 test('selector betul-betul asing -> retryable DAN selectornya dicatat', () => {
   // Bukan fatal: sebabnya belum diketahui, dan mengubur event membuang
   // satu-satunya bukti yang tersisa untuk melacaknya.
+  // check-no-mocks: allow selector yang SENGAJA tidak ada di ABI mana pun — justru itu yang diuji
   const v = classifySubmitError(ethersError({ data: '0xdeadbeef' + '00'.repeat(32) }), false);
   assert.equal(v.verdict, 'retryable');
+  // check-no-mocks: allow selector asing yang sama
   assert.equal(v.selector, '0xdeadbeef');
+  // check-no-mocks: allow selector asing yang sama
   assert.match(v.reason, /0xdeadbeef/);
 });
 
