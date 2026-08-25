@@ -236,6 +236,24 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   ada exception, tidak ada retry yang terpicu — indexer akan menyimpulkan Aave sepi dan
   melewatkan seluruh riwayat secara diam-diam. Karena itu RPC baru **wajib dicocokkan
   hasilnya dengan provider kedua**, bukan sekadar dicek "tidak error".
+- **CC3 Testnet menagih ~3,5x lipat gas simulasi lokal untuk operasi
+  penyimpanan.** Terukur: `grantRole` = **203.235** gas menurut `eth_estimateGas`
+  CC3, sementara simulasi forge memperkirakan ~57.000. Deployment tanpa
+  `--gas-estimate-multiplier` yang besar akan mengirim transaksi dengan limit di
+  bawah kebutuhan, dan gejalanya menyesatkan: `gasUsed == gasLimit` persis, yang
+  terbaca seperti revert logika padahal murni kehabisan gas. Perintah deploy
+  memakai **800**.
+- **`forge script` WAJIB pakai `--slow` di CC3.** Tanpa itu forge mengestimasi
+  SELURUH transaksi terhadap state yang sama, yaitu sebelum apa pun ter-deploy.
+  Panggilan ke kontrak yang belum ada diestimasi sebagai revert murah (~66k) lalu
+  kehabisan gas saat benar-benar dijalankan. Efeknya: kontrak ter-deploy tapi
+  **nol konfigurasi** — role kosong, chainKey kosong, adapter kosong — dan
+  registry yang tampak hidup padahal tidak bisa menerima apa pun.
+- **`forge script` melaporkan "Transaction Failure" palsu di CC3.** Blok CC3
+  tidak punya `mixHash`, sehingga block-watcher `alloy` gagal men-deserialize dan
+  forge menandai transaksi gagal padahal sukses. `cast` membaca blok yang sama
+  tanpa masalah. **Jangan percaya status dari forge di chain ini** — verifikasi
+  dengan `eth_getCode` dan `cast call` ke state sebenarnya.
 - **Jangan `JSON.stringify()` untuk kolom `jsonb` di postgres.js.** Driver-nya
   sudah menserialisasi objek sendiri, jadi men-stringify lebih dulu menyimpan
   nilainya sebagai **string JSON**, bukan objek: `jsonb_typeof` mengembalikan

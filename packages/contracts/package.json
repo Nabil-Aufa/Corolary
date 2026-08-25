@@ -8,7 +8,7 @@
     "test": "forge test -vvv",
     "clean": "forge clean && rm -rf .turbo",
     "abi": "node scripts/export-abi.mjs",
-    "deploy:testnet": "forge script script/Deploy.s.sol --rpc-url cc3-testnet --broadcast --verify --verifier blockscout --verifier-url https://creditcoin-testnet.blockscout.com/api",
+    "deploy:testnet": "forge script script/Deploy.s.sol --rpc-url cc3-testnet --broadcast --slow --gas-estimate-multiplier 800 --verify --verifier blockscout --verifier-url https://creditcoin-testnet.blockscout.com/api",
     "verify:pending": "forge script script/Deploy.s.sol --rpc-url cc3-testnet --resume --verify --verifier blockscout --verifier-url https://creditcoin-testnet.blockscout.com/api",
     "deploy:simulate": "forge script script/Deploy.s.sol --rpc-url cc3-testnet"
   },
