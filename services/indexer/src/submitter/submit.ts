@@ -13,6 +13,14 @@ import { persistReceipt } from './persist.js';
 
 const log = stageLogger('submitter');
 
+/**
+ * Ambang peringatan ukuran batch, dalam byte `encodedTx` gabungan.
+ *
+ * 1,4x rekor produksi saat ini (282.208 byte) dan hanya ~40% dari anggaran yang
+ * setara sepertiga batas gas blok CC3. Ini alarm, bukan penegakan.
+ */
+const BATCH_BYTE_WARN = 400_000;
+
 const MAX_ATTEMPTS = 8;
 
 let factRegistry: ethers.Contract | null = null;
@@ -89,6 +97,24 @@ export async function submitOnce(): Promise<void> {
 async function submitBatch(row: BatchRow): Promise<void> {
   const { batch_id: batchId, payload } = row;
   const startedAt = Date.now();
+  // Ukuran encodedTx-lah yang menentukan gas, BUKAN jumlah transaksi.
+  //
+  // Diregresi atas 476 batch produksi: `gas ≈ 47,4 × byte + 658.615` (R² 0,833).
+  // Batas gas blok CC3 = 75.000.000, dan batch termahal yang pernah terjadi cuma
+  // 12,77 juta (17%) pada 268.704 byte — jadi MAX_BATCH_SIZE = 10 sudah menjadi
+  // pengaman yang memadai dan anggaran byte tidak ditegakkan (docs/open-issues.md T2).
+  //
+  // Yang TIDAK boleh terjadi adalah batas itu ditembus tanpa ada yang tahu. Ambang
+  // di bawah ini 1,4x rekor saat ini dan masih jauh di bawah bahaya; ia ada supaya
+  // kita diberi tahu SEBELUM rusak, bukan sesudah.
+  const totalBytes = payload.encodedTransactions.reduce((n, t) => n + (t.length - 2) / 2, 0);
+  if (totalBytes > BATCH_BYTE_WARN) {
+    log.warn(
+      { batchId, totalBytes, txCount: payload.heights.length, perkiraanGas: Math.round(47.4 * totalBytes + 658_615) },
+      'batch jauh lebih besar dari apa pun yang pernah terukur — tinjau T2 sebelum menaikkan MAX_BATCH_SIZE',
+    );
+  }
+
   const nonce = await claimNextNonce();
 
   try {

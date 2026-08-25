@@ -270,12 +270,51 @@ Estimasi kasar: transaksi Aave 20-log berukuran ~10 KB → ~770k gas untuk decod
 Batch 10 transaksi → **~3,8 juta gas** hanya untuk decode, belum termasuk verifikasi
 precompile dan biaya calldata.
 
-**Aksi yang benar:**
-- Batasi batch berdasarkan **total byte**, bukan hanya jumlah transaksi. Indexer harus
-  menjumlahkan `encodedTx.length` dan memecah batch sebelum menembus anggaran gas.
-- Ukur batas gas blok CC3 Testnet yang sebenarnya, lalu turunkan anggaran itu dari sana.
-- Ukur ulang dengan transaksi Aave V3 nyata (sampel saat ini belum tentu Aave) untuk
-  mendapat angka byte/log yang representatif.
+**Diukur ulang 2026-08-25 atas 476 batch PRODUKSI** (bukan satu sampel):
+
+```
+gas ≈ 47,4 × byte + 658.615        R² = 0,833
+```
+
+Tesis T2 benar — **byte yang mengikat, bukan jumlah log** — tapi koefisien 77
+gas/byte dari pengukuran terisolasi terlalu tinggi. Di batch nyata angkanya **47,4**,
+karena continuity proof dibagi bersama seluruh anggota batch.
+
+| Ukuran batch | n | Gas rata-rata | Gas per tx |
+|---|---|---|---|
+| 1 | 255 | 1.130.826 | **1.130.826** |
+| 5 | 8 | 4.210.728 | 842.145 |
+| 10 | 138 | 5.523.644 | **552.364** |
+
+Batching memangkas gas per transaksi **51%**. Model biaya intinya terbukti di
+produksi, bukan hanya di atas kertas.
+
+**Batas gas blok CC3 Testnet = 75.000.000** (diukur dari `eth_getBlockByNumber`).
+Batch termahal yang pernah terjadi: **12.772.214 gas (268.704 byte, 10 tx)** —
+**17,0%** dari batas blok. Ruang kepala **5,9x**.
+
+**Kesimpulan: anggaran byte TIDAK jadi diimplementasikan sekarang.**
+
+Alasannya bukan malas, melainkan urutan biaya. Batching terjadi **sebelum** proof
+diambil, jadi indexer belum tahu ukuran `encodedTx` saat membentuk batch —
+`buildBatches` hanya menerima `{txHash, blockHeight, txIndex, observedAt}`.
+Menegakkan batas byte berarti salah satu dari dua hal, dan keduanya buruk:
+
+- mengambil ukuran receipt dari RPC Ethereum untuk **setiap** transaksi sebelum
+  membatch — satu panggilan RPC tambahan per transaksi, untuk risiko yang belum
+  pernah terjadi; atau
+- memeriksa setelah proof diambil, yang berarti memecahnya **setelah proof dibayar**.
+
+Dengan `MAX_BATCH_SIZE = 10` dan byte terbesar yang pernah terjadi di 282.208 —
+**55%** dari anggaran 513.630 byte yang setara sepertiga batas blok — batas jumlah
+transaksi sudah menjadi pengaman yang memadai.
+
+**Aksi tersisa:**
+- Pasang peringatan bila total byte satu batch melewati **400.000** (1,4x rekor
+  saat ini). Itu memberi tahu kita **sebelum** rusak, tanpa biaya RPC apa pun.
+- Tinjau ulang kalau `MAX_BATCH_SIZE` pernah dinaikkan di atas 10, atau kalau
+  protokol dengan receipt jauh lebih besar ditambahkan.
+
 
 Pemilik: Dev A.
 
