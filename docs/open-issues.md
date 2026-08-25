@@ -167,6 +167,51 @@ parameter persis di atas. Monotonisitas kurva dan `borrowIndex` diuji
 
 ---
 
+### B5 · Tidak ada dompet mainnet milik tim → `capitalSavedUsd` selalu nol 🔴
+
+**Masalah.** `capitalSavedUsdWad` mengembalikan 0 selama `effectiveRatioBps` masih
+di baseline 15000, dan dompet tanpa riwayat terbukti selalu di baseline. Angka
+utama produk — modal yang dihemat berkat skor — karena itu **tidak bisa bukan-nol**
+sampai ada dompet berskor yang benar-benar meminjam.
+
+Skor 813 (tier 4, 110%) milik `0x94963B928498bE7f06637C3D57ea1E74D7f73423`, alamat
+mainnet yang kunci privatnya **bukan milik tim**. Di CC3 kita tidak bisa
+menandatangani sebagai dia, jadi demo "pinjam di 110%" tidak bisa memakai dompet
+yang skornya 813. Diverifikasi 2026-08-25: `EfficiencyMarket` nol transaksi sejak
+deploy, dan smoke-test dengan dompet deployer (skor 0) menghasilkan
+`capitalSavedUsdWad: 0` — benar secara desain, tapi kosong di layar.
+
+**Jalan keluar yang diukur, menunggu keputusan pemilik proyek.** Pakai dompet
+mainnet milik tim untuk supply/borrow/repay kecil di Aave mainnet. Gas 2026-08-25
+= 0,15 gwei; empat transaksi ≈ **0,00012 ETH (~$0,40)**. Kolateral yang disetor
+bisa ditarik lagi.
+
+Skornya deterministik — komponennya tidak bergantung pada riwayat yang belum
+terukur, jadi ini bukan proyeksi:
+
+| Komponen | Poin | Kenapa pasti |
+|---|---|---|
+| protocolDiversity | 25 | linear, `popcount × 100 / 4`, 1 protokol |
+| activeStanding | 200 | penuh selama < 90 hari |
+| repaymentCount | 15 | 1 pelunasan → `200 × 1/13` |
+| historyDuration | ~0 | dompet baru |
+| **Total** | **~240** | → tier 1 → **140%** |
+
+Demonya jadi **150% → 140%**: kecil, tapi benar-benar diperoleh dari transaksi
+Ethereum mainnet nyata yang dibuktikan kriptografis — dan karena transaksinya
+segar, ia melewati **jalur live** (attestation ~8 menit, tarif eager murah), yang
+jauh lebih meyakinkan buat juri daripada backfill riwayat orang lain.
+
+**Menyetor besar tidak menolong.** `repaymentVolume` setengah-jenuh di $50.000;
+menyetor $100 dan $5.000 hampir tidak berbeda skornya. Ambil yang paling kecil
+yang nyaman.
+
+**Yang dibutuhkan dari pemilik proyek:** alamat dompetnya (bukan kunci privatnya)
+dan jumlah yang mau disetor.
+
+---
+
+
 ## 3. Blocker Teknis — hanya bisa dituntaskan saat development
 
 ### T1 · Tipe transaksi mana yang benar-benar didukung decoder? ✅ **SELESAI**
@@ -482,6 +527,7 @@ untuk pembicaraan CEIP.
 | Prioritas | Item | Kapan |
 |---|---|---|
 | 🟡 Sisa | **B1** backfill — CLI per-subjek ✅ 2026-08-25; endpoint per-alamat & UI belum | sebelum M3 |
+| 🔴 Kritis | **B5** dompet mainnet tim untuk riwayat Aave nyata — tanpa ini `capitalSavedUsd` selalu nol | **menunggu keputusan** |
 | 🔴 Kritis | **B2** posisi jujur soal token testnet — masukkan ke deck & video (kontrak ✅, komunikasi belum) | sebelum M5 |
 | ✅ Selesai | **T1** tipe transaksi — jalur receipt agnostik tipe | 2026-08-25 |
 | 🟠 Tinggi | **T2** anggaran batch berbasis BYTE (bukan jumlah log) | terukur; batas blok CC3 masih perlu diukur |
