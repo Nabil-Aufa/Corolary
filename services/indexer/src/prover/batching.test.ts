@@ -66,3 +66,24 @@ test('buildBatches tidak mengubah array masukan', () => {
   buildBatches(txs);
   assert.deepEqual(txs.map((t) => t.blockHeight), before);
 });
+
+test('tinggi blok di dalam batch selalu MENAIK', () => {
+  // Belum pernah diuji di chain apakah precompile mensyaratkan ini: dari 790
+  // batch multi-transaksi di produksi, nol yang tidak menaik, jadi pertanyaannya
+  // tidak pernah sempat terjawab (docs/open-issues.md T3).
+  //
+  // Sifat itu datang dari pengurutan `observedAt` — timestamp blok, yang monoton
+  // terhadap tinggi — dengan tinggi sebagai pemecah seri. Ia gratis hari ini dan
+  // tidak dijaga apa pun; tes ini yang menjaganya, supaya mengubah pengurutan
+  // tidak diam-diam mengirim batch yang mungkin ditolak precompile.
+  const txs = [tx(900, 9), tx(100, 1), tx(500, 5), tx(300, 3), tx(700, 7)];
+  for (const b of buildBatches(txs)) {
+    const h = b.map((t) => t.blockHeight);
+    assert.deepEqual(h, [...h].sort((x, y) => x - y), `batch tidak menaik: ${h.join(',')}`);
+  }
+});
+
+test('observedAt seri dipecah oleh blockHeight, bukan urutan masukan', () => {
+  const batches = buildBatches([tx(300, 5), tx(100, 5), tx(200, 5)]);
+  assert.deepEqual(batches[0]?.map((t) => t.blockHeight), [100, 200, 300]);
+});

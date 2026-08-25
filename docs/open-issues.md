@@ -346,23 +346,47 @@ Sepuluh pengiriman tunggal akan menghabiskan ~13,1 juta gas; satu batch berisi
 sepuluh menghabiskan 4,2 juta. **~3x lebih murah**, di atas penghematan biaya proof
 yang sudah ada karena satu continuity proof dibagi bersama.
 
-**Yang BELUM terbukti, dan jangan dianggap terjawab:**
+**Diperbarui 2026-08-25 malam — jalur fallback SUDAH dieksekusi di chain.**
 
-- Perilaku semua-atau-tidak-sama-sekali **tidak pernah teramati**, karena tidak ada
-  satu pun batch yang gagal. Asumsinya tetap berlaku dan fallback per-transaksi tetap
-  wajib ada.
-- Apakah tinggi blok harus menaik: seluruh batch uji kebetulan sudah terurut menaik.
-- Batas rentang di perbatasan (span tepat 999 vs 1000) tidak diuji di chain; yang
-  ditegakkan adalah `_verifyBatch` kita sendiri, yang menolak `span >= 1000`.
+16 batch masuk status `split` di produksi. Yang menentukan adalah
+`batch-25830734-25830742-6`: sepuluh transaksi, revert sebagai batch, dipecah,
+lalu **kesepuluh anggotanya berhasil masing-masing** sebagai 10 transaksi
+Creditcoin terpisah — menghasilkan 13 fakta. Jalur per-transaksi bukan lagi kode
+yang bertipe benar tapi belum pernah jalan.
 
-**Fallback per-transaksi sudah diimplementasikan** di `services/indexer/src/submitter/
-submit.ts`: batch yang revert dipecah menjadi pengiriman tunggal, dan tiap kegagalan
-tunggal diklasifikasikan sendiri (`skip` untuk tx sumber yang revert atau duplikat,
-`fatal` untuk dompet kosong). Jalurnya ada dan bertipe benar, tapi **belum pernah
-dieksekusi di chain** karena belum ada batch yang gagal.
+**Dan itu MEMBALIK asumsi awal T3.** Dugaannya: batch gagal karena ada satu
+transaksi buruk di dalamnya. Yang teramati justru sebaliknya — batch itu revert
+sementara **setiap** anggotanya sah, terbukti karena kesepuluhnya lolos sendiri-
+sendiri beberapa detik kemudian dengan proof yang baru dibeli.
 
-**Aksi tersisa:** picu satu batch gagal secara sengaja untuk mengeksekusi jalur
-fallback. Pemilik: Dev A.
+Artinya kegagalan batch **tidak menyiratkan anggota yang buruk**. `sharedContinuityProof`
+adalah titik kegagalan tunggal untuk seluruh batch: satu proof yang kedaluwarsa
+menjatuhkan sepuluh transaksi yang tidak ada cacatnya. Memecah batch tetap respons
+yang benar, tapi bukan karena ia mengisolasi anggota busuk — melainkan karena ia
+memaksa pembelian proof baru.
+
+**Yang MASIH belum terbukti:**
+
+- **Semua-atau-tidak-sama-sekali belum pernah teramati dalam bentuk murninya**,
+  yaitu satu anggota benar-benar tidak sah di antara anggota yang sah. Yang kita
+  amati adalah kegagalan tingkat-batch, bukan kegagalan tingkat-anggota. Asumsinya
+  tetap berlaku.
+- **Apakah tinggi blok harus menaik: tetap tidak terjawab.** Dari 790 batch
+  multi-transaksi, **nol** yang tidak menaik — jadi pertanyaannya tidak pernah
+  sempat diuji. Penyebabnya bukan kebetulan: `buildBatches` mengurutkan berdasarkan
+  `observedAt`, yaitu timestamp blok Ethereum, yang monoton terhadap `blockHeight`,
+  dengan `blockHeight` sebagai pemecah seri. Urutan menaik dijamin **oleh
+  konstruksi**. Kalau pengurutan itu pernah diubah, batasnya akan ditemukan dengan
+  cara yang mahal.
+- **Span di perbatasan (999 vs 1000) tetap tidak diuji di chain**, karena
+  `_verifyBatch` milik kita menolaknya lebih dulu. Sekarang dikunci tes unit di
+  `services/indexer/src/prover/batching.test.ts`, ditulis terhadap span **tepat
+  1000** — off-by-one yang benar-benar pernah rilis.
+
+
+**Aksi tersisa:** picu satu batch gagal dengan anggota yang benar-benar TIDAK SAH
+(bukan sekadar proof kedaluwarsa) untuk mengamati semua-atau-tidak-sama-sekali dalam
+bentuk murninya. Pemilik: Dev A.
 
 ---
 
