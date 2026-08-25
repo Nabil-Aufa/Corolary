@@ -375,6 +375,37 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   disalin ke SQL.** Join `prices` per alamat akan mengembalikan `null` untuk
   tUSDC/tWETH walaupun `tryToUsd1e18` on-chain menjawab benar — dan itu terlihat
   seperti "harga belum ada", bukan seperti join yang salah.
+- **`firstFactAt` adalah minimum LINTAS PROTOKOL, jadi kedalaman backfill harus
+  seragam.** Dompet demo dipindai 24 bulan di Aave tapi hanya 9 bulan di Morpho,
+  dan kesimpulannya "riwayatnya mentok 8 bulan" — padahal ada dua transaksi
+  Morpho dari 2025-09-23. Memindai sisanya menggeser `firstFactAt` mundur 91
+  hari, `historyDuration` 80 → 95, dan skor 797 → **813**, menembus tier 4.
+  Dua transaksi seharga 0,000626 CTC. Selama satu protokol saja belum dipindai
+  sedalam yang lain, "tidak ada riwayat lebih tua" adalah pernyataan tentang
+  jendela pemindaian, bukan tentang dompetnya.
+- **Jangan taksir skor dari jendela pemindaian.** Empat kali berturut-turut
+  taksiran meleset dengan pola yang sama: jumlah bulan yang diminta dianggap
+  sama dengan riwayat yang benar-benar ada. Whale dengan 1.374 transaksi
+  diproyeksikan 788–848, ternyata **684**; dompet demo diproyeksikan 829,
+  ternyata **797**. Satu-satunya angka yang bisa dipercaya datang dari
+  `componentsOf(address)` on-chain.
+- **`protocolDiversity` linear, bukan setengah-jenuh** — `popcount(bitmap) * 100 / 4`,
+  tepat 25 poin per protokol. Karena itu ia bisa dihitung pasti sebelum
+  dikerjakan, tidak seperti komponen lain. Dompet di 1 protokol mentok di 759
+  bahkan bila ketiga protokol sisanya terisi penuh; itu cukup untuk memutuskan
+  tanpa memindai apa pun.
+- **Submitter cuma memuat ABI `FactRegistry`.** Custom error dari kontrak lain —
+  precompile Attestcoin termasuk — tidak punya selector di ABI itu, jadi ethers
+  menyerah dengan `execution reverted (unknown custom error)`: kalimat yang sama
+  untuk sebab yang berbeda-beda. 49 event ditandai gagal permanen dengan teks itu
+  dan nol petunjuk. Payload-nya selalu ada di `err.data`; ia cuma tidak pernah
+  dibaca. Selalu catat selector 4-byte-nya.
+- **Backfill yang menyerah di satu rentang tetap melaporkan ringkasan sukses.**
+  `failures` dicatat di baris error TERPISAH sesudah baris ringkasan, jadi
+  ringkasannya terbaca lengkap dan exit code-nya 0. Gejalanya paling berbahaya
+  dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
+  yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
+  code jadi 2.
 - **Token testnet dinilai lewat `PriceRegistry.setPriceAlias`.** `tUSDC`/`tWETH`
   tidak punya feed Chainlink sendiri, dan satu aggregator hanya bisa menunjuk satu
   aset. Alias membuat mereka memakai harga mainnet yang benar-benar dibuktikan —

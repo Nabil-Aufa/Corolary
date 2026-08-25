@@ -67,7 +67,7 @@ if (!Number.isFinite(priority) || priority < 0) {
   process.exit(1);
 }
 
-await backfillSubject({
+const result = await backfillSubject({
   subject,
   months,
   untilMonths,
@@ -78,5 +78,12 @@ await backfillSubject({
   .catch((err) => {
     logger.error({ err: String(err) }, 'backfill gagal');
     process.exitCode = 1;
+    return null;
   })
   .finally(closeDb);
+
+// Riwayat berlubang HARUS terlihat dari exit code, bukan cuma dari satu baris
+// log di antara ratusan. Sebelumnya backfill yang menyerah di satu rentang tetap
+// keluar 0, jadi pemanggil mana pun — skrip, CI, atau manusia yang membaca baris
+// terakhir — menyimpulkan riwayatnya lengkap.
+if (result && result.failedRanges > 0) process.exitCode = 2;

@@ -98,7 +98,12 @@ interface Found {
   logs: ethers.Log[];
 }
 
-export async function backfillSubject(opts: BackfillOptions): Promise<void> {
+export interface BackfillResult {
+  /** > 0 berarti riwayatnya BERLUBANG, bukan sekadar "ada yang lambat". */
+  failedRanges: number;
+}
+
+export async function backfillSubject(opts: BackfillOptions): Promise<BackfillResult> {
   const subject = ethers.getAddress(opts.subject);
   const targets = targetsFor(opts.protocols);
 
@@ -171,7 +176,7 @@ export async function backfillSubject(opts: BackfillOptions): Promise<void> {
     });
   }
 
-  await report(found, subject, preExisting);
+  await report(found, subject, preExisting, failures.length);
 
   if (failures.length > 0) {
     // Riwayat yang tidak lengkap tanpa ada yang tahu adalah kegagalan terburuk
@@ -184,13 +189,14 @@ export async function backfillSubject(opts: BackfillOptions): Promise<void> {
 
   if (opts.dryRun) {
     log.info('dry-run: tidak ada yang ditulis ke database');
-    return;
+    return { failedRanges: failures.length };
   }
 
   // Cursor TIDAK disentuh. Cursor menandai sampai mana watcher live sudah
   // memindai MAJU; memundurkannya karena backfill akan membuat watcher
   // memindai ulang berbulan-bulan sebagai lalu lintas live.
   log.info({ subject, inserted }, 'backfill selesai — event masuk antrean pipeline biasa');
+  return { failedRanges: failures.length };
 }
 
 /** Rentang yang tetap gagal setelah dipecah sampai batas bawah. */
@@ -387,6 +393,7 @@ async function report(
   found: Found[],
   subject: string,
   preExisting: Set<string> | null,
+  failedRanges: number,
 ): Promise<void> {
   const allTx = new Map<string, ProvableTx>();
   let totalLogs = 0;
@@ -449,6 +456,10 @@ async function report(
       batchTerbentuk: batches.length,
       ukuranBatch: Object.fromEntries([...sizes.entries()].sort((a, b) => a[0] - b[0])),
       perkiraanBiayaProofCtc: Number((fresh.length * LAZY_PROOF_CTC).toFixed(6)),
+      // Ikut di baris RINGKASAN, bukan hanya di baris error terpisah sesudahnya.
+      // Ringkasan yang tidak menyebut lubang terbaca lengkap, dan itulah yang
+      // membuat "127 tx" tampak final padahal satu rentang menyerah.
+      rentangGagal: failedRanges,
     },
     'ringkasan backfill',
   );

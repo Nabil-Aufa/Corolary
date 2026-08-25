@@ -1,3 +1,6 @@
+import { ethers } from 'ethers';
+import { loadAbi } from '../chain/abi.js';
+
 /**
  * Klasifikasi error submit.
  *
@@ -20,6 +23,8 @@ export interface Classified {
   reason: string;
   /** Nama custom error Solidity, kalau berhasil didecode. */
   revertName?: string;
+  /** Selector 4-byte mentah, diisi justru ketika namanya TIDAK bisa didecode. */
+  selector?: string;
 }
 
 /** Custom error yang berarti fakta sudah tercatat / memang tidak layak dicatat. */
@@ -46,6 +51,27 @@ interface EthersLikeError {
   shortMessage?: string;
   message?: string;
   code?: string;
+  /** Payload revert mentah. ethers mengisinya walau namanya tak dikenal. */
+  data?: unknown;
+  info?: { error?: { data?: unknown } };
+}
+
+/**
+ * Selector 4-byte dari revert yang TIDAK bisa dinamai.
+ *
+ * ethers membuang payload-nya dari pesan begitu selector tidak ada di ABI, dan
+ * yang tersisa cuma "execution reverted (unknown custom error)" — kalimat yang
+ * sama untuk sebab yang berbeda-beda. 49 event ditandai gagal permanen dengan
+ * teks itu dan tidak ada satu pun petunjuk untuk melacaknya.
+ *
+ * Selector-nya sendiri selalu ada di `data`; ia cuma tidak pernah dibaca. Empat
+ * byte ini yang membedakan "kontrak kita menolak" dari "precompile menolak" —
+ * dan error precompile memang tidak akan pernah ada di ABI kita.
+ */
+function revertSelector(e: EthersLikeError): string | undefined {
+  const raw = e.data ?? e.info?.error?.data;
+  if (typeof raw !== 'string' || !raw.startsWith('0x') || raw.length < 10) return undefined;
+  return raw.slice(0, 10);
 }
 
 /**
@@ -65,9 +91,32 @@ const STALE_PROOF_MESSAGES = [
   'checkpoint',
 ];
 
+/**
+ * Selector -> nama, dibangun sendiri dari ABI FactRegistry.
+ *
+ * ethers TIDAK selalu menamai custom error walau error itu ada di ABI: kalau
+ * revert-nya muncul lewat jalur yang tidak membawa konteks kontrak (estimateGas,
+ * misalnya), yang sampai cuma `data` mentah dan pesan generik. Terukur:
+ * `QueryAlreadyProcessed` — ada di ABI, ada di SKIP_ERRORS — tetap dilaporkan
+ * sebagai "unknown custom error", sehingga 49 event yang seharusnya DILEWATI
+ * (fakta memang sudah tercatat, kontrak menolak duplikat dengan benar) justru
+ * ditandai gagal permanen.
+ *
+ * Mencocokkan selector sendiri membuat klasifikasi tidak lagi bergantung pada
+ * jalur mana error itu kebetulan lewat.
+ */
+const errorNameBySelector: Map<string, string> = (() => {
+  const map = new Map<string, string>();
+  const iface = new ethers.Interface(loadAbi('FactRegistry'));
+  iface.forEachError((frag) => map.set(frag.selector, frag.name));
+  return map;
+})();
+
 export function classifySubmitError(err: unknown, isBatch: boolean): Classified {
   const e = (err ?? {}) as EthersLikeError;
-  const revertName = e.revert?.name;
+  const selectorRaw = revertSelector(e);
+  const revertName =
+    e.revert?.name ?? (selectorRaw ? errorNameBySelector.get(selectorRaw) : undefined);
   const text = (e.shortMessage ?? e.message ?? String(err)).toLowerCase();
 
   // `Error(string)` adalah revert BERPESAN standar Solidity, bukan custom error
@@ -102,6 +151,16 @@ export function classifySubmitError(err: unknown, isBatch: boolean): Classified 
       };
     }
     return { verdict: 'fatal', reason: `custom error tak dikenal: ${revertName}`, revertName };
+  }
+
+  // Revert yang tidak bisa dinamai TAPI selectornya terbaca. Bukan fatal:
+  // sebabnya belum diketahui, dan menandainya permanen membuang buktinya.
+  if (selectorRaw) {
+    return {
+      verdict: 'retryable',
+      reason: `revert tak dikenal, selector ${selectorRaw}`,
+      selector: selectorRaw,
+    };
   }
 
   // Dompet kosong tidak akan pernah membaik dengan sendirinya. Retry hanya
