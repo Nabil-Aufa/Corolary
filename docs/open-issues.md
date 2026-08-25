@@ -568,7 +568,7 @@ untuk fakta beraset itu tetap `null`. Menambahkannya adalah panggilan
 
 ---
 
-### T6 · Reorg Ethereum sebelum attestation 🟡
+### T6 · Reorg Ethereum sebelum attestation ✅ **SELESAI**
 
 **Masalah.** Indexer bisa melihat event di blok yang kemudian ter-reorg.
 
@@ -578,18 +578,43 @@ menambah latensi yang berarti karena kita memang harus menunggu attestation.
 Sebagai jaring pengaman: attestation itu sendiri hanya terjadi pada blok terkonfirmasi,
 sehingga transaksi ter-reorg tidak akan pernah punya proof yang sah.
 
-**Aksi:** pakai tag `finalized` di watcher. Pemilik: Dev A.
+**Terimplementasi.** `services/indexer/src/watcher/watch.ts` memakai konstanta
+`FINALIZED` untuk menentukan batas atas pemindaian — blok yang belum finalized
+tidak pernah masuk `observed_events`, jadi tidak ada fakta yang bisa berasal dari
+blok ter-reorg. `backfill/run.ts` memakai tag yang sama untuk head-nya.
+Dihindari secara desain, bukan ditangani setelah terjadi. Pemilik: Dev A.
 
 ---
 
-### T7 · Gas CTC untuk dompet indexer 🟡
+### T7 · Gas CTC untuk dompet indexer ✅ **SELESAI**
 
 **Masalah.** Indexer mengirim transaksi terus-menerus. Kalau CTC habis, pipeline mati senyap.
 
 **Solusi:** monitor saldo, alert di ambang batas, dan **jangan** memakai satu dompet
 untuk semua peran. Faucet testnet punya limit — minta lebih awal, jangan saat sudah kering.
 
-**Aksi:** alert saldo + runbook. Pemilik: Dev A.
+**Terimplementasi 2026-08-25** di `services/indexer/src/submitter/balance.ts`,
+dengan ambang yang diturunkan dari biaya NYATA, bukan dikarang.
+
+Terukur atas 476 batch produksi: 1.340.325.969 gas pada baseFee CC3 **0,5 gwei**
+= **0,67 CTC**, yaitu **~0,0014 CTC per batch**.
+
+| Ambang | Sisa batch | Perilaku |
+|---|---|---|
+| < 25 CTC | ~17.800 | `warn` — minta faucet sebelum kering |
+| < 5 CTC | ~3.500 | `error` — antrean akan berhenti total |
+
+Saldo saat ini **498,88 CTC ≈ 356.000 batch**, jadi risikonya jauh lebih kecil
+daripada yang T7 bayangkan. Ambangnya tetap dipasang tinggi karena faucet testnet
+punya limit harian dan tidak bisa mengisi seketika — peringatan yang baru berbunyi
+saat sudah kering tidak ada gunanya.
+
+Diperiksa saat start (paksa, supaya terbaca di baris pertama log) lalu tiap 10
+menit, bukan tiap batch: `eth_getBalance` per pengiriman berarti satu panggilan
+RPC tambahan untuk angka yang bergerak sangat lambat.
+
+**Peran memang sudah dipisah**: `DEPLOYER` untuk deploy dan konfigurasi,
+`SUBMITTER` khusus untuk pencatatan fakta dan harga. Pemilik: Dev A.
 
 ---
 
@@ -622,17 +647,20 @@ untuk pembicaraan CEIP.
 | 🔴 Kritis | **B5** dompet mainnet tim untuk riwayat Aave nyata — tanpa ini `capitalSavedUsd` selalu nol | **menunggu keputusan** |
 | 🔴 Kritis | **B2** posisi jujur soal token testnet — masukkan ke deck & video (kontrak ✅, komunikasi belum) | sebelum M5 |
 | ✅ Selesai | **T1** tipe transaksi — jalur receipt agnostik tipe | 2026-08-25 |
-| 🟠 Tinggi | **T2** anggaran batch berbasis BYTE (bukan jumlah log) | terukur; batas blok CC3 masih perlu diukur |
-| 🟠 Tinggi | **T3** batas batch verify | **di M1** |
+| ✅ Diputuskan | **T2** byte mengikat (47,4 gas/byte, n=476); blok CC3 = 75jt, puncak 17% — anggaran tidak ditegakkan, peringatan 400 KB dipasang | 2026-08-25 |
+| 🟡 Sisa | **T3** fallback per-transaksi TERBUKTI di chain; semua-atau-tidak-sama-sekali murni & urutan tinggi belum teramati | opsional |
 | ✅ Selesai | **B3** kunci rasio + masa tenggang 7 hari | 2026-08-25 |
 | ✅ Selesai | **B4** model bunga linear kink | 2026-08-25 |
 | ✅ Selesai | **T5** himpunan aggregator + kesegaran di titik baca | 2026-08-25 |
 | ✅ Selesai | **T5b** jalur harga di indexer + deteksi rotasi aggregator | 2026-08-25 |
 | ✅ Selesai | **T4** Morpho — tabel pasar via `setMarket` | 2026-08-25 |
 | ✅ Diputuskan | **T8** Compound V3 — biarkan tidak dipetakan; 0,5% registry, nol di dompet demo | 2026-08-25 |
-| 🟡 Rendah | **T6, T7** finalized tag, alert saldo gas | M2 |
+| ✅ Selesai | **T6** watcher memakai tag `finalized` | 2026-08-25 |
+| ✅ Selesai | **T7** alert saldo submitter, ambang dari biaya terukur | 2026-08-25 |
 | 🟢 Pantau | **O1** kesiapan writability | berkala |
 
-> **Satu kalimat kalau harus memilih:** kerjakan **M1** dulu (satu event Aave mainnet
-> nyata terbukti dan tercatat), karena T1/T2/T3 hanya bisa dijawab di sana — dan
-> ketiganya berpotensi mengubah desain. Semua pekerjaan lain bertumpu pada jawaban itu.
+> **Satu kalimat kalau harus memilih:** kerjakan **B5**. M1 sudah lama lewat — per
+> 2026-08-25 ada **3.958 fakta dari 706 dompet** di registry, dan T1/T2/T3 sudah
+> terjawab dari data produksi. Yang tersisa bukan lagi soal teknis: tanpa dompet
+> mainnet yang bisa kita tandatangani, layar utama produk menampilkan `"0.00"`
+> betapa pun lengkapnya semua yang sudah dibangun.

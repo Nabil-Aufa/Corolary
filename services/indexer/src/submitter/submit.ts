@@ -10,6 +10,7 @@ import { proofBuilder } from '../prover/client.js';
 import { splitToSingles, type BatchBundleJson, type SingleBundleJson } from '../prover/bundle.js';
 import { nextRetryDelayMs } from '../prover/run.js';
 import { persistReceipt } from './persist.js';
+import { checkSubmitterBalance } from './balance.js';
 
 const log = stageLogger('submitter');
 
@@ -29,6 +30,9 @@ export async function initSubmitter(): Promise<void> {
   const { factRegistry: address } = requireContracts();
   factRegistry = new ethers.Contract(address, loadAbi('FactRegistry'), submitter);
   const nonce = await reconcileNonce();
+  // Sekali saat start, tanpa menunggu interval: kalau saldonya sudah kritis,
+  // itu harus terbaca di baris pertama log, bukan sepuluh menit kemudian.
+  await checkSubmitterBalance(true);
   const reclaimed = await reclaimOrphanedBatches();
   const requeued = await requeueOrphanedEvents();
   log.info(
@@ -90,6 +94,10 @@ export async function submitOnce(): Promise<void> {
 
   const row = rows[0];
   if (!row) return;
+
+  // Sebelum mengirim, bukan sesudah. Dibatasi interval di dalamnya, jadi ini
+  // tidak menambah panggilan RPC per batch.
+  void checkSubmitterBalance();
 
   await submitBatch(row);
 }
