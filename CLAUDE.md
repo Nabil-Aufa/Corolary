@@ -375,6 +375,29 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   disalin ke SQL.** Join `prices` per alamat akan mengembalikan `null` untuk
   tUSDC/tWETH walaupun `tryToUsd1e18` on-chain menjawab benar — dan itu terlihat
   seperti "harga belum ada", bukan seperti join yang salah.
+- **`cast send` di CC3 bisa kehabisan gas dengan gejala yang terbaca seperti
+  revert.** `eth_estimateGas` CC3 dijawab terhadap state beberapa blok lebih
+  tua; untuk `repay`, bunga terus berjalan sehingga kebutuhan gas naik di antara
+  estimasi dan eksekusi. Terukur: limit **224.001**, kebutuhan **228.804** —
+  transaksi mati dengan `status 0x0` dan **`gasUsed == gasLimit` PERSIS**. Itu
+  satu-satunya pembeda dari revert logika. Pakai `--gas-limit` eksplisit yang
+  longgar, jangan mengandalkan estimasi cast. Sekeluarga dengan
+  `forge --gas-estimate-multiplier 800`.
+- **"Repay all" tidak boleh mengirim `type(uint256).max` begitu saja.** `repay`
+  meng-clamp `amount > debt` ke `debt`, jadi max aman terhadap **utang** — tapi
+  tidak terhadap **saldo**: kalau saldo < utang, `transferFrom` revert dan
+  gejalanya terbaca seperti bug kontrak. Yang benar `min(utang, saldo)`, lalu
+  tarik supply untuk menutup sisanya. Terukur: utang 4.804.687.652 lawan saldo
+  4.335.937.523 karena sebagian tUSDC terkunci sebagai supply.
+- **Melunasi persis sebesar yang dipinjam SELALU menyisakan debu.** Bunga
+  berjalan di antara `borrow` dan `repay`, jadi `amount < debt` dan sisanya terus
+  berbunga selamanya. Terukur: sisa **15** unit. Sama untuk menarik dana dari
+  supply lalu melunasi — saldo mendarat persis sebesar utang lama, lalu satu blok
+  bunga membuatnya kurang lagi. Selalu sertakan penyangga.
+- **`capitalSavedUsdWad` mengembalikan 0 untuk dompet berskor 0**, karena
+  `effectiveRatioBps` = baseline 15000 dan fungsinya `return 0` bila rasio ≥
+  baseline. Itu benar, bukan bug — tapi berarti angka penghematan modal
+  **mustahil bukan-nol** tanpa dompet yang punya riwayat mainnet terbukti.
 - **`firstFactAt` adalah minimum LINTAS PROTOKOL, jadi kedalaman backfill harus
   seragam.** Dompet demo dipindai 24 bulan di Aave tapi hanya 9 bulan di Morpho,
   dan kesimpulannya "riwayatnya mentok 8 bulan" — padahal ada dua transaksi
