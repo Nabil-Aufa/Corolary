@@ -6,7 +6,14 @@ export const logger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
 });
 
-export type Stage = 'watcher' | 'attestation-waiter' | 'prover' | 'submitter' | 'prices' | 'backfill';
+export type Stage =
+  | 'watcher'
+  | 'attestation-waiter'
+  | 'prover'
+  | 'submitter'
+  | 'prices'
+  | 'backfill'
+  | 'rpc';
 
 /** Logger anak dengan field `stage` terpasang (docs/indexer.md §12.1). */
 export function stageLogger(stage: Stage) {

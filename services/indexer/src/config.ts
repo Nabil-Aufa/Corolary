@@ -14,6 +14,12 @@ const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'harus alamat EVM');
 
 const schema = z.object({
   ETHEREUM_RPC_URL: z.url(),
+  /**
+   * RPC Ethereum cadangan. Opsional, tapi tanpanya tidak ada failover sama
+   * sekali — variabel ini sempat ada di `.env` selama berminggu-minggu TANPA
+   * dibaca kode mana pun, memberi rasa aman yang palsu.
+   */
+  ETHEREUM_RPC_URL_FALLBACK: z.url().or(z.literal('')).optional(),
   ETHEREUM_CHAIN_KEY: z.coerce.number().int().positive(),
   CREDITCOIN_RPC_URL: z.url(),
   CREDITCOIN_CHAIN_ID: z.coerce.number().int().positive(),

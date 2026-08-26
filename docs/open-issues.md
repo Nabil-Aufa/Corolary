@@ -108,6 +108,48 @@ Tenggat: sebelum M3.
 
 ---
 
+### B8 · Failover RPC Ethereum ✅ **SELESAI**
+
+**Masalah.** `ETHEREUM_RPC_URL_FALLBACK` ada di `.env` selama berminggu-minggu
+**tanpa dibaca kode mana pun**. Ia memberi rasa aman yang palsu: kalau drpc jatuh,
+tidak ada yang beralih ke mana pun. Risikonya naik setelah indexer pindah ke
+Railway — IP datacenter yang dibagi banyak pengguna, tanpa ada yang mengawasi.
+
+**Yang membatalkan solusi paling jelas.** `ethers.FallbackProvider` mengasumsikan
+para provider setara. Terukur atas rentang 2.000 blok kontrak Aave V3, 2026-08-26:
+
+| Provider | Hasil |
+|---|---|
+| **drpc** | 2.602 log dalam 0,9 detik |
+| Alchemy free | ditolak — `eth_getLogs` maks **10 blok** |
+| publicnode | ditolak — archive butuh token |
+| ankr | ditolak — butuh autentikasi |
+| 1rpc | ditolak — maks 50 blok |
+| llamarpc | tidak menjawab JSON sama sekali |
+
+Tidak ada provider gratis kedua yang menyamai drpc untuk `eth_getLogs` rentang
+lebar. Failover buta akan tetap gagal di jalur yang paling sering dipakai watcher.
+
+**Solusi: failover bertingkat menurut kemampuan** (`chain/failover.ts`).
+`getBlock`/`getTransactionReceipt`/`eth_call` dilayani cadangan sepenuhnya;
+`eth_getLogs` dipecah ke potongan 10 blok, dan di atas 50 potongan ia MENOLAK
+dengan sebab yang jelas alih-alih membanjiri provider yang sedang diandalkan.
+
+Tidak pernah mengembalikan array kosong saat cadangan tidak sanggup — itu meniru
+llamarpc dan membuat watcher memajukan cursor melewati event yang tidak terbaca.
+
+**Terverifikasi live:** primary diarahkan ke host yang tidak ada, Alchemy melayani
+`getBlock` dan `getLogs` 30 blok, hasilnya **56 log di 15 blok — identik dengan
+kontrol saat primary sehat**. 8 tes unit, detail di `docs/indexer.md` §11.0.
+
+**Batasnya, terbuka:** kalau drpc mati, watcher jauh lebih lambat dan chunk lebar
+ditolak. Yang menyelamatkan situasi itu bukan failover, melainkan kenyataan bahwa
+pemadaman RPC Ethereum hanya menghentikan PENEMUAN event baru — attestation,
+prover, dan submitter memakai Creditcoin dan Proof Builder, jadi antrean yang
+sudah ada tetap mengalir.
+
+---
+
 ### B6 · `maxPriceAge` lebih pendek dari heartbeat feed ✅ **SELESAI**
 
 **Masalah.** `PriceRegistry.maxPriceAge` default 24 jam, sama persis dengan

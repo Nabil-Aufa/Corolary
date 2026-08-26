@@ -769,6 +769,56 @@ jalur kritis saat ini).
 
 ## 11. Rate Limit RPC & Kewajiban Archive Node
 
+### 11.0 Failover RPC — sadar kemampuan, bukan `FallbackProvider`
+
+`ETHEREUM_RPC_URL_FALLBACK` dipakai OTOMATIS sejak 2026-08-26. Sebelumnya ia ada
+di `.env` selama berminggu-minggu tanpa dibaca kode mana pun — memberi rasa aman
+yang palsu.
+
+**Kenapa bukan `ethers.FallbackProvider`:** ia mengasumsikan para provider setara.
+Terukur pada rentang 2.000 blok kontrak Aave V3, 2026-08-26:
+
+| Provider | Hasil |
+|---|---|
+| **drpc** | 2.602 log dalam 0,9 detik |
+| Alchemy free | ditolak — `eth_getLogs` maks **10 blok** |
+| publicnode | ditolak — archive butuh token |
+| ankr | ditolak — butuh autentikasi |
+| 1rpc | ditolak — maks 50 blok |
+| llamarpc | tidak menjawab JSON sama sekali |
+
+Tidak ada provider gratis kedua yang menyamai drpc untuk `eth_getLogs` rentang
+lebar. Jadi failover-nya bertingkat menurut kemampuan:
+
+- **`getBlock`, `getTransactionReceipt`, `eth_call`** — cadangan melayani penuh
+  (`ethCall()` di `chain/providers.ts`).
+- **`eth_getLogs`** — cadangan hanya sanggup <= 10 blok, jadi `ethGetLogs()`
+  memecah rentangnya. Di atas **50 potongan** ia MENOLAK dengan sebab yang jelas
+  alih-alih membanjiri provider yang justru sedang kita andalkan.
+
+**Ia tidak pernah mengembalikan array kosong saat cadangan tidak sanggup.**
+Provider yang menjawab kosong tanpa error sudah pernah menipu proyek ini
+(llamarpc menjawab `result: []` untuk rentang berisi 711 log Aave). Kalau failover
+meniru itu, watcher menyimpulkan protokolnya sepi lalu memajukan cursor melewati
+event yang tidak pernah terbaca — kehilangan permanen tanpa satu pun gejala.
+
+**Terverifikasi live**, bukan hanya lewat tes: dengan primary diarahkan ke host
+yang tidak ada, Alchemy melayani `getBlock` dan `getLogs` 30 blok, dan hasilnya
+**56 log di 15 blok — identik dengan kontrol saat primary sehat**. Mencocokkan
+hasil dengan provider kedua adalah syaratnya, bukan sekadar memastikan tidak error.
+
+Log-nya berjenjang: peringatan PERTAMA berlevel `error` dan menyebut
+"Pipeline berjalan DEGRADASI"; berikutnya `warn`. Kalau tiap permintaan berteriak
+sama kencangnya, tidak ada yang terbaca.
+
+**Batasnya, dinyatakan terbuka:** kalau drpc mati, watcher berjalan jauh lebih
+lambat dan chunk lebar akan ditolak. Yang menyelamatkan situasi itu bukan failover
+melainkan kenyataan bahwa pemadaman RPC Ethereum hanya menghentikan PENEMUAN event
+baru — attestation, prover, dan submitter memakai Creditcoin dan Proof Builder,
+jadi antrean yang sudah ada tetap mengalir.
+
+---
+
 ### 11.1 Kenapa RPC Harus Archive-Capable
 
 `ETHEREUM_RPC_URL` **wajib** archive-capable (Alchemy/Infura/QuickNode) —

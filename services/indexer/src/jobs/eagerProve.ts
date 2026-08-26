@@ -1,5 +1,5 @@
 import { sql } from '../db/client.js';
-import { ethereum, ETH_CHAIN_KEY } from '../chain/providers.js';
+import { ETH_CHAIN_KEY, ethCall } from '../chain/providers.js';
 import { PROTOCOLS } from '../watcher/protocols.js';
 import { stageLogger } from '../logger.js';
 
@@ -40,7 +40,7 @@ export async function runEagerProveJobs(): Promise<void> {
   const { txHash } = job.payload;
 
   try {
-    const receipt = await ethereum.getTransactionReceipt(txHash);
+    const receipt = await ethCall('getTransactionReceipt', (p) => p.getTransactionReceipt(txHash));
     if (!receipt) {
       await finish(job.id, 'failed', `transaksi ${txHash} tidak ditemukan di Ethereum`);
       return;
@@ -52,7 +52,7 @@ export async function runEagerProveJobs(): Promise<void> {
       return;
     }
 
-    const block = await ethereum.getBlock(receipt.blockNumber);
+    const block = await ethCall('getBlock', (p) => p.getBlock(receipt.blockNumber));
     if (!block) {
       await requeue(job, 'blok belum tersedia di RPC');
       return;

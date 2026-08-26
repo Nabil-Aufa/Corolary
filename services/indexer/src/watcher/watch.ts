@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import type { TransactionSql } from 'postgres';
 import { sql } from '../db/client.js';
-import { ethereum, ETH_CHAIN_KEY } from '../chain/providers.js';
+import { ETH_CHAIN_KEY, ethGetLogs, ethCall } from '../chain/providers.js';
 import { stageLogger } from '../logger.js';
 import type { ProtocolWatchConfig } from './protocols.js';
 
@@ -126,7 +126,7 @@ export async function insertLogs(
  * cursor bisa maju sementara log belum masuk, dan event itu hilang selamanya.
  */
 export async function watchOnce(cfg: ProtocolWatchConfig): Promise<void> {
-  const head = await ethereum.getBlock(FINALIZED);
+  const head = await ethCall('getBlock', (p) => p.getBlock(FINALIZED));
   if (!head) return; // RPC belum siap; coba lagi di iterasi berikutnya
 
   const stored = await readCursor(cfg.address);
@@ -141,7 +141,7 @@ export async function watchOnce(cfg: ProtocolWatchConfig): Promise<void> {
   let logs: ethers.Log[];
   const startedAt = Date.now();
   try {
-    logs = await ethereum.getLogs({
+    logs = await ethGetLogs({
       address: cfg.address,
       topics: [cfg.topics],
       fromBlock,
@@ -215,7 +215,7 @@ export async function blockTimestamps(heights: Set<number>): Promise<Map<number,
       for (;;) {
         const h = queue.pop();
         if (h === undefined) return;
-        const block = await ethereum.getBlock(h);
+        const block = await ethCall('getBlock', (p) => p.getBlock(h));
         if (block) out.set(h, block.timestamp);
       }
     },

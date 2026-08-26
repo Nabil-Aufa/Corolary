@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { sql } from '../db/client.js';
-import { ethereum, submitter, ETH_CHAIN_KEY } from '../chain/providers.js';
+import { submitter, ETH_CHAIN_KEY, ethGetLogs, ethCall } from '../chain/providers.js';
 import { loadAbi } from '../chain/abi.js';
 import { requireContracts } from '../config.js';
 import { stageLogger } from '../logger.js';
@@ -126,8 +126,10 @@ export async function initPrices(): Promise<void> {
     // Deteksi rotasi. Ini kegagalan yang paling sulit terlihat, jadi ia harus
     // berisik justru saat semuanya tampak baik-baik saja.
     try {
-      const proxy = new ethers.Contract(feed.proxy, proxyAbi, ethereum);
-      const live = (await proxy.getFunction('aggregator')()) as string;
+      const live = await ethCall('aggregator', async (p) => {
+        const proxy = new ethers.Contract(feed.proxy, proxyAbi, p);
+        return (await proxy.getFunction('aggregator')()) as string;
+      });
       if (ethers.getAddress(live) !== ethers.getAddress(feed.aggregator)) {
         log.error(
           { pair: feed.pair, configured: feed.aggregator, live },
@@ -155,7 +157,7 @@ export async function initPrices(): Promise<void> {
 }
 
 export async function refreshPricesOnce(): Promise<void> {
-  const head = await ethereum.getBlock('finalized');
+  const head = await ethCall('getBlock', (p) => p.getBlock('finalized'));
   if (!head) return;
 
   // Satu transaksi Ethereum hanya boleh dikirim sekali per putaran: replay
@@ -345,7 +347,7 @@ async function getLogsWithRetry(filter: ethers.Filter): Promise<ethers.Log[]> {
   let delay = 1_500;
   for (let attempt = 0; ; attempt++) {
     try {
-      return await ethereum.getLogs(filter);
+      return await ethGetLogs(filter);
     } catch (err) {
       if (attempt >= 2) throw err;
       await new Promise((r) => setTimeout(r, delay));
@@ -443,7 +445,7 @@ async function resolveSourceTx(
   roundId: bigint,
 ): Promise<string | null> {
   try {
-    const logs = await ethereum.getLogs({
+    const logs = await ethGetLogs({
       address: feed.aggregator,
       topics: [ANSWER_UPDATED_TOPIC],
       fromBlock: blockNumber,

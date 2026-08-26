@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { sql } from '../db/client.js';
-import { creditcoin, ethereum, ETH_CHAIN_KEY } from '../chain/providers.js';
+import { creditcoin, ETH_CHAIN_KEY, ethCall } from '../chain/providers.js';
 import { loadAbi } from '../chain/abi.js';
 import { requireContracts } from '../config.js';
 import { stageLogger } from '../logger.js';
@@ -237,9 +237,15 @@ export async function ensureAsset(asset: string): Promise<void> {
   let symbol = '';
   let decimals = 18;
   try {
-    const token = new ethers.Contract(address, ERC20_ABI, ethereum);
-    symbol = (await token.getFunction('symbol')()) as string;
-    decimals = Number(await token.getFunction('decimals')());
+    const meta = await ethCall('erc20Metadata', async (p) => {
+      const token = new ethers.Contract(address, ERC20_ABI, p);
+      return {
+        symbol: (await token.getFunction('symbol')()) as string,
+        decimals: Number(await token.getFunction('decimals')()),
+      };
+    });
+    symbol = meta.symbol;
+    decimals = meta.decimals;
   } catch {
     // Sebagian token lama (mis. MKR) memakai bytes32 untuk symbol dan akan gagal
     // di-decode. Alamat terpotong lebih jujur daripada menebak nama.

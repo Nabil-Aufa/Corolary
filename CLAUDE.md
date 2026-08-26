@@ -429,6 +429,15 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
   yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
   code jadi 2.
+- **Tidak ada RPC gratis kedua yang menyamai drpc untuk `eth_getLogs` lebar.**
+  Diukur 2026-08-26 atas rentang 2.000 blok Aave V3: drpc 2.602 log/0,9 detik;
+  Alchemy free menolak di atas **10 blok**; publicnode dan ankr menuntut token;
+  1rpc maks 50 blok; llamarpc tidak menjawab JSON sama sekali. Karena itu
+  failover-nya sadar-kemampuan, bukan `ethers.FallbackProvider` yang
+  mengasumsikan provider setara — `chain/failover.ts`.
+- **Failover TIDAK boleh mengembalikan array kosong saat cadangan tidak sanggup.**
+  Itu meniru mode kegagalan llamarpc dan membuat watcher memajukan cursor
+  melewati event yang tidak pernah terbaca. Ia melempar, dengan sebabnya.
 - **Gerbang yang tidak menemukan berkas apa pun HARUS gagal, bukan lulus.**
   `check-no-mocks.mjs` memakai `new URL('..', import.meta.url).pathname`, yang
   di Windows menghasilkan `/D:/Web3/CTC/` — dengan garis miring di depan.

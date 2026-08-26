@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { sql } from '../db/client.js';
-import { ethereum, ETH_CHAIN_KEY } from '../chain/providers.js';
+import { ETH_CHAIN_KEY, ethGetLogs, ethCall } from '../chain/providers.js';
 import { stageLogger } from '../logger.js';
 import { insertLogs, blockTimestamps } from '../watcher/watch.js';
 import { buildBatches, type ProvableTx } from '../prover/batching.js';
@@ -116,7 +116,7 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
   const subject = ethers.getAddress(opts.subject);
   const targets = targetsFor(opts.protocols);
 
-  const head = await ethereum.getBlock('finalized');
+  const head = await ethCall('getBlock', (p) => p.getBlock('finalized'));
   if (!head) throw new Error('RPC Ethereum tidak mengembalikan blok finalized');
 
   const blocks = Math.round((opts.months * 30.44 * 24 * 3600) / 12);
@@ -389,7 +389,7 @@ async function getLogsWithRetry(filter: ethers.Filter): Promise<ethers.Log[]> {
   let delay = 2_000;
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      return await ethereum.getLogs(filter);
+      return await ethGetLogs(filter);
     } catch (err) {
       if (attempt === 3) throw err;
       log.warn(
