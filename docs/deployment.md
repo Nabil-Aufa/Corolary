@@ -151,9 +151,45 @@ Ukuran data kecil — puluhan ribu baris. Free tier lebih dari cukup untuk hacka
 Ini bukan preferensi gaya. Menjalankannya serverless akan rusak dengan cara yang halus
 dan sulit didiagnosis.
 
+**Healthcheck harus DIKOSONGKAN untuk indexer.** Ia worker tanpa server HTTP;
+mengisi path apa pun membuat setiap deploy gagal, dan gejalanya terbaca seperti
+aplikasinya yang rusak. API sebaliknya: isi `/v1/health`.
+
 **Jalankan tepat satu instance.** Jangan aktifkan autoscaling. Dua indexer yang
 memproses event sama akan bertabrakan nonce; replay protection on-chain menyelamatkan
 konsistensi data, tapi transaksi terbuang dan CTC terkuras.
+
+
+### Build & start command — Railway TIDAK bisa menebaknya
+
+Ditemukan saat deploy sungguhan 2026-08-26. Ketiganya gagal dengan gejala yang
+tidak menunjuk penyebabnya, jadi ditulis lengkap di sini.
+
+| Setting | Nilai |
+|---|---|
+| Build | `pnpm install --frozen-lockfile && pnpm --filter @corolary/shared build` |
+| Start (indexer) | `pnpm --filter @corolary/indexer start` |
+| Start (API) | `pnpm --filter @corolary/api start` |
+
+**Jangan pakai `pnpm build` di root.** Ia memanggil `turbo run build`, yang ikut
+menyapu `@corolary/contracts` → `forge build`. Foundry tidak ada di Railway dan
+build-nya gagal di sana. Satu-satunya paket yang benar-benar perlu dibangun
+adalah `@corolary/shared`, karena `exports`-nya menunjuk ke `./dist`; kedua
+service berjalan lewat `tsx` langsung dari sumber dan tidak punya langkah build
+sama sekali.
+
+**Start command WAJIB diisi eksplisit.** Builder Railway (Railpack) mencari
+skrip `start` di `package.json` root, dan di monorepo ini skrip itu memang tidak
+ada — keduanya dipanggil lewat `--filter`. Tanpa Start Command, deploy mati di
+detik ke-7 dengan `No start command detected`, **sebelum** `pnpm install`
+sempat jalan, sehingga log-nya tidak memuat satu pun petunjuk tentang aplikasi.
+
+**`tsx` ada di `dependencies`, bukan `devDependencies`** — sengaja. Railway
+menyetel `NODE_ENV=production`, dan install produksi melewatkan `devDependencies`;
+kalau `tsx` ada di sana, service naik lalu langsung mati dengan `tsx: not found`.
+Karena kedua service memang dijalankan oleh `tsx` saat runtime, tempatnya di
+`dependencies` bukan siasat melainkan klasifikasi yang benar. Ini juga berarti
+`--prod=false` **tidak** diperlukan di build command.
 
 ### Env (indexer)
 ```bash
@@ -183,14 +219,25 @@ Untuk tim dua orang, itu sepadan.
 ### Env (API)
 ```bash
 DATABASE_URL=postgres://...
+ETHEREUM_CHAIN_KEY=3                 # ← WAJIB, walau API tak menyentuh Ethereum
 CREDITCOIN_RPC_URL=https://rpc.cc3-testnet.creditcoin.network
+CREDITCOIN_CHAIN_ID=102031           # ← WAJIB
 FACT_REGISTRY_ADDRESS=0x...
 CREDIT_GRAPH_ADDRESS=0x...
 EFFICIENCY_MARKET_ADDRESS=0x...
 PRICE_REGISTRY_ADDRESS=0x...
-API_PORT=8080
-CORS_ORIGIN=https://corolary.vercel.app
 ```
+
+Daftar ini persis skema di `services/api/src/config.ts` — kalau ada yang kurang,
+service gagal start dengan menyebut nama variabelnya. Dua catatan:
+
+- **`API_PORT` tidak perlu diisi di Railway.** Platform menyuntikkan `PORT`, dan
+  `PORT` menang atas `API_PORT`. Mengisi `API_PORT` dengan nilai lain justru
+  membuat service mendengarkan port yang tidak dipetakan: ia naik dengan sehat,
+  log-nya bersih, dan domainnya tidak pernah menjawab.
+- **`CORS_ORIGIN` tidak ada.** Versi terdahulu dokumen ini mencantumkannya;
+  variabel itu tidak pernah dibaca kode mana pun. CORS di v1 dibuka untuk semua
+  origin secara sengaja (`docs/api.md` §0.9) karena seluruh datanya publik.
 
 > **API TIDAK boleh punya `SUBMITTER_PRIVATE_KEY` maupun `ETHEREUM_RPC_URL`.**
 > Ia hanya membaca DB dan state Creditcoin. Kalau ia butuh kunci privat, ada yang salah
@@ -208,7 +255,7 @@ Root directory: `apps/web`. Preview otomatis per PR — berguna untuk review Dev
 
 ### Env (Vercel)
 ```bash
-NEXT_PUBLIC_API_URL=https://corolary-api.up.railway.app
+NEXT_PUBLIC_API_URL=https://corolary-production.up.railway.app
 NEXT_PUBLIC_CREDITCOIN_RPC_URL=https://rpc.cc3-testnet.creditcoin.network
 NEXT_PUBLIC_USE_FIXTURES=false      # ← WAJIB false di produksi
 ```
