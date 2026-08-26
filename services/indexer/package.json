@@ -11,6 +11,7 @@
     "migrate": "tsx src/db/migrate.ts",
     "mirror:rebuild": "tsx src/mirror-rebuild.ts",
     "prices:once": "tsx src/prices/once.ts",
+    "t3": "tsx src/t3-invalid-member.ts",
     "test": "tsx --test"
   },
   "dependencies": {

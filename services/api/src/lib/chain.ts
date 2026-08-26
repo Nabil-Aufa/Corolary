@@ -28,18 +28,10 @@ export const priceRegistry = new ethers.Contract(
 export const market = new ethers.Contract(
   config.EFFICIENCY_MARKET_ADDRESS, abi('EfficiencyMarket'), creditcoin);
 
-/** Indeks bunga diskalakan WAD (1e18), sama seperti EfficiencyMarket. */
-export const WAD = 10n ** 18n;
-
-export function scaledToActual(scaled: bigint, index: bigint): bigint {
-  return index === 0n ? 0n : (scaled * index) / WAD;
-}
-
-/** Nilai WAD → string desimal USD dengan 2 angka di belakang koma. */
-export function wadToUsd(wad: bigint): string {
-  const cents = (wad * 100n) / WAD;
-  return `${cents / 100n}.${(cents % 100n).toString().padStart(2, '0')}`;
-}
+// Aritmetika uang pindah ke `money.ts` supaya bisa diuji tanpa menyeret
+// provider dan SDK yang dibangun di file ini. Di-re-export supaya pemanggil
+// lama tidak perlu tahu.
+export { WAD, scaledToActual, wadToUsd, usdOf } from './money.js';
 
 // Precompile ChainInfo diakses lewat SDK, BUKAN ABI tulisan tangan.
 // Percobaan pertama memakai signature karangan dan precompile membalas

@@ -429,6 +429,38 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
   yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
   code jadi 2.
+- **Batch verify precompile itu semua-atau-tidak-sama-sekali, dan revert-nya
+  `Error(string)` — bukan custom error.** Terbukti 2026-08-26 (`pnpm --filter
+  @corolary/indexer t3`): satu byte dibalik di `encodedTx` salah satu anggota
+  menjatuhkan seluruh batch berisi 7 dengan `Error("Merkle proof validation
+  failed")`; idem bila yang dirusak satu simpul Merkle proof. Karena datang
+  sebagai `Error(string)`, ia jatuh ke `retryable` di klasifikasi default — dan
+  retry adalah hal paling tidak berguna untuk kegagalan deterministik: delapan
+  percobaan berikutnya revert dengan pesan yang sama persis, lalu antrean
+  berhenti tanpa ada pihak yang terlihat salah. Sekarang `splitBatch`/`staleProof`.
+- **Eksperimen precompile pakai `eth_call`, jangan transaksi.** Revert di
+  `eth_call` sudah konklusif untuk semua-atau-tidak-sama-sekali (kalau seluruh
+  panggilan revert, tidak ada state yang berubah), biayanya nol, dan registry
+  tidak tersentuh. Wajib disertai KONTROL memakai payload utuh: tanpa itu,
+  revert pada varian rusak tidak membuktikan apa pun — batch-nya bisa saja
+  memang sudah busuk sejak awal karena proof kedaluwarsa, mode kegagalan yang
+  berbeda dan sudah lama diketahui.
+- **Jangan turunkan ambang blok dari cursor watcher.** Cek cakupan backfill
+  sempat memakai `MAX(last_scanned_block) - months*blok` sebagai batas bawah,
+  lalu menuntut `from_block <= batas`. Cursor SELALU tertinggal di belakang head
+  yang dipakai backfill, jadi cakupan yang baru saja ditulis dijawab "belum
+  tercakup": terukur `from_block` 25.617.433 lawan ambang 25.615.294 — meleset
+  2.139 blok, persis sebesar ketertinggalan cursor. Gejalanya bukan error
+  melainkan dedupe yang tidak pernah cocok, dan tiap permintaan memindai ulang
+  riwayat yang sudah lengkap. Ukur kedalaman dari lebar barisnya sendiri
+  (`to_block - from_block`), yang tidak bergantung pada apa pun yang bergerak.
+- **Respons untuk job yang sudah berjalan wajib membawa parameter JOB-nya,
+  bukan parameter PERMINTAAN.** `POST /v1/backfill` sempat menggemakan `months`
+  yang diminta padahal yang dikembalikan adalah job lain yang sedang antre:
+  minta 12 bulan saat job 1 bulan berjalan dijawab `months: 12`. Tidak ada yang
+  salah secara teknis, dan justru itu masalahnya — ia versi API dari kekeliruan
+  yang sudah berulang empat kali di proyek ini: menyamakan jendela pemindaian
+  dengan riwayat yang benar-benar ada.
 - **Token testnet dinilai lewat `PriceRegistry.setPriceAlias`.** `tUSDC`/`tWETH`
   tidak punya feed Chainlink sendiri, dan satu aggregator hanya bisa menunjuk satu
   aset. Alias membuat mereka memakai harga mainnet yang benar-benar dibuktikan —

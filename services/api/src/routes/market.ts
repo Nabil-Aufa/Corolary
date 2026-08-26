@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { sql } from '../lib/db.js';
 import { ok } from '../lib/envelope.js';
 import { parseAddress } from '../lib/validate.js';
-import { market, creditGraph, creditcoin, priceRegistry, scaledToActual, wadToUsd, ensureCreditcoinAsset } from '../lib/chain.js';
-import { ethers } from 'ethers';
+import { market, creditGraph, creditcoin, priceRegistry, scaledToActual, wadToUsd, usdOf, ensureCreditcoinAsset } from '../lib/chain.js';
+import { resolveAliasPrices, createAliasCache } from '../lib/alias.js';
 import type {
   AccountPositions, Address, Hex, MarketSummary, PositionEntry, Reserve, Tier,
 } from '@corolary/shared';
@@ -73,53 +73,29 @@ async function assetMeta(addresses: string[]): Promise<Map<string, AssetMeta>> {
     ]),
   );
 
-  await resolveAliasPrices(meta);
+  await resolveAliasPrices(
+    meta,
+    {
+      aliasOf: async (a) => (await priceRegistry.getFunction('priceAliasOf')(a)) as string,
+      priceOf: async (canonical) => {
+        const rows = await sql<
+          { answer: string; price_decimals: number; source_tx_hash: string | null }[]
+        >`
+          SELECT answer, decimals AS price_decimals, source_tx_hash
+          FROM prices WHERE asset = ${canonical}
+        `;
+        const p = rows[0];
+        return p
+          ? { answer: p.answer, priceDecimals: p.price_decimals, sourceTxHash: p.source_tx_hash }
+          : null;
+      },
+    },
+    aliasCache,
+  );
   return meta;
 }
 
-/**
- * Token pasar testnet (tUSDC/tWETH) tidak punya feed sendiri; mereka memakai
- * harga aset mainnet lewat `PriceRegistry.setPriceAlias`. Pemetaan itu dibaca
- * dari KONTRAK, bukan disalin ke SQL: aturan aliasnya milik kontrak, dan
- * salinan kedua di query adalah salinan yang akan menyimpang.
- *
- * DESIMAL tetap milik token alias itu sendiri — hanya harganya yang dipinjam.
- */
-const aliasCache = new Map<string, string | null>();
-
-async function resolveAliasPrices(meta: Map<string, AssetMeta>): Promise<void> {
-  for (const [address, m] of meta) {
-    if (m.answer !== null) continue;
-
-    let canonical = aliasCache.get(address);
-    if (canonical === undefined) {
-      try {
-        const resolved = (await priceRegistry.getFunction('priceAliasOf')(address)) as string;
-        canonical = resolved === ethers.ZeroAddress ? null : ethers.getAddress(resolved);
-      } catch {
-        canonical = null;
-      }
-      aliasCache.set(address, canonical);
-    }
-    if (!canonical) continue;
-
-    const rows = await sql<{ answer: string; price_decimals: number; source_tx_hash: string | null }[]>`
-      SELECT answer, decimals AS price_decimals, source_tx_hash
-      FROM prices WHERE asset = ${canonical}
-    `;
-    const p = rows[0];
-    if (!p) continue;
-    m.answer = p.answer;
-    m.priceDecimals = p.price_decimals;
-    m.sourceTxHash = p.source_tx_hash;
-  }
-}
-
-function usdOf(amount: bigint, decimals: number, m: AssetMeta | undefined): bigint {
-  // Nilai WAD. Tanpa harga terbukti hasilnya 0 — bukan tebakan.
-  if (!m?.answer || m.priceDecimals === null) return 0n;
-  return (amount * BigInt(m.answer) * 10n ** 18n) / (10n ** BigInt(decimals) * 10n ** BigInt(m.priceDecimals));
-}
+const aliasCache = createAliasCache();
 
 marketRoutes.get('/market/summary', async (c) => {
   const reserves = await listReserves();

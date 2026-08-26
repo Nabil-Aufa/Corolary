@@ -27,7 +27,7 @@
 
 ## 2. Blocker Produk — butuh keputusan sebelum M3
 
-### B1 · Cold start: fakta lama tidak tertangkap eager proving 🟡 **CLI selesai, produk belum**
+### B1 · Cold start: fakta lama tidak tertangkap eager proving 🟢 **selesai sisi backend — UI belum**
 
 **Masalah.** Eager proving hanya menangkap event **baru**. Tapi seluruh nilai Corolary
 ada pada riwayat yang **sudah** terjadi — peminjam yang melunasi 40 pinjaman Aave
@@ -75,6 +75,29 @@ jadi puluhan log. Jalur INSERT-nya sama persis dengan watcher live
 (`insertLogs()`), jadi tidak ada jalur kedua yang bisa menyimpang.
 Detail lengkap di `docs/indexer.md` §13.2b.
 
+**Terimplementasi 2026-08-26 (sisi API).** `POST /v1/backfill` + `GET /v1/backfill/:jobId`
+(`docs/api.md` §14–15). API menitipkan job; indexer yang memindai — submitter tetap
+satu-satunya penulis dari kunci submitter.
+
+Tiga hal yang menentukan endpoint ini benar, semuanya ketahuan dari tes live:
+
+1. **Dedupe terhadap kenyataan, bukan antrean.** Cakupan dicatat di tabel baru
+   `backfill_runs` (migrasi 0010), ditulis `backfillSubject` sehingga **CLI ikut
+   terhitung**. Dedupe yang hanya melihat `jobs` akan memindai ulang riwayat yang
+   sudah dibayar lengkap — dompet demo dipindai lewat CLI dan tidak punya satu pun
+   baris `jobs`. Pelajaran yang sama persis dengan `2864bfd`.
+2. **Cakupan dituntut lengkap untuk SETIAP protokol**, dan daftar protokolnya
+   dibaca dari `source_cursors` — apa yang watcher benar-benar awasi, bukan
+   konstanta di sisi API. Protokol kelima otomatis membuat semua cakupan lama
+   tidak lengkap, yang memang benar.
+3. **Rem biayanya bukan rate limit.** Rate limit per-IP (3/menit) membatasi
+   seberapa cepat job masuk; yang membatasi seberapa cepat CTC keluar adalah
+   pekerja yang menjalankan **satu backfill pada satu waktu**.
+
+**Sisa:** tombol "Claim your history" di `apps/web` (milik Dev B) dan polling
+`GET /v1/backfill/:jobId`. Kontraknya sudah ada di `packages/shared`
+(`BackfillJobAccepted`, `BackfillJob`, `BackfillJobStatus`).
+
 **Konsekuensi:** ini juga jadi mekanik akuisisi yang bagus — pengguna datang untuk
 mengklaim riwayat, dan tindakan itu sendiri yang mengisi registry.
 
@@ -85,7 +108,7 @@ Tenggat: sebelum M3.
 
 ---
 
-### B2 · Aset apa yang dipinjamkan di CC3 Testnet? 🔴
+### B2 · Aset apa yang dipinjamkan di CC3 Testnet? 🟡 **naskah siap — tinggal masuk deck, video, dan UI**
 
 **Masalah.** `EfficiencyMarket` butuh token ERC20 untuk disuplai dan dipinjam.
 Di Creditcoin **testnet** tidak ada USDC/WETH sungguhan. Kita harus men-deploy ERC20
@@ -116,11 +139,37 @@ scoring — dan satu aggregator hanya bisa menunjuk satu aset. Diselesaikan lewa
 `PriceRegistry.setPriceAlias`, sehingga `tUSDC` dinilai memakai **harga USDC
 mainnet yang benar-benar dibuktikan**. Tokennya stand-in; harganya tidak.
 
-**Aksi tersisa:** beri
-label jelas di UI: *"Token pasar adalah token testnet. Riwayat kredit, harga, dan skor
-berasal dari Ethereum mainnet sungguhan."* Menyatakannya lebih dulu **memperkuat**
-kredibilitas, bukan melemahkannya — juri akan menyadarinya sendiri kalau kita diam.
-Masukkan kalimat ini ke deck dan video demo.
+**Naskah disiapkan 2026-08-26.** Kalimat kanoniknya:
+
+> *"Token pasar adalah token testnet. Riwayat kredit, harga, dan skor berasal dari
+> Ethereum mainnet sungguhan."*
+
+Menyatakannya lebih dulu **memperkuat** kredibilitas, bukan melemahkannya — juri
+akan menyadarinya sendiri kalau kita diam, dan kalau mereka yang menemukannya,
+seluruh klaim "nol mock data" ikut jadi tersangka.
+
+| Permukaan | Status | Di mana |
+|---|---|---|
+| README (paling banyak dibaca juri) | ✅ 2026-08-26 | `README.md` §Nol mock data — **salinan kanonik tabelnya** |
+| Attestcoin Integration Summary (form submission) | ✅ 2026-08-26 | `docs/business.md` §14, paragraf penutup |
+| Kerangka deck | ✅ 2026-08-26 | `docs/business.md` §13 **slide 8**, ditaruh tepat setelah slide demo |
+| Naskah video demo | ✅ 2026-08-26 | `docs/business.md` §13.1 — verbatim + penempatan |
+| Checklist submission | ✅ 2026-08-26 | `docs/hackathon.md` |
+| **Deck PDF jadi** | ⬜ belum | diekspor dari §13 |
+| **Video demo terekam** | ⬜ belum | ucapkan naskah §13.1 |
+| **Label di UI** | ⬜ belum | `apps/web` halaman market — **Dev B** |
+
+Tiga baris terakhir bukan pekerjaan menulis lagi, melainkan pekerjaan produksi.
+Yang tersisa untuk Dev A: nol.
+
+**Penempatannya bagian dari isinya.** Di deck, slide 8 datang tepat setelah demo,
+selagi juri baru saja melihat `tUSDC` di layar. Di video, kalimatnya **diucapkan**
+pada detik `EfficiencyMarket` muncul — bukan sebagai teks kecil di sudut layar dan
+bukan di deskripsi YouTube. Keduanya terbaca sebagai memenuhi kewajiban alih-alih
+keterusterangan, dan efeknya pada kredibilitas justru terbalik.
+
+**Kalimat kunci yang membuatnya masuk akal:** token testnet adalah **wadah**, bukan
+**data**. `tUSDC` dinilai memakai harga USDC mainnet yang benar-benar dibuktikan.
 
 ---
 
@@ -320,7 +369,7 @@ Pemilik: Dev A.
 
 ---
 
-### T3 · Batasan sebenarnya dari batch verify 🟡
+### T3 · Batasan sebenarnya dari batch verify ✅ **SELESAI**
 
 **Masalah.** Dokumen menyebut maks 10 proof dan rentang 1000 blok. Yang belum jelas:
 apakah precompile menolak keras di luar batas, apakah semua tinggi harus menaik, dan
@@ -367,10 +416,8 @@ memaksa pembelian proof baru.
 
 **Yang MASIH belum terbukti:**
 
-- **Semua-atau-tidak-sama-sekali belum pernah teramati dalam bentuk murninya**,
-  yaitu satu anggota benar-benar tidak sah di antara anggota yang sah. Yang kita
-  amati adalah kegagalan tingkat-batch, bukan kegagalan tingkat-anggota. Asumsinya
-  tetap berlaku.
+- ~~**Semua-atau-tidak-sama-sekali belum pernah teramati dalam bentuk murninya.**~~
+  **Terjawab 2026-08-26** — lihat di bawah.
 - **Apakah tinggi blok harus menaik: tetap tidak terjawab.** Dari 790 batch
   multi-transaksi, **nol** yang tidak menaik — jadi pertanyaannya tidak pernah
   sempat diuji. Penyebabnya bukan kebetulan: `buildBatches` mengurutkan berdasarkan
@@ -384,9 +431,44 @@ memaksa pembelian proof baru.
   1000** — off-by-one yang benar-benar pernah rilis.
 
 
-**Aksi tersisa:** picu satu batch gagal dengan anggota yang benar-benar TIDAK SAH
-(bukan sekadar proof kedaluwarsa) untuk mengamati semua-atau-tidak-sama-sekali dalam
-bentuk murninya. Pemilik: Dev A.
+### Semua-atau-tidak-sama-sekali — TERBUKTI 2026-08-26
+
+Diuji lewat `pnpm --filter @corolary/indexer t3`
+(`services/indexer/src/t3-invalid-member.ts`) terhadap precompile asli di CC3,
+memakai batch produksi `batch-25832824-25832833-1` berisi **7 transaksi**
+Ethereum mainnet sungguhan. Anggota ke-3 dirusak; enam lainnya dan
+`sharedContinuityProof` dibiarkan utuh.
+
+| Varian | Hasil |
+|---|---|
+| **Kontrol** — batch utuh | sukses |
+| **A** — satu byte dibalik di `encodedTransactions[3]` | revert `Error("Merkle proof validation failed")` |
+| **B** — satu simpul Merkle proof anggota ke-3 dirusak | revert `Error("Merkle proof validation failed")` |
+
+**Semua-atau-tidak-sama-sekali terbukti dalam bentuk murninya.** Satu anggota
+tidak sah menjatuhkan seluruh batch; tidak ada anggota yang diloloskan diam-diam.
+
+**Dijalankan lewat `eth_call`, bukan transaksi.** Revert di `eth_call` sudah
+konklusif: kalau seluruh panggilan revert, tidak ada state yang berubah, jadi
+mustahil ada 6 dari 7 yang tercatat. Biayanya nol dan registry tidak tersentuh.
+Kontrolnya wajib ada — tanpa itu, revert pada varian rusak tidak membuktikan
+apa-apa, karena batch itu bisa saja memang sudah busuk sejak awal (proof
+kedaluwarsa), yaitu mode kegagalan yang SUDAH kita amati dan bukan yang dicari.
+
+**Yang sebenarnya diuji bukan pertanyaan akademis.** Kalau precompile diam-diam
+MELEWATI anggota tidak sah, kegagalan verifikasi tidak punya gejala sama sekali:
+batch tetap sukses, fakta sah tetap tercatat, dan satu-satunya bedanya adalah
+fakta yang hilang. Lebih buruk lagi kalau anggota rusak itu tetap menghasilkan
+fakta — berarti isi `encodedTx` tidak terikat penuh pada proof-nya, dan registry
+bisa diracuni lewat batch yang tampak sukses. Keduanya terbantah.
+
+**Satu bug ditemukan sebagai efek sampingnya.** Revert itu datang sebagai
+`Error(string)`, dan `Error(string)` yang tidak dikenali jatuh ke `retryable` —
+jadi batch dengan anggota tidak sah akan dikirim ulang **delapan kali** dengan
+payload yang sama persis sebelum menyerah, dan antrean berhenti tanpa satu pun
+pihak yang terlihat salah. Diperbaiki di `submitter/errors.ts`: pesan ini
+sekarang `splitBatch` untuk batch (mengisolasi anggotanya) dan `staleProof`
+untuk transaksi tunggal (membeli proof baru), dikunci dua tes.
 
 ---
 
@@ -643,12 +725,12 @@ untuk pembicaraan CEIP.
 
 | Prioritas | Item | Kapan |
 |---|---|---|
-| 🟡 Sisa | **B1** backfill — CLI per-subjek ✅ 2026-08-25; endpoint per-alamat & UI belum | sebelum M3 |
+| 🟡 Sisa | **B1** backfill — CLI ✅ 2026-08-25, endpoint `POST /v1/backfill` ✅ 2026-08-26; **UI belum** (Dev B) | sebelum M3 |
 | 🔴 Kritis | **B5** dompet mainnet tim untuk riwayat Aave nyata — tanpa ini `capitalSavedUsd` selalu nol | **menunggu keputusan** |
-| 🔴 Kritis | **B2** posisi jujur soal token testnet — masukkan ke deck & video (kontrak ✅, komunikasi belum) | sebelum M5 |
+| 🟡 Sisa | **B2** posisi jujur soal token testnet — kontrak ✅, naskah ✅ 2026-08-26 (README, deck §13 slide 8, video §13.1); sisa: ekspor deck, rekam video, label UI (Dev B) | sebelum M5 |
 | ✅ Selesai | **T1** tipe transaksi — jalur receipt agnostik tipe | 2026-08-25 |
 | ✅ Diputuskan | **T2** byte mengikat (47,4 gas/byte, n=476); blok CC3 = 75jt, puncak 17% — anggaran tidak ditegakkan, peringatan 400 KB dipasang | 2026-08-25 |
-| 🟡 Sisa | **T3** fallback per-transaksi TERBUKTI di chain; semua-atau-tidak-sama-sekali murni & urutan tinggi belum teramati | opsional |
+| ✅ Tutup | **T3** semua-atau-tidak-sama-sekali TERBUKTI murni 2026-08-26 (`pnpm t3`); urutan tinggi dijamin oleh konstruksi & dikunci tes unit | — |
 | ✅ Selesai | **B3** kunci rasio + masa tenggang 7 hari | 2026-08-25 |
 | ✅ Selesai | **B4** model bunga linear kink | 2026-08-25 |
 | ✅ Selesai | **T5** himpunan aggregator + kesegaran di titik baca | 2026-08-25 |

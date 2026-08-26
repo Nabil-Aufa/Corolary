@@ -92,6 +92,28 @@ const STALE_PROOF_MESSAGES = [
 ];
 
 /**
+ * Revert string yang berarti proof-nya TIDAK COCOK dengan isi transaksi.
+ *
+ * Teramati langsung dari precompile 2026-08-26 (eksperimen T3,
+ * `src/t3-invalid-member.ts`): satu byte dibalik di `encodedTx` salah satu
+ * anggota, dan SELURUH batch revert dengan
+ * `Error("Merkle proof validation failed")`. Sama persis ketika yang dirusak
+ * adalah satu simpul Merkle proof-nya.
+ *
+ * Kenapa ini butuh vonisnya sendiri: ia datang sebagai `Error(string)`, dan
+ * `Error(string)` yang tidak dikenali jatuh ke `retryable`. Untuk kegagalan
+ * seperti ini retry adalah hal yang paling tidak berguna — payload-nya
+ * deterministik, jadi delapan percobaan berikutnya akan revert dengan pesan
+ * yang sama persis, dan antrean berhenti tanpa satu pun pihak yang salah
+ * terlihat. Yang menolong cuma memecah batch (mengisolasi anggotanya) atau
+ * membeli proof baru.
+ */
+const INVALID_PROOF_MESSAGES = [
+  'merkle proof validation failed',
+  'proof validation failed',
+];
+
+/**
  * Selector -> nama, dibangun sendiri dari ABI FactRegistry.
  *
  * ethers TIDAK selalu menamai custom error walau error itu ada di ABI: kalau
@@ -128,6 +150,16 @@ export function classifySubmitError(err: unknown, isBatch: boolean): Classified 
     const lower = reason.toLowerCase();
     if (STALE_PROOF_MESSAGES.some((m) => lower.includes(m))) {
       return { verdict: 'staleProof', reason: reason || 'continuity proof kedaluwarsa', revertName };
+    }
+    if (INVALID_PROOF_MESSAGES.some((m) => lower.includes(m))) {
+      return {
+        // Batch: pecah, supaya anggota yang sah tetap tercatat dan yang tidak
+        // sah terisolasi. Tunggal: tidak ada yang bisa dipecah lagi, jadi
+        // satu-satunya jalan adalah membeli proof baru.
+        verdict: isBatch ? 'splitBatch' : 'staleProof',
+        reason,
+        revertName,
+      };
     }
     // Revert berpesan lain: sementara sampai terbukti sebaliknya, dan PESANNYA
     // ikut dibawa supaya tidak hilang seperti sebelumnya.

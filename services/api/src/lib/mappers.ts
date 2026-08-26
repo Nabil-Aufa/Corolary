@@ -1,6 +1,7 @@
 import type { Address, Fact, Hex, ScoreComponent, ScoreComponentKey } from '@corolary/shared';
 import { FactKind } from '@corolary/shared';
 import { protocolName } from './protocols.js';
+import { toUsd } from './money.js';
 
 export interface FactRow {
   fact_id: string;
@@ -22,30 +23,6 @@ export interface FactRow {
   decimals: number | null;
   price_answer: string | null;
   price_decimals: number | null;
-}
-
-/**
- * `amountUsd` dihitung dari harga yang TERBUKTI di PriceRegistry, dan `null`
- * kalau belum ada harga terbukti untuk aset itu. Tidak ada fallback ke oracle
- * lain, tidak ada nilai tebakan: kolom kosong di UI lebih jujur daripada angka
- * yang tidak bisa ditelusuri ke sebuah proof.
- */
-function toUsd(
-  amount: string,
-  decimals: number | null,
-  answer: string | null,
-  priceDecimals: number | null,
-): string | null {
-  if (answer === null || priceDecimals === null || decimals === null) return null;
-  try {
-    const scale = 10n ** BigInt(decimals);
-    const priceScale = 10n ** BigInt(priceDecimals);
-    // Dikali 100 dulu supaya pembagian integer tetap menyisakan sen.
-    const cents = (BigInt(amount) * BigInt(answer) * 100n) / (scale * priceScale);
-    return `${cents / 100n}.${(cents % 100n).toString().padStart(2, '0')}`;
-  } catch {
-    return null;
-  }
 }
 
 export function toFact(r: FactRow): Fact {

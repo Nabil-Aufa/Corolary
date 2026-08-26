@@ -92,3 +92,28 @@ test('error kosong tidak melempar', () => {
   assert.equal(classifySubmitError(undefined, false).verdict, 'retryable');
   assert.equal(classifySubmitError(null, true).verdict, 'retryable');
 });
+
+test('"Merkle proof validation failed" pada BATCH -> dipecah, bukan retry', () => {
+  // Teramati langsung dari precompile 2026-08-26 (eksperimen T3): satu byte
+  // dibalik di encodedTx salah satu anggota, dan SELURUH batch revert dengan
+  // pesan ini. Ia datang sebagai Error(string), jadi tanpa penanganan khusus ia
+  // jatuh ke `retryable` — dan retry adalah hal paling tidak berguna untuk
+  // kegagalan yang deterministik: delapan percobaan berikutnya revert dengan
+  // pesan yang sama persis, lalu antrean berhenti tanpa ada yang terlihat salah.
+  const v = classifySubmitError(
+    ethersError({ revert: { name: 'Error', args: ['Merkle proof validation failed'] } }),
+    true,
+  );
+  assert.equal(v.verdict, 'splitBatch');
+  assert.equal(v.reason, 'Merkle proof validation failed');
+});
+
+test('proof tidak cocok pada transaksi TUNGGAL -> beli proof baru', () => {
+  // Memecah sesuatu yang sudah tunggal itu mustahil, dan mengirim ulang payload
+  // yang sama akan gagal dengan cara yang sama.
+  const v = classifySubmitError(
+    ethersError({ revert: { name: 'Error', args: ['Merkle proof validation failed'] } }),
+    false,
+  );
+  assert.equal(v.verdict, 'staleProof');
+});
