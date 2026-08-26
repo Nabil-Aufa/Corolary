@@ -49,3 +49,12 @@ Thumbs.db
 # ── log ───────────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
+
+# Dump database untuk migrasi ke hosting. Besar (ratusan MB) dan bisa dibuat
+# ulang kapan saja dari `pg_dump`, jadi tidak ada gunanya di git.
+#
+# Diberi garis miring di depan DENGAN SENGAJA. Pola `*.sql` tanpa jangkar akan
+# menelan `services/indexer/src/db/migrations/*.sql` juga — migrasi baru lalu
+# hilang dari repo tanpa satu pun peringatan, persis seperti yang pernah terjadi
+# dengan pola `lib/` dan tujuh file sumber API.
+/*.sql
