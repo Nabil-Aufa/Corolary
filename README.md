@@ -260,7 +260,7 @@ Contracts and quality gates:
 ```bash
 forge build && forge test -vvv       # 128 Solidity tests
 pnpm typecheck
-pnpm test                            # 179 tests total across all packages
+pnpm test                            # 183 tests total across all packages
 pnpm check:no-mocks                  # the zero-mock-data gate
 ```
 

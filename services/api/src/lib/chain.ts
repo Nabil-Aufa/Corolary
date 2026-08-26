@@ -31,7 +31,7 @@ export const market = new ethers.Contract(
 // Aritmetika uang pindah ke `money.ts` supaya bisa diuji tanpa menyeret
 // provider dan SDK yang dibangun di file ini. Di-re-export supaya pemanggil
 // lama tidak perlu tahu.
-export { WAD, scaledToActual, wadToUsd, usdOf } from './money.js';
+export { WAD, scaledToActual, wadToUsd, wadToUsdPrice, usdOf } from './money.js';
 
 // Precompile ChainInfo diakses lewat SDK, BUKAN ABI tulisan tangan.
 // Percobaan pertama memakai signature karangan dan precompile membalas

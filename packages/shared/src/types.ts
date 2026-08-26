@@ -11,8 +11,18 @@ export type UnixSeconds = number;
 /** Nilai uint256 sebagai string desimal, satuan native token. */
 export type TokenAmount = string;
 
-/** Nilai USD sebagai string desimal, mis. "2499.85". */
+/** Nilai USD sebagai string desimal dengan DUA desimal, mis. "2499.85". */
 export type UsdAmount = string;
+
+/**
+ * HARGA USD per unit sebagai string desimal dengan ENAM desimal,
+ * mis. "0.999949" atau "2469.250000".
+ *
+ * Tipe terpisah dari `UsdAmount` karena presisinya berbeda, dan bedanya
+ * penting: dua desimal tidak bisa membedakan USDC $0,99994916 dari $0,99 —
+ * selisih 1% pada aset yang seluruh gunanya adalah menempel di $1.
+ */
+export type UsdPrice = string;
 
 // ─────────────────────────────────────────────────────────────
 // Amplop respons
@@ -229,7 +239,7 @@ export interface Reserve {
   supplyApyBps: number;
   borrowApyBps: number;
   utilizationBps: number;
-  priceUsd: UsdAmount | null;
+  priceUsd: UsdPrice | null;
   /**
    * Transaksi Ethereum yang membuktikan `priceUsd` — null bila harga tak
    * tersedia. Lihat PriceEntry.sourceTxHash: harga tidak punya factId.

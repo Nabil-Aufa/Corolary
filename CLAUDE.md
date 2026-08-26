@@ -429,6 +429,27 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
   yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
   code jadi 2.
+- **`maxPriceAge` harus diukur dari heartbeat feed TERLAMBAT, bukan dipilih
+  bulat.** Default 24 jam sama persis dengan heartbeat Chainlink USDC/USD, dan
+  terukur dari aggregator mainnet 2026-08-26 jarak antar ronde adalah **23,00
+  jam** (1148→1149 dan 1150→1151, keduanya 82.812 detik) diselingi ronde
+  pemicu-deviasi berjarak 1 jam. Artinya margin untuk SELURUH pipeline kita —
+  attestation ~8 menit, prove, submit — cuma satu jam, jadi harga stablecoin
+  pasti melewati batas secara berkala. Gejalanya bukan error: `tryToUsd1e18`
+  mengembalikan `ok = false` dan pasar tUSDC membeku diam-diam sampai ronde
+  berikutnya masuk. Dinaikkan ke **28 jam** (100.800 detik) di chain dan di
+  `Deploy.s.sol` — tanpa yang kedua, redeploy mengembalikan bug-nya.
+- **Batas per-aset tidak bisa ditambahkan tanpa redeploy berantai.**
+  `EfficiencyMarket.priceRegistry` di-set di konstruktor dan tidak punya setter,
+  jadi mengganti `PriceRegistry` berarti men-deploy ulang `EfficiencyMarket` dan
+  `CreditGraph` juga — sekaligus membatalkan alamat yang sudah dipublikasikan di
+  README dan verifikasi Blockscout-nya. Periksa ada-tidaknya setter SEBELUM
+  merencanakan perbaikan yang menyentuh alamat kontrak.
+- **Harga bukan jumlah uang, dan tidak boleh memakai formatter yang sama.**
+  `wadToUsd` dua desimal membuat USDC $0,99994916 terbaca `"0.99"` — tak
+  terbedakan dari $0,99, selisih 1% pada aset yang seluruh gunanya menempel di
+  $1. Dua desimal benar untuk nilai total, salah untuk harga per unit; pakai
+  `wadToUsdPrice` (enam desimal, tipe `UsdPrice`).
 - **Batch verify precompile itu semua-atau-tidak-sama-sekali, dan revert-nya
   `Error(string)` — bukan custom error.** Terbukti 2026-08-26 (`pnpm --filter
   @corolary/indexer t3`): satu byte dibalik di `encodedTx` salah satu anggota

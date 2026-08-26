@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { sql } from '../lib/db.js';
 import { ok } from '../lib/envelope.js';
 import { parseAddress } from '../lib/validate.js';
-import { market, creditGraph, creditcoin, priceRegistry, scaledToActual, wadToUsd, usdOf, ensureCreditcoinAsset } from '../lib/chain.js';
+import { market, creditGraph, creditcoin, priceRegistry, scaledToActual, wadToUsd, wadToUsdPrice, usdOf, ensureCreditcoinAsset } from '../lib/chain.js';
 import { resolveAliasPrices, createAliasCache } from '../lib/alias.js';
 import type {
   AccountPositions, Address, Hex, MarketSummary, PositionEntry, Reserve, Tier,
@@ -153,8 +153,11 @@ marketRoutes.get('/market/reserves', async (c) => {
       ),
       borrowApyBps: borrowBps,
       utilizationBps: Number(utilization),
+      // Enam desimal, bukan dua: ini HARGA per unit, bukan nilai total. Dua
+      // desimal membuat USDC $0,99994916 terbaca `"0.99"` — tak terbedakan
+      // dari $0,99, selisih 1% pada aset yang seluruh gunanya menempel di $1.
       priceUsd: m?.answer && m.priceDecimals !== null
-        ? wadToUsd((BigInt(m.answer) * 10n ** 18n) / 10n ** BigInt(m.priceDecimals))
+        ? wadToUsdPrice((BigInt(m.answer) * 10n ** 18n) / 10n ** BigInt(m.priceDecimals))
         : null,
       priceSourceTxHash: (m?.sourceTxHash ?? null) as Hex | null,
     };

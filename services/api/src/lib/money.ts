@@ -24,6 +24,37 @@ export function wadToUsd(wad: bigint): string {
 }
 
 /**
+ * Presisi untuk HARGA, bukan untuk jumlah uang.
+ *
+ * Dua desimal cukup untuk menyatakan berapa dolar sesuatu bernilai, tapi tidak
+ * cukup untuk menyatakan berapa harga satu unitnya. Harga USDC mainnet yang
+ * dibuktikan adalah $0,99994916; dipotong ke dua desimal ia menjadi `"0.99"` —
+ * tidak bisa dibedakan dari $0,99000000, yaitu selisih 1% pada aset yang
+ * seluruh gunanya adalah menempel di $1.
+ *
+ * Enam desimal memisahkan keduanya dengan jelas dan masih terbaca wajar untuk
+ * aset mahal (`2469.250000`). Nilai persisnya selalu tersedia sebagai `answer`
+ * + `decimals` di `/v1/prices`; ini bentuk untuk dibaca manusia.
+ */
+const PRICE_DECIMALS = 6n;
+
+/**
+ * Nilai WAD → string harga USD dengan enam desimal.
+ *
+ * Memotong, tidak membulatkan — sama seperti seluruh formatter di file ini.
+ * Pada enam desimal galatnya 1e-6 dolar, dan satu mode pembulatan untuk semua
+ * jalur lebih mudah dipercaya daripada dua mode yang berbeda tipis.
+ */
+export function wadToUsdPrice(wad: bigint): string {
+  const scale = 10n ** PRICE_DECIMALS;
+  const units = (wad * scale) / WAD;
+  const negative = units < 0n;
+  const abs = negative ? -units : units;
+  const body = `${abs / scale}.${(abs % scale).toString().padStart(Number(PRICE_DECIMALS), '0')}`;
+  return negative ? `-${body}` : body;
+}
+
+/**
  * Nilai USD dalam WAD dari sejumlah token dan harga Chainlink.
  *
  * Mengembalikan `0n` kalau tidak ada harga terbukti — bukan tebakan, bukan

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { WAD, scaledToActual, wadToUsd, usdOf, toUsd } from './money.js';
+import { WAD, scaledToActual, wadToUsd, wadToUsdPrice, usdOf, toUsd } from './money.js';
 
 /**
  * Aritmetika uang. Kegagalan di lapis ini tidak pernah melempar — ia menghasilkan
@@ -92,4 +92,28 @@ test('toUsd tidak melempar pada masukan cacat', () => {
   // /v1/facts karena satu baris.
   assert.equal(toUsd('bukan angka', 6, '100000000', USD8), null);
   assert.equal(toUsd('1000000', -1, '100000000', USD8), null);
+});
+
+test('harga stablecoin butuh lebih dari dua desimal', () => {
+  // USDC mainnet yang benar-benar dibuktikan pada ronde 1152: $0,99994916.
+  // Dua desimal memotongnya jadi "0.99", yang tak terbedakan dari $0,99 —
+  // selisih 1% pada aset yang seluruh gunanya adalah menempel di $1.
+  const usdc = (99_994_916n * WAD) / 10n ** 8n;
+  assert.equal(wadToUsd(usdc), '0.99');
+  assert.equal(wadToUsdPrice(usdc), '0.999949');
+});
+
+test('harga aset mahal tetap terbaca wajar', () => {
+  const weth = (2_469_25000000n * WAD) / 10n ** 8n;
+  assert.equal(wadToUsdPrice(weth), '2469.250000');
+});
+
+test('wadToUsdPrice: nol, satu, dan nilai negatif', () => {
+  assert.equal(wadToUsdPrice(0n), '0.000000');
+  assert.equal(wadToUsdPrice(WAD), '1.000000');
+  assert.equal(wadToUsdPrice(-WAD), '-1.000000');
+});
+
+test('wadToUsdPrice tidak kehilangan presisi di atas 2^53', () => {
+  assert.equal(wadToUsdPrice(98_765_432_109_876_543_210n * WAD), '98765432109876543210.000000');
 });

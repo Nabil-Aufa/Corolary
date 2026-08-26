@@ -108,6 +108,67 @@ Tenggat: sebelum M3.
 
 ---
 
+### B6 · `maxPriceAge` lebih pendek dari heartbeat feed 🟡 **dimitigasi — desain benar butuh redeploy**
+
+**Masalah.** `PriceRegistry.maxPriceAge` default 24 jam, sama persis dengan
+heartbeat Chainlink USDC/USD. Terukur langsung dari aggregator mainnet
+`0xc9E1a09622afdB659913fefE800fEaE5DBbFe9d7` pada 2026-08-26:
+
+| Ronde | Jarak |
+|---|---|
+| 1148 → 1149 | 82.812 s = **23,00 jam** |
+| 1149 → 1150 | 3.600 s = 1,00 jam (pemicu deviasi) |
+| 1150 → 1151 | 82.812 s = **23,00 jam** |
+| 1151 → 1152 | 3.564 s = 0,99 jam |
+
+Polanya: sepasang ronde berjarak ~1 jam, lalu jeda ~23 jam. Jadi margin antara
+umur maksimum harga stablecoin dan batas 24 jam **cuma satu jam**, dan seluruh
+pipeline kita harus muat di dalamnya — attestation ~8 menit, lalu prove dan
+submit. Indexer yang mati satu jam saja sudah cukup melewatinya.
+
+Gejalanya bukan error. `tryToUsd1e18` mengembalikan `ok = false`, dan pasar
+tUSDC **membeku diam-diam** sampai ronde berikutnya masuk. Bisa terjadi tepat di
+tengah demo.
+
+**Dimitigasi 2026-08-26:** `setMaxPriceAge(100800)` — **28 jam** — dikirim ke
+chain dari deployer, terverifikasi lewat `cast call`. Juga ditambahkan ke
+`Deploy.s.sol`; tanpa itu redeploy mengembalikan bug-nya diam-diam. 28 jam =
+plafon heartbeat 24 jam + 4 jam kelonggaran operasional.
+
+**Ini melonggarkan batas untuk ETH/BTC juga** (heartbeat 1 jam), dan itu memang
+kelemahan mitigasinya. Tapi batas 24 jam sebelumnya pun tidak pernah jadi
+jaminan ketat untuk keduanya: satu batas global selalu berukuran feed
+**terlambat**, jadi ETH sudah 24x lebih longgar dari yang dibutuhkannya bahkan
+sebelum perubahan ini.
+
+**Desain yang benar adalah batas per-aset** (`mapping(address => uint64)` dengan
+fallback ke global). Tidak dikerjakan sekarang, dan alasannya bukan malas:
+`EfficiencyMarket.priceRegistry` di-set di konstruktor **tanpa setter**, jadi
+mengganti `PriceRegistry` berarti men-deploy ulang `EfficiencyMarket` dan
+`CreditGraph` juga — membatalkan sepuluh alamat yang baru dipublikasikan di
+README beserta verifikasi Blockscout-nya, beberapa hari sebelum submission.
+Menambahkannya ke source tanpa deploy lebih buruk lagi: repo tidak akan lagi
+cocok dengan bytecode yang terverifikasi.
+
+**Aksi tersisa:** kalau ada redeploy karena alasan lain sebelum submission,
+ikutkan batas per-aset dan tambahkan setter `setPriceRegistry` supaya jebakan
+yang sama tidak terulang.
+
+---
+
+### B7 · Harga dipotong dua desimal ✅ **SELESAI**
+
+`priceUsd` memakai formatter yang sama dengan jumlah uang, sehingga harga USDC
+mainnet terbukti $0,99994916 tampil `"0.99"` — tak terbedakan dari $0,99, yaitu
+selisih 1% pada aset yang seluruh gunanya adalah menempel di $1.
+
+Dua desimal benar untuk **nilai total**, salah untuk **harga per unit**.
+Diperbaiki dengan `wadToUsdPrice` (enam desimal) dan tipe `UsdPrice` yang
+terpisah dari `UsdAmount` di `packages/shared`, dikunci empat tes. Terverifikasi
+live: tUSDC `0.999949`, tWETH `2462.020588`.
+
+---
+
 ### B2 · Aset apa yang dipinjamkan di CC3 Testnet? 🟡 **naskah siap — tinggal masuk deck, video, dan UI**
 
 **Masalah.** `EfficiencyMarket` butuh token ERC20 untuk disuplai dan dipinjam.

@@ -105,6 +105,24 @@ contract Deploy is Script {
         prices.trustAggregator(USDC, USDC_USD_AGG, CHAINLINK_FEED_DECIMALS);
         prices.trustAggregator(WBTC, BTC_USD_AGG, CHAINLINK_FEED_DECIMALS);
 
+        // Default kontrak 24 jam TIDAK cukup, dan kekurangannya struktural.
+        //
+        // Heartbeat Chainlink USDC/USD adalah 24 jam, dan terukur dari
+        // aggregator mainnet 2026-08-26 jaraknya 23,00 jam antar ronde
+        // (1148->1149 dan 1150->1151, keduanya 82.812 detik). Batas 24 jam
+        // menyisakan margin satu jam untuk seluruh pipeline kita — attestation
+        // ~8 menit, lalu prove dan submit — sehingga harga stablecoin PASTI
+        // melewati batas secara berkala. Gejalanya bukan error: pasar tUSDC
+        // membeku diam-diam sampai ronde berikutnya masuk.
+        //
+        // 28 jam = plafon heartbeat 24 jam + 4 jam kelonggaran operasional.
+        // Ini melonggarkan batas untuk ETH/BTC juga (heartbeat 1 jam), tapi
+        // batas 24 jam sebelumnya pun tidak pernah menjadi jaminan ketat bagi
+        // keduanya: ia selalu berukuran feed TERLAMBAT. Batas per-aset adalah
+        // desain yang benar dan butuh perubahan kontrak — dicatat di
+        // docs/open-issues.md.
+        prices.setMaxPriceAge(28 hours);
+
         graph.setPriceRegistry(address(prices));
 
         // --- Lapis 3: pasar ---

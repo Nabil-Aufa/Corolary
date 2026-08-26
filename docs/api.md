@@ -903,7 +903,7 @@ curl -s https://api.corolary.xyz/v1/market/reserves
       "supplyApyBps": 0,
       "borrowApyBps": 0,
       "utilizationBps": 0,
-      "priceUsd": "0.99",
+      "priceUsd": "0.999949",
       "priceSourceTxHash": "0x25466b36fdf34cfe1b767e4a64b7389cd96b32ec80a1d3d105d1560c5525321c"
     },
     {
@@ -915,7 +915,7 @@ curl -s https://api.corolary.xyz/v1/market/reserves
       "supplyApyBps": 0,
       "borrowApyBps": 0,
       "utilizationBps": 0,
-      "priceUsd": "2511.24",
+      "priceUsd": "2511.240000",
       "priceSourceTxHash": "0x7f4c377c94034e24d8c9f49f579581ba8b1087605a6f6f319ba68f29ef18b659"
     }
   ],
@@ -938,6 +938,12 @@ bukan placeholder.
 > ini nilai yang sudah dibagi `decimals` feed (8) untuk keterbacaan UI. Nilai
 > mentah `answer` (uint256/int256 sesuai Chainlink) tersedia apa adanya di
 > `GET /v1/prices`.
+>
+> **Enam desimal, bukan dua** (tipe `UsdPrice`, terpisah dari `UsdAmount`).
+> `priceUsd` adalah harga per unit, bukan nilai total, dan dua desimal tidak
+> sanggup membedakan USDC $0,99994916 dari $0,99 — selisih 1% pada aset yang
+> seluruh gunanya adalah menempel di $1. Memotong, tidak membulatkan, sama
+> seperti seluruh formatter uang di API ini.
 
 ### Respons Error
 
