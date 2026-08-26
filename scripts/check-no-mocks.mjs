@@ -22,8 +22,19 @@
  */
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+/**
+ * `fileURLToPath`, BUKAN `.pathname`.
+ *
+ * Di Windows `new URL('..', import.meta.url).pathname` menghasilkan
+ * `/D:/Web3/CTC/` — dengan garis miring di depan. Setiap `join()` sesudahnya
+ * menghasilkan `\D:\Web3\CTC\...` yang tidak pernah ada, jadi keempat root
+ * pemindaian dianggap hilang dan gerbangnya memeriksa NOL berkas sambil tetap
+ * melaporkan LULUS. Di Linux (CI) jalurnya kebetulan benar, jadi bug ini
+ * tidak akan pernah terlihat di sana.
+ */
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const requireWeb = process.argv.includes('--require-web');
 
 const SCAN_ROOTS = ['apps/web/src', 'services/api/src', 'services/indexer/src', 'packages/shared/src'];
@@ -173,8 +184,20 @@ if (webMissing) {
   if (requireWeb) fail('apps/web/src', 1, 'frontend-absen', msg);
   else notes.push(msg);
 }
+// Root selain frontend TIDAK boleh hilang. Kalau hilang, penyebabnya bukan
+// "belum dibuat" melainkan skripnya sendiri yang salah menghitung jalur — dan
+// itu justru mode kegagalan terburuk untuk sebuah gerbang: ia melaporkan lulus
+// tanpa membaca apa pun.
 for (const root of missingRoots.filter((r) => r !== 'apps/web/src')) {
-  notes.push(`${root} tidak ada — tidak diperiksa`);
+  fail(root, 1, 'root-hilang',
+    `${root} tidak ditemukan dari ROOT=${ROOT} — gerbang tidak memeriksa apa pun di sana`);
+}
+
+// Nol berkas berarti gerbangnya tidak menjalankan satu pun aturan. Apa pun
+// sebabnya, jawabannya bukan "lulus".
+if (scanned.length === 0) {
+  fail('scripts/check-no-mocks.mjs', 1, 'nol-berkas',
+    `tidak ada berkas terpindai sama sekali (ROOT=${ROOT}) — gerbang ini tidak menjamin apa pun`);
 }
 
 // ── Laporan ───────────────────────────────────────────────────────────
