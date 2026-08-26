@@ -198,7 +198,7 @@ async function refreshFeed(
     // alarm palsu dan menenggelamkan yang sungguhan.
     const line = {
       pair: feed.pair,
-      lookbackBlocks: MAX_LOOKBACK_BLOCKS,
+      lookbackBlocks: feed.lookbackBlocks ?? MAX_LOOKBACK_BLOCKS,
       onChainRound: current.roundId.toString(),
       ageSeconds: ageSeconds === Infinity ? null : ageSeconds,
     };
@@ -303,7 +303,7 @@ async function findNewerRound(
   head: number,
   afterRound: bigint,
 ): Promise<FoundRound | null> {
-  const floor = Math.max(0, head - MAX_LOOKBACK_BLOCKS);
+  const floor = Math.max(0, head - (feed.lookbackBlocks ?? MAX_LOOKBACK_BLOCKS));
 
   for (let to = head; to > floor; to -= SCAN_CHUNK_BLOCKS) {
     const from = Math.max(floor, to - SCAN_CHUNK_BLOCKS + 1);

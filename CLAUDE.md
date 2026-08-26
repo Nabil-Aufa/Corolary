@@ -429,6 +429,19 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
   yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
   code jadi 2.
+- **Jendela lookback harga harus MELEBIHI heartbeat feed paling lambat.**
+  `MAX_LOOKBACK_BLOCKS` 6.000 blok = 20 jam, sementara heartbeat USDC/USD 24 jam.
+  Di steady state tidak masalah karena registry sudah punya harga dan hanya
+  mencari ronde yang lebih baru. Tapi pada registry KOSONG ia buntu permanen:
+  terukur saat cutover 2026-08-26, ronde USDC terakhir berumur 22,9 jam — di luar
+  jendela — sehingga `findNewerRound` tidak akan pernah menemukannya.
+  `tryToUsd1e18(tUSDC)` menjawab `false` dan pasar tUSDC beku. Sekarang
+  `lookbackBlocks` per-feed; USDC 9.000 blok (30 jam).
+- **API menampilkan harga dari mirror Postgres, kontrak bisa saja kosong.**
+  Setelah mengganti `PriceRegistry`, `/v1/market/reserves` tetap memperlihatkan
+  `priceUsd` yang sehat dari tabel `prices`, padahal registry on-chain masih
+  `roundId 0` dan setiap operasi pasar akan revert. UI terlihat normal, pasarnya
+  beku. Verifikasi cutover harga WAJIB lewat `cast call tryToUsd1e18`, bukan lewat API.
 - **Tidak ada RPC gratis kedua yang menyamai drpc untuk `eth_getLogs` lebar.**
   Diukur 2026-08-26 atas rentang 2.000 blok Aave V3: drpc 2.602 log/0,9 detik;
   Alchemy free menolak di atas **10 blok**; publicnode dan ankr menuntut token;

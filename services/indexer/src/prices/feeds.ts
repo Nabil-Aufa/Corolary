@@ -28,6 +28,19 @@ export interface FeedConfig {
   aggregator: string;
   /** Aset kanonik di Ethereum mainnet yang dihargai feed ini. */
   asset: string;
+  /**
+   * Seberapa jauh ke belakang mencari ronde, dalam blok. Default
+   * `MAX_LOOKBACK_BLOCKS` (~20 jam).
+   *
+   * Ada karena jendela default lebih PENDEK daripada heartbeat feed lambat, dan
+   * itu membuat registry kosong tidak bisa bootstrap sama sekali. Terukur
+   * 2026-08-26 saat cutover PriceRegistry: ronde USDC/USD terakhir berumur
+   * 22,9 jam, di luar jendela 20 jam, sehingga `findNewerRound` tidak akan
+   * pernah menemukannya — `tryToUsd1e18(tUSDC)` menjawab `false` dan pasar
+   * tUSDC beku, sementara API tetap menampilkan harga dari mirror Postgres.
+   * ETH/USD dan BTC/USD (heartbeat 1 jam) terisi normal dalam hitungan menit.
+   */
+  lookbackBlocks?: number;
 }
 
 /**
@@ -59,5 +72,14 @@ export const FEEDS: FeedConfig[] = [
     proxy: '0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6',
     aggregator: '0xc9E1a09622afdB659913fefE800fEaE5DBbFe9d7',
     asset: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    // 30 jam. Heartbeat USDC/USD adalah 24 jam dan jarak antar ronde terukur
+    // 23,00 jam, jadi jendela harus melewatinya — kalau tidak, ronde terbaru
+    // bisa berada tepat di luar jangkauan justru ketika paling dibutuhkan.
+    //
+    // Konsekuensinya diterima dengan sadar: ronde di atas 24 jam dibuktikan
+    // pada tarif lazy 3,13x10^-4 CTC, bukan 2,59x10^-5. Selisihnya ~2,9x10^-4
+    // CTC untuk SATU ronde — sepele, dan hanya terjadi saat bootstrap registry
+    // kosong. Feed cepat tetap memakai jendela ketat.
+    lookbackBlocks: 9_000,
   },
 ];
