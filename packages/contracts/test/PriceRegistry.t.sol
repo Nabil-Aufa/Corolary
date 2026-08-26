@@ -133,6 +133,21 @@ contract PriceRegistryTest is Test {
         return registry.recordPrice(_bundle(ETH_MAINNET, HEIGHT), encoded);
     }
 
+    /// @dev `queryId` diturunkan dari tinggi blok, jadi merekam dua feed dalam
+    ///      satu tes WAJIB memakai tinggi berbeda - kalau tidak, yang kedua
+    ///      ditolak `QueryAlreadyProcessed` dan tesnya menguji hal yang salah.
+    function _recordAt(
+        uint64 height,
+        address aggregator,
+        int256 answer,
+        uint256 roundId,
+        uint256 updatedAt
+    ) internal returns (uint256) {
+        bytes memory encoded = _priceTx(aggregator, answer, roundId, updatedAt);
+        vm.prank(recorder);
+        return registry.recordPrice(_bundle(ETH_MAINNET, height), encoded);
+    }
+
     // ─────────────────────────────────────────────────────────────
     // Jalur bahagia + tata letak log
     // ─────────────────────────────────────────────────────────────
@@ -244,6 +259,114 @@ contract PriceRegistryTest is Test {
 
         vm.expectPartialRevert(PriceRegistry.PriceStale.selector);
         registry.getPrice(WETH);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Batas kesegaran per aset (open-issues B6)
+    // ─────────────────────────────────────────────────────────────
+
+    /// @notice Satu batas global selalu berukuran feed TERLAMBAT.
+    /// @dev Inilah alasan `maxPriceAgeOf` ada. Heartbeat Chainlink USDC/USD 24 jam
+    ///      (jarak antar ronde terukur 23,00 jam pada aggregator mainnet), sementara
+    ///      ETH/USD 1 jam. Batas global yang cukup longgar untuk USDC otomatis
+    ///      melonggarkan ETH puluhan kali lipat dari yang dibutuhkannya.
+    function test_PerAssetMaxAgeIsTighterThanGlobal() public {
+        vm.startPrank(admin);
+        registry.setMaxPriceAge(28 hours); // longgar, demi USDC
+        registry.setMaxPriceAgeFor(WETH, 3 hours); // ketat, sesuai heartbeat ETH
+        vm.stopPrank();
+
+        _recordAt(HEIGHT, ETH_USD_AGG, ETH_USD_ANSWER, 1, block.timestamp - 60);
+        _recordAt(HEIGHT + 1, USDC_USD_AGG, USDC_USD_ANSWER, 1, block.timestamp - 60);
+
+        vm.warp(block.timestamp + 4 hours);
+
+        (bool ethOk,,) = registry.tryGetPrice(WETH);
+        assertFalse(ethOk, "ETH 4 jam harus basi di batas 3 jam");
+
+        (bool usdcOk,,) = registry.tryGetPrice(USDC);
+        assertTrue(usdcOk, "USDC 4 jam masih segar di batas global 28 jam");
+    }
+
+    function test_MaxAgeForFallsBackToGlobal() public {
+        vm.prank(admin);
+        registry.setMaxPriceAge(28 hours);
+        assertEq(registry.maxAgeFor(WETH), 28 hours, "tanpa batas khusus = global");
+
+        vm.prank(admin);
+        registry.setMaxPriceAgeFor(WETH, 3 hours);
+        assertEq(registry.maxAgeFor(WETH), 3 hours);
+
+        // 0 mengembalikannya ke global, bukan membuat semuanya langsung basi.
+        vm.prank(admin);
+        registry.setMaxPriceAgeFor(WETH, 0);
+        assertEq(registry.maxAgeFor(WETH), 28 hours, "0 = kembali ke global");
+    }
+
+    /// @notice Alias MEWARISI batas aset kanoniknya.
+    /// @dev Kesegaran adalah sifat FEED, bukan sifat token yang meminjam harganya.
+    ///      Kalau tUSDC punya batasnya sendiri, akan ada dua sumber kebenaran untuk
+    ///      satu feed - dan yang satu pasti menyimpang diam-diam.
+    function test_AliasInheritsCanonicalMaxAge() public {
+        address tUsdc = address(0x7E57);
+        vm.startPrank(curator);
+        registry.registerAsset(tUsdc, 6);
+        registry.setPriceAlias(tUsdc, USDC);
+        vm.stopPrank();
+        vm.startPrank(admin);
+        registry.setMaxPriceAge(28 hours);
+        registry.setMaxPriceAgeFor(USDC, 2 hours);
+        vm.stopPrank();
+
+        assertEq(registry.maxAgeFor(tUsdc), 2 hours, "alias ikut batas kanonik");
+
+        _record(USDC_USD_AGG, USDC_USD_ANSWER, 1, block.timestamp - 60);
+        vm.warp(block.timestamp + 3 hours);
+
+        (, bool ok) = registry.tryToUsd1e18(tUsdc, 1e6);
+        assertFalse(ok, "alias ikut basi ketika feed kanoniknya basi");
+    }
+
+    /// @notice Menyetel batas pada ALIAS tidak berpengaruh apa-apa.
+    /// @dev Dikunci sebagai tes karena kegagalannya senyap: pemanggil mengira
+    ///      sudah mengetatkan tUSDC, padahal yang dibaca selalu batas USDC.
+    function test_SettingMaxAgeOnAliasIsIgnored() public {
+        address tUsdc = address(0x7E57);
+        vm.startPrank(curator);
+        registry.registerAsset(tUsdc, 6);
+        registry.setPriceAlias(tUsdc, USDC);
+        vm.stopPrank();
+        vm.startPrank(admin);
+        registry.setMaxPriceAge(28 hours);
+        registry.setMaxPriceAgeFor(tUsdc, 1 hours); // salah sasaran, sengaja
+        vm.stopPrank();
+
+        assertEq(registry.maxAgeFor(tUsdc), 28 hours, "batas alias diabaikan");
+    }
+
+    /// @notice Error menyebut ambang yang BERLAKU, bukan yang global.
+    function test_PriceStaleReportsEffectiveThreshold() public {
+        vm.startPrank(admin);
+        registry.setMaxPriceAge(28 hours);
+        registry.setMaxPriceAgeFor(WETH, 3 hours);
+        vm.stopPrank();
+
+        _record(ETH_USD_AGG, ETH_USD_ANSWER, 1, block.timestamp - 60);
+        uint64 updatedAt = registry.priceDataOf(WETH).updatedAt;
+        vm.warp(block.timestamp + 4 hours);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PriceRegistry.PriceStale.selector, WETH, updatedAt, uint64(3 hours)
+            )
+        );
+        registry.getPrice(WETH);
+    }
+
+    function test_OnlyAdminSetsPerAssetMaxAge() public {
+        vm.prank(recorder);
+        vm.expectPartialRevert(IAccessControl.AccessControlUnauthorizedAccount.selector);
+        registry.setMaxPriceAgeFor(WETH, 1 hours);
     }
 
     /// @notice Kesegaran diukur dari `updatedAt` Ethereum yang TERBUKTI,

@@ -2066,8 +2066,46 @@ export const PriceRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "maxAgeFor",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "maxPriceAge",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "maxPriceAgeOf",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -2340,6 +2378,24 @@ export const PriceRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "setMaxPriceAgeFor",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "seconds_",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPriceAlias",
     "inputs": [
       {
@@ -2528,6 +2584,25 @@ export const PriceRegistryAbi = [
         "type": "uint8",
         "indexed": false,
         "internalType": "uint8"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MaxPriceAgeForAssetUpdated",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "seconds_",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
       }
     ],
     "anonymous": false
@@ -3596,6 +3671,19 @@ export const EfficiencyMarketAbi = [
   },
   {
     "type": "function",
+    "name": "setPriceRegistry",
+    "inputs": [
+      {
+        "name": "prices",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supply",
     "inputs": [
       {
@@ -3811,6 +3899,19 @@ export const EfficiencyMarketAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriceRegistryUpdated",
+    "inputs": [
+      {
+        "name": "priceRegistry",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false

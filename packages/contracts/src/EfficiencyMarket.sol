@@ -111,6 +111,7 @@ contract EfficiencyMarket is AccessControl, ReentrancyGuard {
         address indexed user, uint16 fromBps, uint16 toBps, uint64 effectiveFrom
     );
     event RatioImproved(address indexed user, uint16 fromBps, uint16 toBps);
+    event PriceRegistryUpdated(address indexed priceRegistry);
 
     error ReserveInactive(address asset);
     error ReserveAlreadyExists(address asset);
@@ -133,6 +134,19 @@ contract EfficiencyMarket is AccessControl, ReentrancyGuard {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         creditGraph = ICreditGraphRatio(graph);
         priceRegistry = IPriceRegistryFull(prices);
+    }
+
+    /// @notice Arahkan pasar ke PriceRegistry lain.
+    /// @dev Ada karena ketiadaannya pernah mahal. `priceRegistry` semula hanya
+    ///      di-set di konstruktor, sehingga memperbaiki apa pun di PriceRegistry
+    ///      memaksa deploy ulang KONTRAK INI juga - membatalkan alamat yang sudah
+    ///      dipublikasikan beserta verifikasi explorer-nya, dan menelantarkan
+    ///      likuiditas yang tersimpan di sini. Registry harga adalah dependensi
+    ///      yang bisa berubah; perlakukan begitu.
+    function setPriceRegistry(address prices) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (prices == address(0)) revert ZeroAddress();
+        priceRegistry = IPriceRegistryFull(prices);
+        emit PriceRegistryUpdated(prices);
     }
 
     // -------------------------------------------------------------

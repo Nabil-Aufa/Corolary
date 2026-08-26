@@ -75,7 +75,21 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
     ///      B2 sendiri.
     mapping(address => address) public priceAliasOf;
 
+    /// @notice Batas kesegaran default, dipakai aset yang tidak punya batasnya sendiri.
+    /// @dev 24 jam adalah nilai yang SALAH untuk dipakai sendirian, dan itu terukur:
+    ///      heartbeat Chainlink USDC/USD 24 jam, dengan jarak antar ronde terukur
+    ///      23,00 jam - menyisakan satu jam untuk seluruh pipeline kita. Satu batas
+    ///      global selalu berukuran feed TERLAMBAT, sehingga feed cepat seperti
+    ///      ETH/USD (heartbeat 1 jam) ikut dilonggarkan 24x lipat tanpa alasan.
+    ///      Itulah yang diperbaiki `maxPriceAgeOf`.
     uint64 public maxPriceAge = 24 hours;
+
+    /// @notice Batas kesegaran khusus per aset KANONIK. 0 = pakai `maxPriceAge`.
+    /// @dev Dikunci ke aset kanonik, bukan aset yang diminta, karena kesegaran
+    ///      adalah sifat FEED-nya - bukan sifat token yang meminjam harga itu.
+    ///      Konsekuensinya `tUSDC` otomatis mewarisi batas `USDC`, dan tidak ada
+    ///      cara untuk keliru menyetelnya berbeda dari feed yang menjadi sumbernya.
+    mapping(address => uint64) public maxPriceAgeOf;
 
     event PriceRecorded(
         address indexed asset,
@@ -90,6 +104,7 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
     event AssetRegistered(address indexed asset, uint8 decimals);
     event PriceAliasSet(address indexed aliasAsset, address indexed canonicalAsset);
     event MaxPriceAgeUpdated(uint64 maxPriceAge);
+    event MaxPriceAgeForAssetUpdated(address indexed asset, uint64 seconds_);
 
     error PriceUnavailable(address asset);
     error PriceStale(address asset, uint64 updatedAt, uint64 maxAge);
@@ -209,8 +224,12 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
     function getPrice(address asset) external view returns (uint256 answer, uint8 decimals) {
         PriceData storage p = _prices[_canonical(asset)];
         if (p.roundId == 0) revert PriceUnavailable(asset);
-        if (_ageOf(p.updatedAt) > maxPriceAge) {
-            revert PriceStale(asset, p.updatedAt, maxPriceAge);
+        uint64 maxAge = maxAgeFor(asset);
+        if (_ageOf(p.updatedAt) > maxAge) {
+            // Ambang yang dilaporkan adalah yang BERLAKU, bukan yang global.
+            // Error yang menyebut ambang salah membuat orang mencari sebab di
+            // tempat yang salah.
+            revert PriceStale(asset, p.updatedAt, maxAge);
         }
         return (p.answer, p.feedDecimals);
     }
@@ -229,6 +248,14 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
         return _prices[_canonical(asset)];
     }
 
+    /// @notice Batas kesegaran yang BENAR-BENAR berlaku untuk sebuah aset.
+    /// @dev Diekspos supaya pemanggil dan UI bisa menjelaskan kenapa sebuah harga
+    ///      ditolak. Tanpa ini, "harga basi" adalah pernyataan tanpa ambang.
+    function maxAgeFor(address asset) public view returns (uint64) {
+        uint64 specific = maxPriceAgeOf[_canonical(asset)];
+        return specific == 0 ? maxPriceAge : specific;
+    }
+
     function _canonical(address asset) private view returns (address) {
         address c = priceAliasOf[asset];
         return c == address(0) ? asset : c;
@@ -245,7 +272,7 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
         address canonical = priceAliasOf[asset];
         PriceData storage p = _prices[canonical == address(0) ? asset : canonical];
         if (p.roundId == 0) return (0, 0, false);
-        if (_ageOf(p.updatedAt) > maxPriceAge) return (0, 0, false);
+        if (_ageOf(p.updatedAt) > maxAgeFor(asset)) return (0, 0, false);
         return (p.answer, p.feedDecimals, true);
     }
 
@@ -318,6 +345,19 @@ contract PriceRegistry is AccessControl, ReentrancyGuard, AttestcoinReader, IPri
     function setMaxPriceAge(uint64 seconds_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         maxPriceAge = seconds_;
         emit MaxPriceAgeUpdated(seconds_);
+    }
+
+    /// @notice Setel batas kesegaran khusus satu aset; 0 mengembalikannya ke global.
+    /// @dev Setel pada aset KANONIK (mis. USDC), bukan pada alias (tUSDC) - alias
+    ///      mewarisinya lewat `_canonical`. Menyetel pada alias tidak akan pernah
+    ///      terbaca, dan itu kegagalan senyap.
+    function setMaxPriceAgeFor(address asset, uint64 seconds_)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (asset == address(0)) revert ZeroAddress();
+        maxPriceAgeOf[asset] = seconds_;
+        emit MaxPriceAgeForAssetUpdated(asset, seconds_);
     }
 
     function setChainKeyAllowed(uint64 chainKey, bool allowed)

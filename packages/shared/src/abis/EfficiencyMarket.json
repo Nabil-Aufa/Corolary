@@ -692,6 +692,19 @@
   },
   {
     "type": "function",
+    "name": "setPriceRegistry",
+    "inputs": [
+      {
+        "name": "prices",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supply",
     "inputs": [
       {
@@ -907,6 +920,19 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriceRegistryUpdated",
+    "inputs": [
+      {
+        "name": "priceRegistry",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false

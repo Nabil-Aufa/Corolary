@@ -550,4 +550,36 @@ contract EfficiencyMarketTest is Test {
         vm.expectPartialRevert(EfficiencyMarket.InsufficientLiquidity.selector);
         market.borrow(address(usdc), 600_000e6); // pool hanya punya 500.000
     }
+    // ─────────────────────────────────────────────────────────────
+    // Registry harga bisa diganti (open-issues B6)
+    // ─────────────────────────────────────────────────────────────
+
+    /// @notice Ketiadaan setter ini pernah mahal.
+    /// @dev `priceRegistry` semula hanya di-set di konstruktor, sehingga
+    ///      memperbaiki apa pun di PriceRegistry memaksa deploy ulang KONTRAK INI
+    ///      juga - membatalkan alamat yang sudah dipublikasikan beserta verifikasi
+    ///      explorer-nya, dan menelantarkan likuiditas yang tersimpan di sini.
+    function test_AdminCanRepointPriceRegistry() public {
+        StubPrices replacement = new StubPrices();
+        assertEq(address(market.priceRegistry()), address(prices));
+
+        vm.prank(admin);
+        market.setPriceRegistry(address(replacement));
+
+        assertEq(address(market.priceRegistry()), address(replacement));
+    }
+
+    function test_PriceRegistryCannotBeSetToZero() public {
+        vm.prank(admin);
+        vm.expectRevert(EfficiencyMarket.ZeroAddress.selector);
+        market.setPriceRegistry(address(0));
+    }
+
+    function test_OnlyAdminCanRepointPriceRegistry() public {
+        StubPrices replacement = new StubPrices();
+        vm.prank(address(0xDEAD));
+        vm.expectPartialRevert(IAccessControl.AccessControlUnauthorizedAccount.selector);
+        market.setPriceRegistry(address(replacement));
+    }
+
 }
