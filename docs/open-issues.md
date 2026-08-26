@@ -108,7 +108,7 @@ Tenggat: sebelum M3.
 
 ---
 
-### B6 · `maxPriceAge` lebih pendek dari heartbeat feed 🟡 **dimitigasi — desain benar butuh redeploy**
+### B6 · `maxPriceAge` lebih pendek dari heartbeat feed ✅ **SELESAI**
 
 **Masalah.** `PriceRegistry.maxPriceAge` default 24 jam, sama persis dengan
 heartbeat Chainlink USDC/USD. Terukur langsung dari aggregator mainnet
@@ -141,18 +141,50 @@ jaminan ketat untuk keduanya: satu batas global selalu berukuran feed
 **terlambat**, jadi ETH sudah 24x lebih longgar dari yang dibutuhkannya bahkan
 sebelum perubahan ini.
 
-**Desain yang benar adalah batas per-aset** (`mapping(address => uint64)` dengan
-fallback ke global). Tidak dikerjakan sekarang, dan alasannya bukan malas:
-`EfficiencyMarket.priceRegistry` di-set di konstruktor **tanpa setter**, jadi
-mengganti `PriceRegistry` berarti men-deploy ulang `EfficiencyMarket` dan
-`CreditGraph` juga — membatalkan sepuluh alamat yang baru dipublikasikan di
-README beserta verifikasi Blockscout-nya, beberapa hari sebelum submission.
-Menambahkannya ke source tanpa deploy lebih buruk lagi: repo tidak akan lagi
-cocok dengan bytecode yang terverifikasi.
+**Diselesaikan 2026-08-26 dengan batas per-aset.** `PriceRegistry.maxPriceAgeOf`
+dikunci ke aset **kanonik**, karena kesegaran adalah sifat FEED — bukan sifat token
+yang meminjam harganya. Konsekuensinya `tUSDC` mewarisi batas `USDC` dan tidak bisa
+disetel berbeda dari feed sumbernya. Menyetel batas pada alias diam-diam tidak
+berpengaruh, jadi itu dikunci sebagai tes tersendiri.
 
-**Aksi tersisa:** kalau ada redeploy karena alasan lain sebelum submission,
-ikutkan batas per-aset dan tambahkan setter `setPriceRegistry` supaya jebakan
-yang sama tidak terulang.
+**Defaultnya dibalik dari rencana awal: KETAT, dengan pengecualian longgar.**
+
+| | Batas | Alasan |
+|---|---|---|
+| Global (ETH/USD, BTC/USD, tWETH) | **3 jam** | heartbeat 1 jam + 2 jam toleransi pipeline |
+| `USDC` (dan `tUSDC` lewat alias) | **28 jam** | heartbeat 24 jam, jarak antar ronde terukur 23,00 jam |
+
+Rencana semula "global longgar, ETH diperketat" itu terbalik. Bedanya muncul saat
+seseorang menambah feed baru dan lupa mengaturnya: dengan default longgar, feed itu
+diam-diam menerima harga basi; dengan default ketat, pasarnya membeku — keras dan
+terlihat. Kegagalan yang terlihat selalu lebih baik daripada yang senyap.
+
+`PriceStale` sekarang melaporkan ambang yang BERLAKU, bukan yang global. Error yang
+menyebut ambang salah mengirim orang mencari sebab di tempat yang salah.
+
+**`EfficiencyMarket.setPriceRegistry` ditambahkan, dan itu bagian yang menghentikan
+pengulangan.** `priceRegistry` semula hanya di-set di konstruktor, sehingga
+memperbaiki apa pun di `PriceRegistry` memaksa deploy ulang pasar juga — membatalkan
+alamat yang sudah dipublikasikan beserta verifikasi explorer-nya, dan menelantarkan
+likuiditas di dalamnya. Ini deploy ulang pasar yang **terakhir**.
+
+**Deployment-nya bedah, bukan ulang total.** `script/RedeployPricing.s.sol` tidak
+menyentuh `FactRegistry` (5.933 fakta terbukti), `CreditGraph`, keempat adapter,
+maupun kedua FaucetToken — token sengaja tidak diganti karena alamatnya sudah
+dipegang dompet lain lewat faucet, dan menggantinya menghanguskan saldo mereka
+tanpa jejak.
+
+| Kontrak | Alamat baru |
+|---|---|
+| `PriceRegistry` | `0x1fC6c2CFB9e339012B70D45977737B9e411efdc9` |
+| `EfficiencyMarket` | `0xd97657E361928298A342D8e5049b7aD440b167d4` |
+
+21 transaksi, semuanya `status 0x1`, keduanya terverifikasi di Blockscout.
+Terverifikasi lewat `cast call` — bukan status forge, yang di chain ini melaporkan
+kegagalan palsu karena blok CC3 tidak punya `mixHash`.
+
+**Aksi tersisa:** perbarui `PRICE_REGISTRY_ADDRESS` dan `EFFICIENCY_MARKET_ADDRESS`
+di kedua service Railway, lalu pindahkan likuiditas dari pasar lama.
 
 ---
 

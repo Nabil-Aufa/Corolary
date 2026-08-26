@@ -136,9 +136,9 @@ All contracts are **verified** on Blockscout — source is readable, not just by
 | Contract | Address |
 |---|---|
 | `FactRegistry` | [`0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5`](https://creditcoin-testnet.blockscout.com/address/0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5) |
-| `PriceRegistry` | [`0x80B20b96E3b9c3CaD077f535f1F95D5b8a06012C`](https://creditcoin-testnet.blockscout.com/address/0x80B20b96E3b9c3CaD077f535f1F95D5b8a06012C) |
+| `PriceRegistry` | [`0x1fC6c2CFB9e339012B70D45977737B9e411efdc9`](https://creditcoin-testnet.blockscout.com/address/0x1fC6c2CFB9e339012B70D45977737B9e411efdc9) |
 | `CreditGraph` | [`0x896E283FB7213650f2C65c239168fEd89F57e952`](https://creditcoin-testnet.blockscout.com/address/0x896E283FB7213650f2C65c239168fEd89F57e952) |
-| `EfficiencyMarket` | [`0x767705FEaE080Cd30AA58BB29A63401114A4308d`](https://creditcoin-testnet.blockscout.com/address/0x767705FEaE080Cd30AA58BB29A63401114A4308d) |
+| `EfficiencyMarket` | [`0xd97657E361928298A342D8e5049b7aD440b167d4`](https://creditcoin-testnet.blockscout.com/address/0xd97657E361928298A342D8e5049b7aD440b167d4) |
 
 ### Protocol adapters
 
