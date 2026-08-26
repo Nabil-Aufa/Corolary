@@ -429,6 +429,19 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
   yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
   code jadi 2.
+- **`loop()` bisa berhenti SELAMANYA tanpa satu pun error.** Ia menjadwalkan
+  tick berikutnya setelah `await fn()`, jadi satu iterasi yang tidak pernah
+  selesai mematikan loop itu diam-diam. Terjadi 2026-08-26: loop harga berhenti
+  total selama 1 jam 40 menit sementara watcher dan submitter terus jalan —
+  gejalanya cuma harga yang tidak diperbarui, dan 50 transaksi terakhir submitter
+  semuanya `recordFactBatch`, nol `recordPrice`. Yang bisa menggantung tanpa
+  batas adalah `tx.wait()`; Proof Builder punya timeout 60 detik. Sekarang tiap
+  iterasi dijaga `ITERATION_TIMEOUT_MS` 10 menit.
+- **Loop harga yang mati TIDAK menghentikan apa pun yang lain**, dan itu yang
+  membuatnya sulit terlihat. Di `main.ts`, loop submitter dinyalakan SEBELUM
+  `initPrices()`, jadi kegagalan jalur harga membiarkan fakta terus mengalir —
+  dashboard hijau, pasar membeku. Verifikasi jalur harga terpisah dari verifikasi
+  pipeline fakta.
 - **Jendela lookback harga harus MELEBIHI heartbeat feed paling lambat.**
   `MAX_LOOKBACK_BLOCKS` 6.000 blok = 20 jam, sementara heartbeat USDC/USD 24 jam.
   Di steady state tidak masalah karena registry sudah punya harga dan hanya

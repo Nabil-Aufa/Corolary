@@ -38,19 +38,68 @@ const PRICE_INTERVAL_MS = 120_000;
 let stopping = false;
 
 /**
- * Loop yang tidak pernah menjalankan dua iterasi bersamaan.
+ * Batas waktu satu iterasi loop.
+ *
+ * Ada karena `loop` menjadwalkan tick berikutnya SETELAH `await fn()` selesai —
+ * jadi satu iterasi yang tidak pernah selesai menghentikan loop itu selamanya,
+ * tanpa satu pun error, tanpa gejala apa pun selain pekerjaan yang berhenti
+ * diam-diam. Terjadi 2026-08-26: loop harga berhenti sepenuhnya sementara
+ * watcher dan submitter terus berjalan; tidak ada `recordPrice` selama 1 jam 40
+ * menit padahal ronde Chainlink baru sudah tersedia, dan 50 transaksi terakhir
+ * submitter semuanya `recordFactBatch`.
+ *
+ * Yang bisa menggantung tanpa batas: `tx.wait()` pada transaksi yang tidak
+ * pernah tertambang. Proof Builder punya timeout 60 detik dan `getLogs` punya
+ * timeout HTTP, jadi keduanya bukan penyebabnya.
+ *
+ * 10 menit jauh di atas iterasi terlama yang wajar (chunk Aave ~40 detik,
+ * pengiriman batch beberapa detik), jadi ia tidak akan memotong pekerjaan yang
+ * sehat.
+ */
+const ITERATION_TIMEOUT_MS = 600_000;
+
+/**
+ * Loop yang tidak pernah menjalankan dua iterasi bersamaan — dan tidak pernah
+ * berhenti diam-diam.
  *
  * setInterval akan menumpuk iterasi kalau satu putaran lebih lambat dari
- * intervalnya — pada watcher itu berarti beberapa eth_getLogs berjalan
- * bersamaan dan memicu rate limit yang justru memperlambatnya lagi.
+ * intervalnya; pada watcher itu berarti beberapa eth_getLogs berjalan bersamaan
+ * dan memicu rate limit yang justru memperlambatnya lagi.
+ *
+ * Iterasi yang melewati `ITERATION_TIMEOUT_MS` dijadwalkan ulang, dan itu
+ * disengaja meski berarti iterasi lama mungkin masih berjalan: loop yang
+ * tumpang tindih sesekali bisa dipulihkan, loop yang mati permanen tidak.
+ * Pengaman terhadap tumpang tindih ada di lapis bawah — `claimNextNonce` dan
+ * `FOR UPDATE SKIP LOCKED` — bukan di sini.
  */
 function loop(name: string, intervalMs: number, fn: () => Promise<void>): void {
   const tick = async (): Promise<void> => {
     if (stopping) return;
+    const startedAt = Date.now();
     try {
-      await fn();
+      let timer: NodeJS.Timeout | undefined;
+      const guard = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`iterasi melewati ${ITERATION_TIMEOUT_MS} ms`)),
+          ITERATION_TIMEOUT_MS,
+        );
+      });
+      try {
+        await Promise.race([fn(), guard]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     } catch (err) {
-      logger.error({ loop: name, err: String(err) }, 'iterasi loop gagal');
+      const durationMs = Date.now() - startedAt;
+      if (durationMs >= ITERATION_TIMEOUT_MS) {
+        logger.error(
+          { loop: name, durationMs },
+          'iterasi loop MENGGANTUNG dan dilewati — loop dijadwalkan ulang. ' +
+            'Iterasi lama mungkin masih berjalan; periksa penyebabnya',
+        );
+      } else {
+        logger.error({ loop: name, err: String(err), durationMs }, 'iterasi loop gagal');
+      }
     }
     if (!stopping) setTimeout(() => void tick(), intervalMs);
   };
