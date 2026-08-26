@@ -429,6 +429,25 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
   yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
   code jadi 2.
+- **drpc juga membalas `400 Bad Request` pada `eth_getLogs`.** Bentuk kegagalan
+  keempat setelah 403 (User-Agent), 429, dan `-32000 method handler crashed`.
+  Terukur 2026-08-26 pada rentang 3.000 blok aggregator Chainlink, dan transien —
+  pulih dalam hitungan detik. Perlakukan tetap sebagai transien; jangan tambahkan
+  daftar kata kunci baru.
+- **Jalur harga TIDAK bisa memakai RPC cadangan.** `SCAN_CHUNK_BLOCKS` 3.000 blok
+  butuh 300 permintaan pada batas 10 blok Alchemy, jauh di atas
+  `FALLBACK_MAX_SPLITS` 50 — jadi failover MENOLAK dan feed itu gagal sampai
+  primary pulih. Ini disengaja (300 permintaan ke provider yang sedang jadi
+  tumpuan adalah cara kehilangan keduanya), tapi artinya jalur harga bergantung
+  penuh pada drpc. Fakta dan blok tetap terlindungi.
+- **Memulihkan harga dari laptop AMAN asal `reconcileNonce` dilewati.**
+  `claimNextNonce` satu `UPDATE ... RETURNING` atomik, jadi dua proses yang
+  membaca baris `submitter_state` yang SAMA tidak akan bertabrakan — bahaya
+  sebenarnya dua DATABASE, bukan dua proses. Yang berbahaya justru
+  `reconcileNonce`: kalau indexer punya transaksi in-flight, ia bisa memundurkan
+  penghitung dan membuat dua transaksi memakai nonce sama. `pnpm prices:once`
+  memanggilnya; untuk pemulihan darurat pakai skrip tanpa rekonsiliasi dan
+  arahkan `DATABASE_URL` ke database produksi.
 - **`loop()` bisa berhenti SELAMANYA tanpa satu pun error.** Ia menjadwalkan
   tick berikutnya setelah `await fn()`, jadi satu iterasi yang tidak pernah
   selesai mematikan loop itu diam-diam. Terjadi 2026-08-26: loop harga berhenti
