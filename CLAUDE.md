@@ -429,6 +429,28 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
   yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
   code jadi 2.
+- **Gerbang yang tidak menemukan berkas apa pun HARUS gagal, bukan lulus.**
+  `check-no-mocks.mjs` memakai `new URL('..', import.meta.url).pathname`, yang
+  di Windows menghasilkan `/D:/Web3/CTC/` — dengan garis miring di depan.
+  Keempat root pemindaian jadi tidak ditemukan dan skripnya melaporkan
+  "LULUS SEBAGIAN" setelah memeriksa **nol berkas**. Di Linux jalurnya kebetulan
+  benar, jadi CI tidak akan pernah menangkapnya. Pakai `fileURLToPath()`; dan
+  sekarang nol-berkas maupun root non-frontend yang hilang divonis GAGAL.
+- **`turbo run build` menyeret `forge build`.** `packages/contracts` punya skrip
+  `build`, jadi `pnpm build` di root gagal di host mana pun yang tidak punya
+  Foundry. Untuk deploy, satu-satunya yang perlu dibangun adalah
+  `@corolary/shared` (exports-nya menunjuk `./dist`); kedua service jalan lewat
+  `tsx` langsung dari sumber.
+- **`tsx` wajib di `dependencies`, bukan `devDependencies`.** Host menyetel
+  `NODE_ENV=production` dan install produksi melewatkan devDependencies —
+  service naik lalu mati dengan `tsx: not found`. Karena `tsx` memang runtime
+  bagi kedua service, tempatnya di `dependencies` adalah klasifikasi yang benar,
+  bukan siasat.
+- **`liquidationPenalty` bergerak KE BAWAH.** Kontrak menulis
+  `points[3] = -penalty`, jadi rentangnya -300..0 dan `maxPoints`-nya **0**.
+  Indexer sempat menyimpan 300, sehingga dompet yang tidak pernah kena likuidasi
+  tampil "0 dari 300" — terbaca sebagai kehilangan 300 poin, kebalikan penuh
+  dari artinya. Diperbaiki di `persist.ts` + migrasi 0011.
 - **Platform hosting memakai `PORT`, dan salah port TIDAK menghasilkan error.**
   API kita membaca `API_PORT`; Railway/Fly/Render menyuntikkan `PORT` dan
   mengarahkan traffic ke sana. Kalau tidak dipetakan, service naik dengan sehat,

@@ -272,7 +272,13 @@ to a single file behind `NEXT_PUBLIC_USE_FIXTURES`, which defaults to `false`.
 
 ## API
 
-Base: `/v1`. Every response — success or failure — uses the same envelope.
+**Live:** `https://corolary-production.up.railway.app`
+
+```bash
+curl https://corolary-production.up.railway.app/v1/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423
+```
+
+Base path: `/v1`. Every response — success or failure — uses the same envelope.
 
 | Method | Path | Returns |
 |---|---|---|

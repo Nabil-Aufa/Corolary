@@ -53,7 +53,27 @@ for (const { dir, file } of TARGETS) {
     unlinkSync(linkPath);
   }
 
-  symlinkSync(target, linkPath);
+  try {
+    symlinkSync(target, linkPath);
+  } catch (err) {
+    // Windows melarang symlink untuk akun non-admin kecuali Developer Mode
+    // menyala, dan pesan bawaannya — "EPERM: operation not permitted" — tidak
+    // menyebut itu sama sekali. Tanpa petunjuk ini, gejalanya terbaca seperti
+    // masalah izin berkas dan orang akan mencoba menjalankan ulang sebagai
+    // administrator, yang memang berhasil tapi bukan perbaikan yang benar.
+    if (err.code === 'EPERM' || err.code === 'EACCES') {
+      console.error(
+        `[link-env] tidak bisa membuat symlink ${relative(root, linkPath)}.\n` +
+          '  Di Windows, symlink butuh Developer Mode:\n' +
+          '    Settings > Privacy & security > For developers > Developer Mode = On\n' +
+          '  Lalu jalankan ulang perintahnya. Menjalankan terminal sebagai\n' +
+          '  administrator juga berhasil, tapi Developer Mode yang benar.',
+      );
+      failed = true;
+      continue;
+    }
+    throw err;
+  }
   console.log(`[link-env] ${relative(root, linkPath)} -> ${target}`);
 }
 
