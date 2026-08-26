@@ -113,6 +113,15 @@ export type ScoreComponentKey =
   | 'protocolDiversity'
   | 'activeStanding';
 
+/**
+ * Satu komponen skor beserta buktinya.
+ *
+ * Lima komponen bersifat MENAMBAH (`points` 0..`maxPoints`). Satu tidak:
+ * `liquidationPenalty` berkisar **-300 sampai 0**, dengan `maxPoints: 0` —
+ * nilai terbaik yang mungkin adalah nol. Merendernya sebagai bilah kemajuan
+ * membuat dompet bersih tampil "0 dari 300", yang terbaca persis kebalikan dari
+ * artinya. Batas bawahnya `LIQUIDATION_PENALTY_MIN`.
+ */
 export interface ScoreComponent {
   key: ScoreComponentKey;
   label: string;

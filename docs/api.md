@@ -674,7 +674,7 @@ Contoh nyata: dompet demo, skor 813 (tier 4).
                 "key": "liquidationPenalty",
                 "label": "Penalti likuidasi",
                 "points": 0,
-                "maxPoints": 300,
+                "maxPoints": 0,
                 "factCount": 0,
                 "factIds": []
             },
@@ -735,6 +735,16 @@ padahal tidak. Untuk daftar penuh, pakai `GET /v1/facts?subject=…`.
 komponen lain selalu nol atau positif. `historyDuration` selalu
 `factIds: []` karena ia diturunkan dari `firstFactAt`, bukan dari satu fakta
 tertentu.
+
+> **`liquidationPenalty` bergerak ke bawah, bukan ke atas.** Kontrak menuliskan
+> `points[3] = -penalty`, jadi komponen ini berkisar dari **-300 sampai 0** dan
+> nilai TERBAIK yang mungkin adalah `points: 0` dengan `maxPoints: 0`. Batas
+> bawahnya diekspor sebagai `LIQUIDATION_PENALTY_MIN` di `packages/shared`.
+>
+> UI **tidak boleh** merendernya dengan bilah kemajuan seperti lima komponen
+> lain. "0 dari 300" terbaca sebagai kehilangan 300 poin, padahal artinya justru
+> dompet ini tidak pernah kena likuidasi sama sekali — kebalikan penuh dari yang
+> terbaca. Perlakukan sebagai pengurang: tampilkan hanya ketika `points < 0`.
 
 ### Contoh Respons — Alamat Tanpa Riwayat
 

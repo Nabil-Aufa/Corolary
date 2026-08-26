@@ -150,7 +150,17 @@ const COMPONENT_KEYS = [
   'activeStanding',
 ] as const;
 
-const COMPONENT_MAX = [300, 200, 200, 300, 100, 200] as const;
+/**
+ * Poin MAKSIMUM yang bisa dicapai tiap komponen — bukan besar pengaruhnya.
+ *
+ * `liquidationPenalty` adalah 0, dan itu bukan salah ketik. Kontrak menuliskan
+ * `points[3] = -penalty`, jadi komponen ini bergerak dari **-300 sampai 0**:
+ * nilai terbaik yang mungkin adalah nol. Menulis 300 di sini membuat UI
+ * merender dompet yang tidak pernah kena likuidasi sebagai "0 dari 300" —
+ * terbaca seperti kehilangan 300 poin, padahal artinya justru bersih sempurna.
+ * Batas bawahnya ada di `packages/shared` sebagai `LIQUIDATION_PENALTY_MIN`.
+ */
+const COMPONENT_MAX = [300, 200, 200, 0, 100, 200] as const;
 
 /**
  * Skor dibaca ULANG dari kontrak, bukan dihitung ulang di sini.
