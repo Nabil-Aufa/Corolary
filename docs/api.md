@@ -133,6 +133,13 @@ ditambahkan — belum ada di v1).
 | `GET /v1/*` (baca) | 120 request / menit / IP, burst 20 | Data publik, murah untuk API baca dari mirror Postgres |
 | `POST /v1/prove` | 10 request / menit / IP | Tiap panggilan berujung ke antrean job yang memanggil prover + mengirim tx on-chain (biaya CTC nyata) |
 | `GET /v1/prove/:jobId` | Termasuk kelompok baca (120/menit) | Polling status murah |
+| `POST /v1/backfill` | 3 request / menit / IP, burst 2 | Paling mahal di seluruh API: satu panggilan yang lolos dedupe memindai ribuan blok lalu membuktikan SETIAP transaksi yang ditemukan pada tarif lazy 3,13×10⁻⁴ CTC |
+| `GET /v1/backfill/:jobId` | Termasuk kelompok baca (120/menit) | Polling status murah |
+
+Rate limit per-IP bukan rem biaya yang sebenarnya untuk `POST /v1/backfill` — ia
+hanya membatasi seberapa cepat job MASUK. Yang membatasi seberapa cepat CTC
+KELUAR adalah pekerja di indexer, yang menjalankan **satu backfill pada satu
+waktu** (`services/indexer/src/jobs/backfill.ts`).
 
 Header yang selalu disertakan di respons:
 
@@ -195,6 +202,8 @@ dan body:
 | GET | `/v1/prices` | Harga terbukti terbaru per aset |
 | POST | `/v1/prove` | Antre eager-proof untuk sebuah tx |
 | GET | `/v1/prove/:jobId` | Status job proving |
+| POST | `/v1/backfill` | Antre pemindaian riwayat mainnet untuk satu dompet |
+| GET | `/v1/backfill/:jobId` | Status job backfill |
 
 ---
 
@@ -1324,6 +1333,185 @@ lengkapnya.
 ```json
 { "ok": false, "error": { "code": "INVALID_PARAM", "message": "jobId must be a valid UUID" } }
 ```
+
+### Kode Error yang Mungkin
+
+`NOT_FOUND`, `INVALID_PARAM`, `RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`, `INTERNAL`
+
+
+---
+
+## 14. `POST /v1/backfill`
+
+Memicu pemindaian riwayat Ethereum mainnet untuk satu dompet, sedalam `months`
+bulan ke belakang, di keempat protokol sekaligus.
+
+Ada karena tanpanya UI tidak punya jalan keluar: dompet yang belum pernah
+dipindai menampilkan skor 0, dan satu-satunya cara memperbaikinya adalah CLI di
+laptop Dev A. Endpoint ini yang membuat tombol "Claim your history" berfungsi.
+
+API **tidak** memindai apa pun sendiri. Ia menitipkan job dan indexer yang
+mengerjakannya — alasan yang sama dengan `POST /v1/prove`: submitter harus tetap
+satu-satunya penulis dari kunci submitter, dan backfill berbagi RPC Ethereum
+dengan watcher live.
+
+### Body Request
+
+| Field | Tipe | Wajib | Keterangan |
+|---|---|---|---|
+| `address` | `Address` | ya | Dompet yang riwayatnya dipindai |
+| `months` | `number` | tidak | Kedalaman riwayat, bilangan bulat `1..24`. Default `6` |
+
+`months` di luar rentang **ditolak**, tidak dipangkas diam-diam. Memangkas
+`120` jadi `24` membuat pemanggil mengira ia memesan riwayat sepuluh tahun, lalu
+membaca skor yang lebih rendah sebagai sifat dompetnya alih-alih sebagai jendela
+yang dipotong.
+
+**Kenapa default 6 dan bukan 24.** `historyDuration` memakai half-saturation
+`saturating(days, 365, 200)`: 365 hari memberi 100 dari 200 poin, 730 hari
+memberi 133. Menggandakan jendela dari 6 ke 12 bulan hanya menambah ~34 poin,
+sementara biayanya naik sebanding jumlah transaksi yang ditemukan. Tuas skor yang
+sebenarnya ada di cakupan protokol (`protocolDiversity`, linear, 25 poin per
+protokol) — dan endpoint ini selalu memindai keempat-empatnya.
+
+### Contoh Request
+
+```bash
+curl -X POST http://localhost:8080/v1/backfill \
+  -H 'content-type: application/json' \
+  -d '{"address":"0x1111111111111111111111111111111111111111","months":1}'
+```
+
+### Respons Sukses — `202 Accepted`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "jobId": "b38e5847-3430-40df-80ad-2ec0249d10f8",
+    "status": "pending",
+    "subject": "0x1111111111111111111111111111111111111111",
+    "months": 1,
+    "createdAt": 1787714719
+  }
+}
+```
+
+### Respons Sukses — sudah pernah dipindai sedalam ini
+
+```json
+{
+  "ok": true,
+  "data": {
+    "jobId": null,
+    "status": "covered",
+    "subject": "0x1111111111111111111111111111111111111111",
+    "months": 1,
+    "createdAt": 1787715063
+  }
+}
+```
+
+Tidak ada job yang dibuat dan tidak ada CTC yang keluar. UI harus langsung
+menampilkan skor yang ada, bukan spinner.
+
+**Dedupe-nya terhadap KENYATAAN, bukan terhadap antrean.** Cakupan dibaca dari
+tabel `backfill_runs`, yang ditulis `backfillSubject` — jadi backfill lewat CLI
+ikut terhitung. Dedupe yang hanya melihat tabel `jobs` akan memindai ulang
+riwayat yang sudah dibayar lengkap, karena CLI tidak pernah menulis baris `jobs`.
+Dompet demo salah satu contohnya.
+
+Cakupan dituntut lengkap untuk **setiap** protokol yang diawasi watcher, bukan
+sekadar "ada satu barisnya". `firstFactAt` adalah minimum lintas protokol, jadi
+kedalaman yang tidak seragam menghasilkan kesimpulan yang salah tentang
+dompetnya: dompet demo pernah dipindai 24 bulan di Aave tapi hanya 9 bulan di
+Morpho, dan "riwayatnya mentok 8 bulan" ternyata pernyataan tentang jendela
+pemindaian. Dua transaksi Morpho dari 2025-09-23 menggeser skornya 797 → 813.
+
+### Job yang sedang berjalan
+
+Permintaan untuk dompet yang sudah punya job `pending`/`running` mengembalikan
+job yang sudah ada, bukan job kedua. Kalau job itu belum mulai dan lebih dangkal
+dari yang diminta, kedalamannya **diperdalam di tempat**.
+
+`months` di respons selalu kedalaman yang **benar-benar dikerjakan**, bukan yang
+diminta. Meminta 3 bulan saat job 24 bulan sedang antre akan dijawab `24`.
+
+### Respons Error
+
+| Kondisi | Kode | HTTP |
+|---|---|---|
+| `address` cacat atau kosong | `INVALID_ADDRESS` | 400 |
+| `months` di luar `1..24`, atau body bukan JSON | `INVALID_PARAM` | 400 |
+| Melebihi 3 request/menit | `RATE_LIMITED` | 429 |
+
+### Kode Error yang Mungkin
+
+`INVALID_ADDRESS`, `INVALID_PARAM`, `RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`, `INTERNAL`
+
+---
+
+## 15. `GET /v1/backfill/:jobId`
+
+### Parameter Path
+
+| Nama | Tipe | Keterangan |
+|---|---|---|
+| `jobId` | `string` (UUID) | Dari respons `POST /v1/backfill` |
+
+### Contoh Request
+
+```bash
+curl http://localhost:8080/v1/backfill/b38e5847-3430-40df-80ad-2ec0249d10f8
+```
+
+### Respons Sukses — `200`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "jobId": "b38e5847-3430-40df-80ad-2ec0249d10f8",
+    "status": "complete",
+    "subject": "0x1111111111111111111111111111111111111111",
+    "months": 1,
+    "attempts": 0,
+    "lastError": null,
+    "failedRanges": 0,
+    "logsFound": 0,
+    "createdAt": 1787714719,
+    "updatedAt": 1787714957
+  }
+}
+```
+
+### Status
+
+| Nilai | Arti |
+|---|---|
+| `pending` | Sudah diantre, belum mulai |
+| `running` | Sedang memindai |
+| `complete` | Selesai, seluruh rentang terbaca |
+| `partial` | Selesai, tapi sebagian rentang **tidak terbaca** |
+| `covered` | Hanya muncul di respons POST; tidak ada job |
+| `failed` | Gagal permanen setelah 3 percobaan |
+
+**`partial` bukan kesuksesan.** Ia berarti riwayatnya berlubang, dan lubang itu
+tidak punya gejala apa pun selain skor yang lebih rendah dari seharusnya —
+skornya tetap sah, tidak ada yang tampak rusak. `failedRanges` menyebut berapa
+rentang yang menyerah. Menjalankan ulang permintaan yang sama akan melanjutkan;
+insert-nya idempoten.
+
+`logsFound` adalah log yang cocok subjek **sebelum** dedup terhadap apa yang
+sudah tercatat — bukan jumlah fakta baru. Sebagian besar bisa saja sudah ada di
+registry.
+
+### Respons Error
+
+| Kondisi | Kode | HTTP |
+|---|---|---|
+| `jobId` bukan UUID | `INVALID_PARAM` | 400 |
+| Job tidak ada, atau bukan job backfill | `NOT_FOUND` | 404 |
 
 ### Kode Error yang Mungkin
 

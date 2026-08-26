@@ -346,3 +346,57 @@ export interface ProveJobAccepted {
   /** Terisi begitu faktanya ada, entah lewat job ini atau lewat watcher. */
   factId?: Hex;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Job backfill riwayat
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * `covered` dan `partial` ada karena keduanya BUKAN kegagalan, dan bukan pula
+ * kesuksesan biasa.
+ *
+ * - `covered`  — riwayat sedalam ini sudah pernah dipindai; tidak ada job baru,
+ *                tidak ada CTC yang keluar. UI harus menampilkan skor yang ada,
+ *                bukan spinner.
+ * - `partial`  — pemindaian selesai tapi sebagian rentang tidak terbaca. Ini
+ *                satu-satunya sinyal bahwa riwayatnya BERLUBANG: skornya tetap
+ *                sah, hanya lebih rendah dari seharusnya, dan tidak ada gejala
+ *                lain yang bisa dilihat pengguna. Menampilkannya sebagai
+ *                "selesai" berarti berbohong tentang angka yang ditampilkan.
+ */
+export type BackfillJobStatus =
+  | 'pending'
+  | 'running'
+  | 'complete'
+  | 'partial'
+  | 'covered'
+  | 'failed';
+
+/** Respons POST /v1/backfill (202 Accepted). */
+export interface BackfillJobAccepted {
+  /** `null` ketika `status = 'covered'` — tidak ada job untuk ditanyakan. */
+  jobId: string | null;
+  status: BackfillJobStatus;
+  subject: Address;
+  /** Kedalaman riwayat yang diminta, dalam bulan ke belakang. */
+  months: number;
+  createdAt: UnixSeconds;
+}
+
+export interface BackfillJob {
+  jobId: string;
+  status: BackfillJobStatus;
+  subject: Address;
+  months: number;
+  attempts: number;
+  lastError: string | null;
+  /** Terisi setelah selesai. `> 0` berarti riwayatnya berlubang. */
+  failedRanges: number | null;
+  /**
+   * Log yang cocok subjek, SEBELUM dedup terhadap yang sudah tercatat. Bukan
+   * jumlah fakta baru: sebagian besar bisa saja sudah ada di registry.
+   */
+  logsFound: number | null;
+  createdAt: UnixSeconds;
+  updatedAt: UnixSeconds;
+}

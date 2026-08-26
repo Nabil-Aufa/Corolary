@@ -70,3 +70,22 @@ export function decodeCursor(raw: string | undefined): FactCursor | null {
     throw new ApiFailure('INVALID_PARAM', 'cursor tidak valid');
   }
 }
+
+/**
+ * Kedalaman riwayat backfill, dalam bulan. Ditolak kalau di luar rentang —
+ * TIDAK dipangkas diam-diam.
+ *
+ * Bedanya bukan gaya. Memangkas `months: 120` jadi 24 membuat klien mengira ia
+ * memesan riwayat sepuluh tahun, lalu membaca skor yang lebih rendah dari
+ * harapannya sebagai "dompet ini memang tipis" — padahal jendelanya yang
+ * dipotong. Persis kekeliruan yang berulang empat kali di proyek ini: menyamakan
+ * jendela pemindaian dengan riwayat yang benar-benar ada.
+ */
+export function parseMonths(raw: unknown, def: number, max: number): number {
+  if (raw === undefined || raw === null) return def;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > max) {
+    throw new ApiFailure('INVALID_PARAM', `months harus bilangan bulat 1..${max}`);
+  }
+  return n;
+}

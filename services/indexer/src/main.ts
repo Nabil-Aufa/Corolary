@@ -7,6 +7,7 @@ import { watchOnce } from './watcher/watch.js';
 import { waitOnce } from './attestation/waiter.js';
 import { proveOnce } from './prover/run.js';
 import { runEagerProveJobs } from './jobs/eagerProve.js';
+import { runBackfillJobs } from './jobs/backfill.js';
 import { initSubmitter, submitOnce } from './submitter/submit.js';
 import { initPrices, refreshPricesOnce } from './prices/run.js';
 import {
@@ -27,6 +28,7 @@ import {
 const WATCH_INTERVAL_MS = 15_000;
 const WAIT_INTERVAL_MS = 15_000; // ~1 blok Creditcoin
 const PROVE_INTERVAL_MS = 5_000;
+const BACKFILL_INTERVAL_MS = 20_000;
 const SUBMIT_INTERVAL_MS = 5_000;
 const METRICS_INTERVAL_MS = 60_000;
 // Harga tidak butuh putaran cepat: ambang penyegarannya satu jam, dan tiap
@@ -83,6 +85,12 @@ async function main(): Promise<void> {
   // menerima job yang tidak pernah dikerjakan siapa pun — fitur yang tampak
   // hidup padahal tidak, yang persis dilarang aturan nol-mock.
   loop('prove-jobs', PROVE_INTERVAL_MS, runEagerProveJobs);
+
+  // Permintaan dari POST /v1/backfill. Intervalnya panjang dan pekerjanya
+  // serial: satu backfill makan menit, bukan detik, dan berbagi RPC Ethereum
+  // dengan watcher di atas. Menyalakannya secepat prove-jobs hanya menambah
+  // polling ke Postgres untuk pekerjaan yang tidak bisa dimulai.
+  loop('backfill-jobs', BACKFILL_INTERVAL_MS, runBackfillJobs);
 
   // Submitter hanya menyala kalau alamat kontraknya sudah ada. Sebelum deploy,
   // tiga tahap di atas tetap bekerja dan menumpuk antrean yang siap dikirim.

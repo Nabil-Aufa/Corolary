@@ -12,6 +12,7 @@ import { status } from './routes/status.js';
 import { marketRoutes } from './routes/market.js';
 import { prices } from './routes/prices.js';
 import { prove } from './routes/prove.js';
+import { backfill } from './routes/backfill.js';
 
 const logger = pino({ base: null, timestamp: pino.stdTimeFunctions.isoTime });
 
@@ -50,6 +51,7 @@ v1.route('/', score);
 v1.route('/', marketRoutes);
 v1.route('/', prices);
 v1.route('/', prove);
+v1.route('/', backfill);
 app.route('/v1', v1);
 
 app.notFound((c) => fail(c, 'NOT_FOUND', `tidak ada route ${c.req.method} ${c.req.path}`));

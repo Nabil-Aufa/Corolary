@@ -5,6 +5,7 @@ import { stageLogger } from '../logger.js';
 import { insertLogs, blockTimestamps } from '../watcher/watch.js';
 import { buildBatches, type ProvableTx } from '../prover/batching.js';
 import { targetsFor, type BackfillTarget } from './filters.js';
+import { recordCoverage } from './coverage.js';
 
 const log = stageLogger('backfill');
 
@@ -92,6 +93,10 @@ export interface BackfillOptions {
   priority: number;
 }
 
+function totalFound(found: Found[]): number {
+  return found.reduce((n, f) => n + f.logs.length, 0);
+}
+
 interface Found {
   protocolName: string;
   protocolAddress: string;
@@ -101,6 +106,10 @@ interface Found {
 export interface BackfillResult {
   /** > 0 berarti riwayatnya BERLUBANG, bukan sekadar "ada yang lambat". */
   failedRanges: number;
+  /** Log yang cocok subjek, sebelum dedup terhadap apa yang sudah tercatat. */
+  logsFound: number;
+  fromBlock: number;
+  toBlock: number;
 }
 
 export async function backfillSubject(opts: BackfillOptions): Promise<BackfillResult> {
@@ -145,6 +154,7 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
   const preExisting = opts.dryRun ? null : new Set<string>();
 
   for (const target of targets) {
+    const failedBefore = failures.length;
     const onChunk = opts.dryRun
       ? null
       : async (logs: ethers.Log[]): Promise<void> => {
@@ -174,6 +184,21 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
       protocolAddress: target.protocol.address,
       logs,
     });
+
+    // Dicatat per protokol begitu protokolnya selesai, bukan sekali di akhir.
+    // Pemindaian empat protokol makan ~20 menit; kalau prosesnya mati di
+    // protokol ketiga, dua protokol pertama sudah dibayar penuh dan tidak boleh
+    // dilupakan hanya karena run-nya tidak sempat mencapai baris terakhir.
+    if (!opts.dryRun) {
+      await recordCoverage({
+        subject,
+        protocol: target.protocol.address,
+        fromBlock: floor,
+        toBlock: ceiling,
+        logsFound: logs.length,
+        complete: failures.length === failedBefore,
+      });
+    }
   }
 
   await report(found, subject, preExisting, failures.length);
@@ -189,14 +214,14 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
 
   if (opts.dryRun) {
     log.info('dry-run: tidak ada yang ditulis ke database');
-    return { failedRanges: failures.length };
+    return { failedRanges: failures.length, logsFound: totalFound(found), fromBlock: floor, toBlock: ceiling };
   }
 
   // Cursor TIDAK disentuh. Cursor menandai sampai mana watcher live sudah
   // memindai MAJU; memundurkannya karena backfill akan membuat watcher
   // memindai ulang berbulan-bulan sebagai lalu lintas live.
   log.info({ subject, inserted }, 'backfill selesai — event masuk antrean pipeline biasa');
-  return { failedRanges: failures.length };
+  return { failedRanges: failures.length, logsFound: totalFound(found), fromBlock: floor, toBlock: ceiling };
 }
 
 /** Rentang yang tetap gagal setelah dipecah sampai batas bawah. */

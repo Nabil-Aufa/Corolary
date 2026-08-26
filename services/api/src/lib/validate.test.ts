@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAddress, parseHash32, parseLimit, encodeCursor, decodeCursor } from './validate.js';
+import {
+  parseAddress,
+  parseHash32,
+  parseLimit,
+  parseMonths,
+  encodeCursor,
+  decodeCursor,
+} from './validate.js';
 import { ApiFailure } from './envelope.js';
 
 /**
@@ -83,4 +90,25 @@ test('cursor karangan atau terpotong ditolak, bukan diam-diam jadi halaman 1', (
   failsWith('INVALID_PARAM', () =>
     decodeCursor(Buffer.from(JSON.stringify({ blockHeight: 1.5, txIndex: 0, logIndex: 0 })).toString('base64url')),
   );
+});
+
+test('months di luar rentang DITOLAK, bukan dipangkas', () => {
+  // Memangkas diam-diam membuat pemanggil mengira ia memesan riwayat 10 tahun,
+  // lalu membaca skor yang lebih rendah sebagai sifat dompetnya alih-alih
+  // sebagai jendela yang dipotong.
+  assert.equal(parseMonths(undefined, 6, 24), 6);
+  assert.equal(parseMonths(12, 6, 24), 12);
+  assert.equal(parseMonths('12', 6, 24), 12);
+  assert.equal(parseMonths(24, 6, 24), 24);
+  failsWith('INVALID_PARAM', () => parseMonths(25, 6, 24));
+  failsWith('INVALID_PARAM', () => parseMonths(0, 6, 24));
+  failsWith('INVALID_PARAM', () => parseMonths(-1, 6, 24));
+  failsWith('INVALID_PARAM', () => parseMonths(6.5, 6, 24));
+  failsWith('INVALID_PARAM', () => parseMonths('enam', 6, 24));
+});
+
+test('months null diperlakukan sebagai tidak diisi', () => {
+  // `JSON.parse` menghasilkan null untuk field yang dikirim eksplisit kosong;
+  // Number(null) adalah 0, yang akan ditolak — bukan yang dimaksud pemanggil.
+  assert.equal(parseMonths(null, 6, 24), 6);
 });
