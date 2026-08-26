@@ -156,8 +156,8 @@ Dengan submit, tim setuju bahwa:
 - [ ] Kode integrasi Attestcoin yang benar-benar berjalan (bukan stub)
 - [ ] Dokumentasi teknis setup + penjelasan pemakaian Attestcoin
 - [ ] Deployed & verified di testnet (alamat kontrak dicantumkan)
-- [ ] Deck / whitepaper PDF (URL publik)
-- [ ] Demo video prototype (URL publik)
+- [ ] Deck / whitepaper PDF (URL publik) — **memuat slide pengungkapan token testnet** (`docs/business.md` §13 slide 8)
+- [ ] Demo video prototype (URL publik) — **memuat pengungkapan token testnet yang diucapkan**, bukan hanya teks di deskripsi (`docs/business.md` §13.1)
 - [ ] Attestcoin Integration Summary ditulis eksplisit
 - [ ] Data lengkap semua anggota tim
 - [ ] Logo proyek

@@ -550,7 +550,7 @@ pendapatan #5 (§6.5) bukan sekadar ide di atas kertas.
 
 ## 13. Kerangka Pitch Deck
 
-12–15 slide, urutan naratif problem → solusi → bukti → bisnis → tim/ask.
+13–16 slide, urutan naratif problem → solusi → bukti → bisnis → tim/ask.
 
 1. **Cover** — nama produk (Corolary), tagline ("reputasi yang mengikuti dari
    bukti"), track (DeFi), logo, nama tim.
@@ -571,26 +571,71 @@ pendapatan #5 (§6.5) bukan sekadar ide di atas kertas.
    ekstraksi field selektif. Ini slide yang menunjukkan kedalaman teknis ke juri.
 7. **Demo langsung / screenshot Proof Viewer** — satu dompet nyata, satu fakta nyata,
    tautan ke transaksi Ethereum sungguhan yang membentuk skornya.
-8. **Kenapa ini tahan manipulasi** — Sybil resistance: biaya memalsukan riwayat ≈
+8. **Apa yang nyata, dan satu hal yang testnet** — slide pengungkapan, ditaruh
+   TEPAT SETELAH demo, selagi juri baru saja melihat `tUSDC` di layar. Tabel empat
+   baris: fakta kredit, harga, dan skor dari Ethereum mainnet yang dibuktikan
+   kriptografis; token yang dipinjamkan adalah ERC20 testnet. Satu kalimat kunci:
+   *"Token pasar adalah token testnet. Riwayat kredit, harga, dan skor berasal dari
+   Ethereum mainnet sungguhan."* Token testnet adalah **wadah**, bukan **data** —
+   `tUSDC` bahkan dinilai memakai harga USDC mainnet yang benar-benar dibuktikan
+   (`PriceRegistry.setPriceAlias`). Aturan hackathon mewajibkan deploy di testnet;
+   token testnet adalah konsekuensi aturan itu, bukan pilihan kami.
+
+   **Kenapa slide ini ada.** Juri akan menyadarinya sendiri. Kalau mereka yang
+   menemukannya, seluruh klaim "nol mock data" jadi tersangka; kalau kami yang
+   menyatakannya lebih dulu, klaim itu justru menguat karena menunjukkan kami tahu
+   persis di mana batasnya. Salinan kanonik tabelnya ada di `README.md` §Nol mock
+   data — jangan menulis ulang dari ingatan, drift di angka atau kata di sini
+   berbiaya kredibilitas.
+
+9. **Kenapa ini tahan manipulasi** — Sybil resistance: biaya memalsukan riwayat ≈
    biaya memiliki riwayat asli.
-9. **Model bisnis** — lima aliran pendapatan (§6) dalam satu tabel ringkas.
-10. **Unit economics** — biaya proving mendekati nol (2,59×10⁻⁵ CTC/fakta) vs
+10. **Model bisnis** — lima aliran pendapatan (§6) dalam satu tabel ringkas.
+11. **Unit economics** — biaya proving mendekati nol (2,59×10⁻⁵ CTC/fakta) vs
     pendapatan per transaksi berorde dolar; margin kotor mendekati 100%.
-11. **Ukuran pasar & GTM** — kerangka TAM (dengan disclaimer estimasi), fase go-to-
+12. **Ukuran pasar & GTM** — kerangka TAM (dengan disclaimer estimasi), fase go-to-
     market dimulai dari pengguna DeFi mapan.
-12. **Kecocokan strategis dengan Creditcoin** — Credal + Aella + traksi
+13. **Kecocokan strategis dengan Creditcoin** — Credal + Aella + traksi
     4,27 juta transaksi/$79,7 juta/337.000 nasabah; Corolary sebagai pelengkap sisi
     crypto-native.
-13. **Lanskap kompetitif** (§9) — kenapa kategori skor on-chain stagnan (kotak
+14. **Lanskap kompetitif** (§9) — kenapa kategori skor on-chain stagnan (kotak
     hitam, tidak tersambung ke manfaat ekonomi), kenapa infrastruktur bukti
     (Axiom/Herodotus/Brevis) query-per-request sementara Corolary menyimpan fakta
     permanen, dan kenapa Corolary berbeda secara struktural (over-collateralized
     selalu, bukan gradasi framing). **Jangan pakai kata "gagal" untuk Spectral —
     mereka masih aktif dan pembaca tahu itu.**
-14. **Roadmap & penggunaan dana CEIP** — audit keamanan, ekspansi adapter protokol,
+15. **Roadmap & penggunaan dana CEIP** — audit keamanan, ekspansi adapter protokol,
     kemitraan formal Gluwa/Credal, ekspansi tim.
-15. **Tim & ask** — Dev A/Dev B, peran masing-masing, kontak, ajakan untuk masuk
+16. **Tim & ask** — Dev A/Dev B, peran masing-masing, kontak, ajakan untuk masuk
     due diligence CEIP.
+
+### 13.1 Naskah pengungkapan untuk video demo
+
+Video demo adalah tempat pengungkapan ini paling mudah terlewat, karena tidak ada
+tabel untuk bersembunyi — kalau tidak diucapkan, ia tidak ada.
+
+**Kapan.** Tepat pada momen `EfficiencyMarket` muncul di layar dan penonton
+membaca `tUSDC` untuk pertama kali. Bukan di akhir, bukan sebagai catatan kaki di
+deskripsi video: pada detik itu penonton sedang bertanya-tanya, dan jawaban yang
+datang belakangan terdengar seperti pembelaan.
+
+**Yang diucapkan** (verbatim, ~12 detik):
+
+> "Satu hal yang perlu saya sebutkan terus terang. Token yang dipinjam di sini —
+> `tUSDC` dan `tWETH` — adalah token testnet, karena hackathon ini mewajibkan
+> deploy di testnet dan CC3 tidak punya USDC sungguhan. **Token pasar adalah token
+> testnet. Riwayat kredit, harga, dan skor berasal dari Ethereum mainnet
+> sungguhan.** Skor 813 yang barusan Anda lihat dihitung dari transaksi Aave dan
+> Morpho mainnet yang benar-benar terjadi, dan `tUSDC` itu sendiri dinilai memakai
+> harga USDC mainnet yang dibuktikan lewat Chainlink."
+
+**Yang JANGAN dilakukan:** menaruhnya hanya sebagai teks kecil di sudut layar,
+atau hanya di deskripsi YouTube. Keduanya terbaca sebagai memenuhi kewajiban,
+bukan sebagai keterusterangan — dan efeknya pada kredibilitas justru terbalik.
+
+**Pasangannya di UI.** Label yang sama harus terlihat di halaman market
+(`apps/web`, Dev B), sehingga penonton yang membuka aplikasinya sendiri menemukan
+pernyataan yang sama, bukan hanya mendengarnya sekali di video.
 
 ---
 
@@ -606,8 +651,8 @@ Corolary yang memenuhinya:
 | Project Description | Ringkasan eksekutif §1 dokumen ini, atau versi ringkas di §3 (Solusi & Cara Kerja) |
 | **Attestcoin Protocol Integration Summary** | Lihat pemetaan detail di bawah — inti submission, bukan tempelan |
 | GitHub Repository URL + README | Repo monorepo Corolary; `README.md` root memuat ringkasan produk, aturan proyek, dan tautan ke `docs/` |
-| Project Deck / Whitepaper (PDF) | Diekspor dari kerangka §13 dokumen ini |
-| Prototype Demo Video URL | Merekam alur: dompet nyata → Score Explorer → Proof Viewer → transaksi pinjam dengan rasio kolateral efisien di EfficiencyMarket |
+| Project Deck / Whitepaper (PDF) | Diekspor dari kerangka §13 dokumen ini — **slide 8 (pengungkapan token testnet) tidak boleh dibuang saat memangkas jumlah slide** |
+| Prototype Demo Video URL | Merekam alur: dompet nyata → Score Explorer → Proof Viewer → transaksi pinjam dengan rasio kolateral efisien di EfficiencyMarket. **Wajib memuat pengungkapan token testnet** — naskah verbatim dan penempatannya di §13.1 |
 | Deployed di testnet, alamat kontrak dicantumkan | Deploy ke CC3 Testnet (chainId 102031), alamat `FactRegistry`/`CreditGraph`/`EfficiencyMarket` dicatat di README dan `.env` (lihat `docs/setup.md` §7.4) |
 | Attestcoin Protocol sebagai core feature | Attestcoin **adalah** lapisan bukti FactRegistry — tanpa itu tidak ada fakta yang bisa dicatat sama sekali; bukan fitur tambahan yang bisa dicabut |
 | Original work dibuat selama hackathon | Seluruh kontrak, indexer, API, dan frontend Corolary ditulis untuk BUIDL CTC 2026 Fall |
@@ -651,3 +696,11 @@ Protocol utilization"**), jadi disusun terpisah dan lebih rinci:
 > Tidak ada data dummy atau mock di jalur ini: seluruh fakta berasal dari transaksi
 > Ethereum mainnet nyata, dibuktikan lewat pipeline Attestcoin yang sama seperti di
 > atas, dibaca dari CC3 Testnet.
+>
+> Batas yang jujur, dinyatakan terbuka: token yang **dipinjamkan** di pasar demo
+> (`tUSDC`, `tWETH`) adalah ERC20 testnet, karena aturan hackathon mewajibkan deploy
+> di testnet dan CC3 Testnet tidak punya USDC/WETH sungguhan. Itu satu-satunya
+> komponen yang bukan mainnet. Token pasar adalah token testnet; riwayat kredit,
+> harga, dan skor berasal dari Ethereum mainnet sungguhan — `tUSDC` bahkan dinilai
+> memakai harga USDC mainnet yang dibuktikan lewat Chainlink
+> (`PriceRegistry.setPriceAlias`). Yang testnet adalah wadahnya, bukan datanya.

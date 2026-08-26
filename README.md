@@ -62,10 +62,31 @@ Keduanya terlihat bertentangan — ternyata tidak.
 
 Creditcoin CC3 **Testnet** mendukung **Ethereum Mainnet** sebagai source chain
 (`chainKey = 3`, terverifikasi langsung dari precompile). Corolary berjalan di testnet
-sesuai aturan, sambil mengonsumsi event Aave V3, Morpho Blue, Compound V3, dan Chainlink
+sesuai aturan, sambil mengonsumsi event Aave V3, Spark, Morpho Blue, Compound V3, dan Chainlink
 yang **sungguhan** dari Ethereum mainnet.
 
 Tidak ada satu pun angka di produk ini yang dikarang.
+
+#### Yang nyata, dan satu hal yang testnet
+
+Ada satu pengecualian, dan kami menyatakannya lebih dulu alih-alih menunggu
+ditanya: di CC3 Testnet tidak ada USDC atau WETH sungguhan untuk dipinjamkan, jadi
+pasar demo memakai ERC20 testnet.
+
+| Lapisan | Sumber | Nyata? |
+|---|---|---|
+| Fakta kredit (Aave V3, Spark, Morpho Blue, Compound V3) | Ethereum **mainnet**, dibuktikan kriptografis lewat Attestcoin | **Ya** |
+| Harga (Chainlink `AnswerUpdated`) | Ethereum **mainnet**, dibuktikan kriptografis | **Ya** |
+| Skor & tier kolateral | Diturunkan on-chain dari fakta di atas | **Ya** |
+| Token yang dipinjamkan di `EfficiencyMarket` | ERC20 testnet (`tUSDC`, `tWETH`) | **Tidak** — tak terhindarkan |
+
+> **Token pasar adalah token testnet. Riwayat kredit, harga, dan skor berasal dari
+> Ethereum mainnet sungguhan.**
+
+Perbedaannya penting: token testnet adalah **wadah**, bukan **data**. `tUSDC`
+bahkan dinilai memakai harga USDC mainnet yang benar-benar dibuktikan, lewat
+`PriceRegistry.setPriceAlias` — tokennya stand-in, harganya tidak. Yang dilarang
+di proyek ini adalah angka karangan, dan tidak ada satu pun di sini.
 
 ---
 
