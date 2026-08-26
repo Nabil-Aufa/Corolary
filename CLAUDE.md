@@ -429,6 +429,15 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   dari semua: skor tetap sah, hanya lebih rendah dari seharusnya, dan tidak ada
   yang tampak rusak. Sekarang `rentangGagal` ikut di baris ringkasan dan exit
   code jadi 2.
+- **Platform hosting memakai `PORT`, dan salah port TIDAK menghasilkan error.**
+  API kita membaca `API_PORT`; Railway/Fly/Render menyuntikkan `PORT` dan
+  mengarahkan traffic ke sana. Kalau tidak dipetakan, service naik dengan sehat,
+  log-nya bersih, dan satu-satunya gejala adalah domain yang tidak pernah
+  menjawab. `PORT` sekarang menang atas `API_PORT` di `services/api/src/config.ts`.
+- **`ETHEREUM_RPC_URL_FALLBACK` ada di `.env` tapi TIDAK dibaca kode mana pun.**
+  Ia memberi rasa aman yang palsu: kalau drpc jatuh, tidak ada yang beralih ke
+  Alchemy. Sebelum mengandalkannya sebagai redundansi, cek `grep -rn FALLBACK
+  services packages` — hasilnya kosong.
 - **`maxPriceAge` harus diukur dari heartbeat feed TERLAMBAT, bukan dipilih
   bulat.** Default 24 jam sama persis dengan heartbeat Chainlink USDC/USD, dan
   terukur dari aggregator mainnet 2026-08-26 jarak antar ronde adalah **23,00

@@ -19,7 +19,20 @@ const schema = z.object({
   EFFICIENCY_MARKET_ADDRESS: address,
 });
 
-const parsed = schema.safeParse(process.env);
+/**
+ * Platform hosting (Railway, Fly, Render) menyuntikkan port lewat `PORT` dan
+ * mengarahkan traffic ke sana — bukan lewat nama variabel kita sendiri.
+ *
+ * `PORT` menang atas `API_PORT` kalau keduanya ada, dan urutan itu disengaja:
+ * kalau kita mendengarkan port lain daripada yang dipetakan platform, service-nya
+ * naik dengan sehat, log-nya bersih, health check-nya gagal, dan satu-satunya
+ * gejala adalah domain yang tidak pernah menjawab. Tidak ada error di mana pun
+ * untuk dilacak.
+ */
+const parsed = schema.safeParse({
+  ...process.env,
+  API_PORT: process.env.PORT ?? process.env.API_PORT,
+});
 if (!parsed.success) {
   throw new Error(
     'Konfigurasi .env tidak valid:\n' +
