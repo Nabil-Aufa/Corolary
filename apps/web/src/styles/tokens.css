@@ -1,0 +1,84 @@
+/* Token warna Corolary — docs/frontend.md §2.3.
+ *
+ * Prinsipnya: latar netral hampir-putih (bukan putih murni), SATU warna aksen
+ * untuk interaktif, dan satu warna "verified" yang SENGAJA berbeda dari aksen.
+ * Pemisahan itu bukan selera — kalau semuanya biru, "tombol biasa" dan "fakta
+ * yang terbukti secara kriptografis" jadi tak terbedakan, dan itu melemahkan
+ * satu-satunya klaim yang dijual produk ini.
+ *
+ * Light mode adalah default. Dark tersedia lewat ThemeToggle (class `.dark`).
+ */
+:root {
+  /* permukaan */
+  --color-bg: #f6f7fa;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #e1e4ea;
+  --color-border-strong: #c7ccd6;
+
+  /* teks */
+  --color-ink-900: #0b0e14; /* judul, angka utama */
+  --color-ink-700: #333a46; /* body */
+  --color-ink-500: #667085; /* label, meta */
+  --color-ink-400: #98a2b3; /* placeholder, disabled */
+
+  /* aksen interaktif — "Proof Blue" */
+  --color-accent: #1d4fd8;
+  --color-accent-hover: #1840b3;
+  --color-accent-soft: #e8edff;
+
+  /* "terbukti secara kriptografis" — HANYA untuk elemen proof */
+  --color-verified: #0e8f7d;
+  --color-verified-soft: #e3f5f1;
+
+  /* peringatan */
+  --color-warning: #b45309;
+  --color-warning-soft: #fdf0dc;
+
+  /* bahaya / likuidasi / tier turun */
+  --color-danger: #c0233d;
+  --color-danger-soft: #fce8ec;
+
+  --color-focus-ring: #1d4fd8;
+
+  /* Biru yang TIDAK ikut berubah di dark mode.
+   *
+   * `--color-accent` sengaja lebih terang di gelap supaya kontras teks terjaga,
+   * tapi tombol Connect adalah permukaan berisi — teks putih di atas biru muda
+   * justru melemah. Satu warna tetap untuk kedua tema membuat tombol itu
+   * terlihat identik di mana pun, dan itu memang yang diinginkan. */
+  --color-brand: #1d4fd8;
+  --color-brand-hover: #1840b3;
+
+  --radius-sm: 6px;
+  --radius-base: 8px;
+  --radius-lg: 12px;
+}
+
+.dark {
+  --color-bg: #0a0d13;
+  --color-surface: #10141c;
+  --color-surface-raised: #141924;
+  --color-border: #232938;
+  --color-border-strong: #323a4d;
+
+  --color-ink-900: #f4f6f9;
+  --color-ink-700: #c6ccd9;
+  --color-ink-500: #8b93a7;
+  --color-ink-400: #5c6577;
+
+  --color-accent: #5b85ff;
+  --color-accent-hover: #7b9dff;
+  --color-accent-soft: #182348;
+
+  --color-verified: #35c9ae;
+  --color-verified-soft: #0e2a26;
+
+  --color-warning: #f2b84b;
+  --color-warning-soft: #3a2a12;
+
+  --color-danger: #f2607a;
+  --color-danger-soft: #3a1620;
+
+  --color-focus-ring: #5b85ff;
+}
