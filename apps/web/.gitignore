@@ -1,0 +1,8 @@
+# Artefak build TypeScript/Next yang tidak tercakup .gitignore root.
+*.tsbuildinfo
+next-env.d.ts
+
+# Digenerate ulang Next 16 tiap kali `agentRules` aktif — repo ini memakai
+# CLAUDE.md di root sebagai instruksi tunggal.
+AGENTS.md
+CLAUDE.md
