@@ -3,18 +3,18 @@
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { AppFooter } from './AppFooter';
 import { AppHeader } from './AppHeader';
 
 /**
- * Rute yang mengisi layar PERSIS setinggi viewport: tidak ada scroll halaman,
- * dan karena itu tidak ada footer.
+ * Aplikasi tidak punya footer sama sekali — itu milik landing.
  *
- * /proofs adalah tabel, bukan dokumen. Yang bergerak saat pengguna men-scroll
- * seharusnya barisnya — halaman yang ikut bergeser membuat header kolom hilang
- * dari pandangan tepat saat ia paling dibutuhkan. Footer pun tidak punya
- * tempat: ia hanya bisa dicapai dengan menggulung sesuatu yang sengaja
- * dibuat tidak bergulung.
+ * Di dalam app, footer hanya mengulang hal yang sudah dibaca pengunjung
+ * sebelum masuk, dan menambah satu hal lagi untuk digulung di halaman yang
+ * tugasnya menampilkan data.
+ *
+ * Yang masih dibedakan di sini adalah SCROLL: /proofs mengisi layar persis
+ * setinggi viewport. Ia tabel, bukan dokumen, dan halaman yang ikut bergeser
+ * membuat header kolom hilang dari pandangan tepat saat ia paling dibutuhkan.
  */
 const FIXED_HEIGHT_ROUTES: ReadonlySet<string> = new Set(['/proofs']);
 
@@ -29,7 +29,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           tanpa itu, kotak scroll di dalamnya akan memanjang dan mendorong
           halaman, persis yang ingin dihindari. */}
       <div className={cn('flex-1', isFixedHeight && 'min-h-0')}>{children}</div>
-      {!isFixedHeight && <AppFooter />}
     </div>
   );
 }

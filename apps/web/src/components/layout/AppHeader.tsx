@@ -2,7 +2,6 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { CorolaryLogo } from '@/components/brand/CorolaryLogo';
 import { NavLink } from './NavLink';
-import { ThemeToggle } from './ThemeToggle';
 import { WalletButton } from './WalletButton';
 
 // Skor lebih dulu: itu yang dicari pengunjung. Bukti datang setelah ada klaim
@@ -38,8 +37,10 @@ export function AppHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle />
+        {/* Tema tidak lagi punya tombol sendiri di sini — kendalinya hidup di
+            panel wallet, dan dua pemicu untuk satu pengaturan hanya menambah
+            hal yang harus dipindai mata di baris yang seharusnya tenang. */}
+        <div className="ml-auto flex items-center">
           <WalletButton />
         </div>
       </div>
