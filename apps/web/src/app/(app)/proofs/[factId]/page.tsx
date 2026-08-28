@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { ProofChain } from '@/components/proofs/ProofChain';
 import { AddressDisplay } from '@/components/shared/AddressDisplay';
 import { ErrorState } from '@/components/shared/ErrorState';
@@ -78,8 +78,12 @@ export default function FactDetailPage() {
           <div className="mt-4 flex flex-wrap items-center gap-2 text-small text-ink-500">
             <span>Subject</span>
             <AddressDisplay address={data.subject} truncate={false} />
-            <Link href={`/score/${data.subject}`} className="text-accent hover:underline">
-              See their score →
+            <Link
+              href={`/score/${data.subject}`}
+              className="inline-flex items-center gap-1 text-accent hover:underline"
+            >
+              See their score
+              <ArrowRight size={14} strokeWidth={2} />
             </Link>
           </div>
 

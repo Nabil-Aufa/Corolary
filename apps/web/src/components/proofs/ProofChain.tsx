@@ -17,28 +17,45 @@ export function ProofChain({ fact }: { fact: FactWithProof }) {
     {
       key: 'observed',
       label: 'Ethereum transaction',
-      detail: `Block ${formatCount(fact.blockHeight)} · tx index ${fact.txIndex} · log ${fact.logIndex}`,
+      // Potongan detail dipisah oleh JARAK, bukan tanda baca. Titik tengah
+      // menambah satu simbol yang harus dibaca tanpa menambah arti.
+      details: [
+        `Block ${formatCount(fact.blockHeight)}`,
+        `tx index ${fact.txIndex}`,
+        `log ${fact.logIndex}`,
+      ],
       href: etherscanTx(fact.txHash),
       hrefLabel: 'View on Etherscan',
     },
     {
       key: 'attested',
       label: 'Attested on Creditcoin',
-      detail: `Attestor consensus reached · ${formatDuration(lagSeconds)} from observation to record`,
+      details: [
+        'Attestor consensus reached',
+        `${formatDuration(lagSeconds)} from observation to record`,
+      ],
       href: null,
       hrefLabel: null,
     },
     {
       key: 'proved',
       label: 'Proof built',
-      detail: `chainKey ${fact.chainKey} · ${formatCount(fact.proof.merkleProofSiblingsCount)} Merkle siblings · ${formatCount(fact.proof.continuityProofRootsCount)} continuity roots · proved ${fact.proof.provedWithinHours.toFixed(2)}h after the transaction`,
+      details: [
+        `chainKey ${fact.chainKey}`,
+        `${formatCount(fact.proof.merkleProofSiblingsCount)} Merkle siblings`,
+        `${formatCount(fact.proof.continuityProofRootsCount)} continuity roots`,
+        `proved ${fact.proof.provedWithinHours.toFixed(2)}h after the transaction`,
+      ],
       href: null,
       hrefLabel: null,
     },
     {
       key: 'recorded',
       label: 'Recorded in FactRegistry',
-      detail: `Creditcoin block ${formatCount(fact.proof.verifiedAtBlock)} · batch of ${fact.proof.batchSize}`,
+      details: [
+        `Creditcoin block ${formatCount(fact.proof.verifiedAtBlock)}`,
+        `batch of ${fact.proof.batchSize}`,
+      ],
       href: creditcoinTx(fact.creditcoinTxHash),
       hrefLabel: 'View on Blockscout',
     },
@@ -63,7 +80,11 @@ export function ProofChain({ fact }: { fact: FactWithProof }) {
 
           <div className="min-w-0">
             <p className="text-body font-medium text-ink-900">{step.label}</p>
-            <p className="num mt-1 break-words text-small text-ink-500">{step.detail}</p>
+            <p className="num mt-1 flex flex-wrap gap-x-3 gap-y-1 text-small text-ink-500">
+              {step.details.map((detail) => (
+                <span key={detail}>{detail}</span>
+              ))}
+            </p>
             {step.href !== null && (
               <a
                 href={step.href}
