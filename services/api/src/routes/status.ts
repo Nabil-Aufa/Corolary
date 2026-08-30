@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { sql } from '../lib/db.js';
 import { ok } from '../lib/envelope.js';
 import { config, VERSION, STARTED_AT } from '../config.js';
-import { creditcoin, chainInfoProvider } from '../lib/chain.js';
+import { creditcoin, chainInfoProvider, priceRegistry } from '../lib/chain.js';
 import { protocolName } from '../lib/protocols.js';
 import type { Address, ChainStatus, HealthStatus, IndexerStatus } from '@corolary/shared';
 
@@ -119,6 +119,15 @@ status.get('/indexer/status', async (c) => {
 
   const latest = await latestEthereumBlock();
 
+  const totals = await sql<{ total_facts: string; distinct_subjects: string }[]>`
+    SELECT count(*)::text AS total_facts, count(DISTINCT subject)::text AS distinct_subjects
+    FROM facts
+  `;
+  const totalFacts = Number(totals[0]?.total_facts ?? 0);
+  const distinctSubjects = Number(totals[0]?.distinct_subjects ?? 0);
+
+  const onChainPriceAgeSeconds = await maxOnChainPriceAgeSeconds();
+
   const data: IndexerStatus = {
     chainKey: config.ETHEREUM_CHAIN_KEY,
     latestEthereumBlock: latest,
@@ -142,6 +151,61 @@ status.get('/indexer/status', async (c) => {
     oldestUnprovenAgeSeconds: oldestAt
       ? Math.max(0, Math.floor(Date.now() / 1000) - Number(oldestAt))
       : 0,
+    totalFacts,
+    distinctSubjects,
+    onChainPriceAgeSeconds,
   };
   return ok(c, data);
 });
+
+/**
+ * Aset kanonik yang dipantau harga-nya, dan alamatnya di Ethereum mainnet —
+ * sama seperti yang dipetakan `PriceRegistry.setPriceAlias` untuk token
+ * testnet (tUSDC/tWETH memakai harga mainnet WETH/USDC yang benar-benar
+ * dibuktikan; lihat CLAUDE.md).
+ */
+const CANONICAL_PRICE_ASSETS = [
+  '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
+  '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', // WBTC
+  '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+] as const;
+
+/**
+ * Umur harga terbesar di antara aset kanonik, dibaca LANGSUNG dari
+ * `PriceRegistry` on-chain — bukan dari mirror Postgres `prices`.
+ *
+ * Kenapa ini penting ada sejarahnya: `/v1/market/reserves` pernah menampilkan
+ * `priceUsd` yang sehat dari tabel `prices` padahal registry on-chain masih
+ * `roundId 0` dan setiap operasi pasar akan revert — mirror-nya jujur tentang
+ * apa yang PERNAH ditulis loop harga, bukan tentang apa yang benar-benar ada
+ * di kontrak sekarang. Angka ini adalah pengecekan silang yang tidak bisa
+ * dibohongi oleh mirror yang basi.
+ *
+ * `roundId == 0` berarti registry BENAR-BENAR kosong untuk aset itu (belum
+ * pernah ditulis sama sekali) — dikecualikan dari perhitungan umur, bukan
+ * dihitung sebagai umur tak-terhingga.
+ *
+ * Kegagalan RPC per-aset tidak menjatuhkan seluruh endpoint: dikembalikan
+ * `null` dan dicatat, karena field ini tambahan diagnostik, bukan jalur kritis
+ * `/v1/indexer/status`.
+ */
+async function maxOnChainPriceAgeSeconds(): Promise<number | null> {
+  let maxAge: number | null = null;
+  const now = Math.floor(Date.now() / 1000);
+
+  for (const asset of CANONICAL_PRICE_ASSETS) {
+    try {
+      const p = (await priceRegistry.getFunction('priceDataOf')(asset)) as {
+        roundId: bigint;
+        updatedAt: bigint;
+      };
+      if (p.roundId === 0n) continue; // registry kosong untuk aset ini
+      const age = Math.max(0, now - Number(p.updatedAt));
+      if (maxAge === null || age > maxAge) maxAge = age;
+    } catch (err) {
+      console.error(`priceDataOf(${asset}) gagal, dilewati:`, err);
+    }
+  }
+
+  return maxAge;
+}

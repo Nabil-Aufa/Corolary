@@ -99,12 +99,22 @@ score.get('/score/:address/history', async (c) => {
   const subject = parseAddress(c.req.param('address'));
   const limit = parseLimit(c.req.query()['limit'], 50, 200);
 
+  // `docs/api.md` §7 menjanjikan titik data menaik, dan `limit` titik
+  // TERBARU — bukan tertua. Dua tuntutan itu tidak bisa dipenuhi satu
+  // `ORDER BY at_block ASC LIMIT n` biasa: itu akan mengembalikan `limit`
+  // titik TERTUA, diam-diam mengubah arti endpointnya (grafik tren akan
+  // berhenti di masa lalu, bukan menunjukkan kondisi terkini). Jadi ambil
+  // `limit` titik terbaru dulu (subquery DESC), baru urutkan hasilnya menaik
+  // di luar.
   const rows = await sql<
     { subject: string; score: number; tier: number; at_block: string; at_time: string }[]
   >`
-    SELECT subject, score, tier, at_block, at_time FROM score_history
-    WHERE subject = ${subject}
-    ORDER BY at_block DESC LIMIT ${limit}
+    SELECT * FROM (
+      SELECT subject, score, tier, at_block, at_time FROM score_history
+      WHERE subject = ${subject}
+      ORDER BY at_block DESC LIMIT ${limit}
+    ) latest
+    ORDER BY at_block ASC
   `;
 
   const data: ScoreHistoryPoint[] = rows.map((r) => ({

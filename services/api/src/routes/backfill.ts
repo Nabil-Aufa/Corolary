@@ -135,6 +135,63 @@ backfill.post('/backfill', rateLimit({ perMinute: 3, burst: 2 }), async (c) => {
   return ok(c, accepted(row.id, 'pending', subject, months, row.created_at), undefined, 202);
 });
 
+/**
+ * "Dompet ini sedang dipindai?" — jawaban tanpa perlu tahu `jobId`.
+ *
+ * Frontend menyimpan `jobId` di `localStorage` milik SATU browser. Siapa pun
+ * yang membuka dompet yang sama dari tempat lain (tab lain, orang lain) tidak
+ * punya `jobId` itu, melihat tombol "Scan" biasa, dan mengantrekan pemindaian
+ * KEDUA untuk subjek yang sudah punya job berjalan.
+ *
+ * WAJIB didaftarkan SEBELUM `/backfill/:jobId` di Hono: kalau urutannya
+ * dibalik, `/backfill?subject=...` tidak pernah cocok karena `/backfill/:jobId`
+ * menuntut segmen path tambahan dan tidak menabrak — tapi urutan pendaftaran
+ * tetap dijaga eksplisit di sini karena route match Hono berbasis urutan
+ * definisi untuk pola yang tumpang tindih.
+ */
+backfill.get('/backfill', async (c) => {
+  const subject = parseAddress(c.req.query()['subject']);
+
+  const rows = await sql<
+    {
+      id: string;
+      status: string;
+      payload: { subject: string; months: number; failedRanges?: number; logsFound?: number };
+      attempts: number;
+      last_error: string | null;
+      created_at: Date;
+      updated_at: Date;
+    }[]
+  >`
+    SELECT id, status, payload, attempts, last_error, created_at, updated_at
+    FROM jobs
+    WHERE kind = 'backfill' AND payload->>'subject' = ${subject}
+    ORDER BY
+      -- Job aktif didahulukan di atas yang terbaru apa pun statusnya: itulah
+      -- yang menjawab "sedang dipindai sekarang?" dengan benar.
+      (status IN ('pending', 'running')) DESC,
+      created_at DESC
+    LIMIT 1
+  `;
+  const row = rows[0];
+
+  if (!row) return ok(c, null);
+
+  const data: BackfillJob = {
+    jobId: row.id,
+    status: row.status as BackfillJobStatus,
+    subject: row.payload.subject as Address,
+    months: row.payload.months,
+    attempts: row.attempts,
+    lastError: row.last_error,
+    failedRanges: row.payload.failedRanges ?? null,
+    logsFound: row.payload.logsFound ?? null,
+    createdAt: Math.floor(new Date(row.created_at).getTime() / 1000),
+    updatedAt: Math.floor(new Date(row.updated_at).getTime() / 1000),
+  };
+  return ok(c, data);
+});
+
 backfill.get('/backfill/:jobId', async (c) => {
   const jobId = c.req.param('jobId');
   if (!/^[0-9a-f-]{36}$/i.test(jobId)) invalidParam('jobId harus UUID');
@@ -212,8 +269,37 @@ function accepted(
  * dijawab "belum tercakup", dan setiap permintaan berikutnya akan memindai ulang
  * riwayat yang sudah lengkap. Lebar baris tidak punya masalah itu: ia tidak
  * bergantung pada apa pun yang bergerak.
+ *
+ * BUKTI KEDUA — dari tabel `facts`, bukan `backfill_runs`.
+ *
+ * `backfill_runs` hanya ada sejak endpoint ini ada. Dompet yang riwayatnya
+ * didapat lewat CLI (sebelum tabel itu ada, atau lewat watcher live yang
+ * memindai maju tanpa pernah mengisi `backfill_runs`) punya fakta tanpa satu
+ * pun baris cakupan — dompet demo salah satunya, 267 fakta, nol baris. Setiap
+ * `POST /v1/backfill` untuk dompet begitu mengantre ulang pemindaian ~25 menit
+ * yang tidak akan pernah menemukan apa pun baru.
+ *
+ * Protokol P dianggap tercakup sedalam `months` untuk subjek S kalau cakupan
+ * (a) dari `backfill_runs` (predikat di atas, tidak diubah) benar, ATAU
+ * (b) fakta TERTUA milik S di P (`MIN(block_height)`) berada PADA ATAU DI
+ *     BAWAH lantai jendela `max(last_scanned_block) - months * BLOCKS_PER_MONTH`.
+ *     Menemukan sesuatu sedalam itu adalah bukti langsung bahwa kita pernah
+ *     memindai sedalam itu — tidak perlu baris `backfill_runs` untuk
+ *     mempercayainya.
+ *
+ * ATURAN YANG TIDAK BOLEH DILANGGAR: ketiadaan fakta untuk P BUKAN bukti
+ * cakupan. ini kekeliruan yang sudah berulang lima kali di proyek ini —
+ * menyamakan jendela pemindaian dengan riwayat yang benar-benar ada (lihat
+ * `firstFactAt` di CLAUDE.md). Subjek yang tidak pernah bertransaksi di
+ * protokol P tetap TIDAK tercakup lewat jalur (b): jalur (b) HANYA berlaku
+ * kalau ada MINIMAL SATU fakta S di P. Nol fakta untuk P berarti jalur (b)
+ * diam-diam gagal (MIN mengembalikan NULL, yang tidak pernah <= lantai apa
+ * pun), dan protokol itu tetap harus tercakup lewat jalur (a) atau tetap
+ * dianggap belum tercakup.
  */
 async function isCovered(subject: string, months: number): Promise<boolean> {
+  const floorBlocks = months * BLOCKS_PER_MONTH;
+
   const rows = await sql<{ missing: string }[]>`
     SELECT w.protocol AS missing
     FROM source_cursors w
@@ -222,8 +308,19 @@ async function isCovered(subject: string, months: number): Promise<boolean> {
       WHERE r.subject = ${subject}
         AND r.protocol = w.protocol
         AND r.complete
-        AND r.to_block - r.from_block >= ${months * BLOCKS_PER_MONTH}::bigint
+        AND r.to_block - r.from_block >= ${floorBlocks}::bigint
         AND r.to_block >= w.last_scanned_block - ${COVERAGE_SLACK_BLOCKS}::bigint
+    )
+    -- Jalur (b): fakta tertua S di protokol w.protocol ada pada atau di bawah
+    -- lantai jendela yang diminta. MIN(block_height) atas nol baris adalah
+    -- NULL di Postgres, dan 'NULL <= x' selalu UNKNOWN (bukan TRUE) -- jadi
+    -- protokol tanpa satu pun fakta S diam-diam GAGAL lolos sini, persis
+    -- yang diminta: ketiadaan fakta bukan bukti cakupan.
+    AND NOT EXISTS (
+      SELECT 1 FROM facts f
+      WHERE f.subject = ${subject}
+        AND f.protocol = w.protocol
+      HAVING MIN(f.block_height) <= (w.last_scanned_block - ${floorBlocks}::bigint)
     )
   `;
 

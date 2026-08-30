@@ -215,6 +215,18 @@ export interface IndexerStatus {
    * paling penting di sistem. Lihat docs/indexer.md.
    */
   oldestUnprovenAgeSeconds: number;
+  /** Jumlah baris `facts` kumulatif — seluruh riwayat, bukan 24 jam terakhir. */
+  totalFacts: number;
+  /** Jumlah subjek (dompet) berbeda yang punya minimal satu fakta. */
+  distinctSubjects: number;
+  /**
+   * Umur harga terbesar di antara aset kanonik (WETH/WBTC/USDC), dibaca
+   * LANGSUNG dari `PriceRegistry.priceDataOf` on-chain — bukan dari mirror
+   * Postgres `prices`. `null` berarti registry masih benar-benar kosong untuk
+   * SELURUH aset kanonik (`roundId == 0`) atau panggilan RPC gagal untuk
+   * semuanya; lihat komentar `maxOnChainPriceAgeSeconds` di `status.ts`.
+   */
+  onChainPriceAgeSeconds: number | null;
 }
 
 export interface HealthStatus {

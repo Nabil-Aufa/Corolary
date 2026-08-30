@@ -135,6 +135,7 @@ ditambahkan — belum ada di v1).
 | `GET /v1/prove/:jobId` | Termasuk kelompok baca (120/menit) | Polling status murah |
 | `POST /v1/backfill` | 3 request / menit / IP, burst 2 | Paling mahal di seluruh API: satu panggilan yang lolos dedupe memindai ribuan blok lalu membuktikan SETIAP transaksi yang ditemukan pada tarif lazy 3,13×10⁻⁴ CTC |
 | `GET /v1/backfill/:jobId` | Termasuk kelompok baca (120/menit) | Polling status murah |
+| `GET /v1/backfill` | Termasuk kelompok baca (120/menit) | Cek job aktif per subjek |
 
 Rate limit per-IP bukan rem biaya yang sebenarnya untuk `POST /v1/backfill` — ia
 hanya membatasi seberapa cepat job MASUK. Yang membatasi seberapa cepat CTC
@@ -204,6 +205,7 @@ dan body:
 | GET | `/v1/prove/:jobId` | Status job proving |
 | POST | `/v1/backfill` | Antre pemindaian riwayat mainnet untuk satu dompet |
 | GET | `/v1/backfill/:jobId` | Status job backfill |
+| GET | `/v1/backfill` | Job backfill terakhir untuk sebuah subjek |
 
 ---
 
@@ -357,7 +359,10 @@ curl -s https://api.corolary.xyz/v1/indexer/status
       "failed": 0,
       "skipped24h": 5
     },
-    "oldestUnprovenAgeSeconds": 612
+    "oldestUnprovenAgeSeconds": 612,
+    "totalFacts": 32481,
+    "distinctSubjects": 1327,
+    "onChainPriceAgeSeconds": 4120
   }
 }
 ```
@@ -369,6 +374,9 @@ Field kunci:
 | `cursors[].lastScannedBlock` | Blok Ethereum terakhir yang sudah dipindai tuntas untuk protokol itu (`source_cursors.last_scanned_block`) |
 | `queue.*` | Hitungan baris `observed_events` per nilai `status` saat ini (kecuali `recorded24h`/`skipped24h` yang dihitung 24 jam terakhir) |
 | `oldestUnprovenAgeSeconds` | Umur event tertua yang belum `recorded`/`skipped` — indikator paling penting untuk memantau bahwa eager-proving (< 24 jam) tetap terjaga; lihat `docs/indexer.md` §4 |
+| `totalFacts` | Jumlah baris `facts` KUMULATIF, seluruh riwayat — bukan 24 jam terakhir seperti `queue.recorded24h` |
+| `distinctSubjects` | Jumlah dompet berbeda yang punya minimal satu fakta terbukti |
+| `onChainPriceAgeSeconds` | Umur harga terbesar di antara aset kanonik (WETH/WBTC/USDC), dibaca LANGSUNG dari `PriceRegistry.priceDataOf` on-chain — bukan dari mirror Postgres `prices`. `null` kalau registry kosong untuk semua aset kanonik atau RPC gagal |
 
 ### Respons Error
 
@@ -393,10 +401,16 @@ aktivitas dan penelusuran bukti.
 | Parameter | Tipe | Wajib | Default | Validasi |
 |---|---|---|---|---|
 | `subject` | `Address` | tidak | — | Harus `0x` + 40 hex char valid, jika tidak → `INVALID_ADDRESS` |
-| `kind` | integer `0`–`4` | tidak | — | Harus salah satu nilai `FactKind` (lihat tabel di bawah); nilai lain → `INVALID_PARAM` |
-| `protocol` | `Address` | tidak | — | Harus alamat valid; tidak divalidasi terhadap daftar protokol terdaftar (hasil kosong kalau tidak cocok) |
+| `kind` | integer `0`–`4`, atau daftar dipisah koma (mis. `1,2`) | tidak | — | Tiap elemen harus salah satu nilai `FactKind` (lihat tabel di bawah); elemen lain → `INVALID_PARAM`; maks 10 elemen |
+| `protocol` | `Address`, atau daftar dipisah koma (mis. `0xaaa,0xbbb`) | tidak | — | Tiap elemen harus alamat valid; tidak divalidasi terhadap daftar protokol terdaftar (hasil kosong kalau tidak cocok); maks 10 elemen |
 | `cursor` | string | tidak | — | Nilai buram dari `meta.cursor` respons sebelumnya; nilai rusak → `INVALID_PARAM` |
 | `limit` | integer | tidak | `20` | `1`–`100`; di luar rentang → `INVALID_PARAM` |
+
+Nilai tunggal (mis. `?kind=1`) tetap didukung — daftar dipisah koma adalah
+tambahan, bukan pengganti. Elemen dalam satu parameter digabung dengan **OR**
+(mis. `kind=1,2` berarti "jenis 1 ATAU 2"); antar parameter berbeda tetap
+**AND** seperti sebelumnya (mis. `subject` + `kind` berarti "fakta jenis X
+milik alamat Y").
 
 `FactKind`:
 
@@ -1532,3 +1546,76 @@ registry.
 ### Kode Error yang Mungkin
 
 `NOT_FOUND`, `INVALID_PARAM`, `RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`, `INTERNAL`
+
+---
+
+## 16. `GET /v1/backfill`
+
+Job backfill TERAKHIR yang relevan untuk sebuah subjek — dipakai frontend untuk
+menjawab "dompet ini sedang dipindai?" tanpa perlu tahu `jobId`.
+
+Ada karena `jobId` sebelumnya hanya hidup di `localStorage` browser yang
+memicunya. Siapa pun yang membuka dompet yang sama dari tempat lain (tab lain,
+orang lain) tidak melihat job yang sedang berjalan, dan tombol "Scan" polos
+mengantre pemindaian KEDUA di atas yang pertama.
+
+### Parameter Query
+
+| Parameter | Tipe | Wajib | Validasi |
+|---|---|---|---|
+| `subject` | `Address` | ya | `0x` + 40 hex char valid; jika tidak → `INVALID_ADDRESS` |
+
+### Pemilihan Job
+
+Job berstatus `pending`/`running` selalu didahulukan di atas job lain, tidak
+peduli kapan dibuat. Kalau tidak ada job aktif, dikembalikan job TERBARU apa
+pun statusnya. Kalau subjek ini tidak pernah punya job sama sekali, `data`
+adalah `null` — BUKAN 404, karena "belum pernah dipindai lewat endpoint ini"
+bukan kesalahan permintaan (dompetnya bisa saja punya riwayat lewat CLI atau
+watcher live; lihat §14 tentang `covered`).
+
+Field `months` di respons adalah kedalaman job yang DITEMUKAN, bukan apa pun
+yang diminta penanya — endpoint ini tidak menerima parameter `months` sama
+sekali.
+
+### Contoh Request
+
+```bash
+curl -s "https://api.corolary.xyz/v1/backfill?subject=0x1234567890AbcdEF1234567890aBcdef12345678"
+```
+
+### Respons Sukses — `200`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "jobId": "b38e5847-3430-40df-80ad-2ec0249d10f8",
+    "status": "running",
+    "subject": "0x1234567890AbcdEF1234567890aBcdef12345678",
+    "months": 6,
+    "attempts": 0,
+    "lastError": null,
+    "failedRanges": null,
+    "logsFound": null,
+    "createdAt": 1787714719,
+    "updatedAt": 1787714957
+  }
+}
+```
+
+Atau, kalau subjek belum pernah punya job:
+
+```json
+{ "ok": true, "data": null }
+```
+
+### Respons Error
+
+```json
+{ "ok": false, "error": { "code": "INVALID_ADDRESS", "message": "alamat tidak valid: 0xzz" } }
+```
+
+### Kode Error yang Mungkin
+
+`INVALID_ADDRESS`, `RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`, `INTERNAL`
