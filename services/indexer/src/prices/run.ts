@@ -86,45 +86,121 @@ interface OnChainPrice {
 }
 
 /**
- * Verifikasi sekali di awal bahwa setiap feed yang dipantau benar-benar
- * dipercaya kontrak, dan bahwa aggregator-nya belum dirotasi Chainlink.
+ * Menyiapkan objek kontrak. TIDAK melakukan I/O apa pun — dan itulah
+ * keseluruhan maksudnya.
  *
- * Keduanya gagal secara SENYAP kalau tidak diperiksa: log yang dipanen dari
- * aggregator tak tepercaya dilewati `recordPrice` tanpa revert, dan aggregator
- * yang sudah dirotasi berhenti memancarkan log sama sekali. Dua-duanya terlihat
- * sama dari luar — "harga tidak pernah terbarui" — dan tidak ada yang muncul
- * di log error.
+ * Versi sebelumnya memverifikasi feed lewat RPC di sini, sementara di `main.ts`
+ * panggilan ini berbagi satu `try` dengan `initSubmitter()` yang loop-nya sudah
+ * dinyalakan lebih dulu. Akibatnya satu kedipan RPC CC3 saat boot — satu
+ * `assetOfAggregator` yang gagal — membuat `loop('prices')` TIDAK PERNAH
+ * dijadwalkan untuk seumur hidup proses itu, sementara fakta terus mengalir dan
+ * setiap dashboard tetap hijau.
+ *
+ * Terukur 2026-08-30: nol `recordPrice` selama 91,8 jam, `priceDataOf`
+ * mengembalikan `recordedAt` empat hari lalu, dan `tryToUsd1e18` menjawab
+ * `false` untuk tUSDC maupun tWETH — seluruh lapis pasar beku, tanpa satu pun
+ * baris error. `ITERATION_TIMEOUT_MS` tidak menolong sedikit pun: tidak ada
+ * iterasi yang pernah berjalan untuk di-timeout.
+ *
+ * Karena itu semua yang menyentuh jaringan pindah ke `verifyFeedsOnce()`, yang
+ * dipanggil DARI DALAM loop dan boleh gagal berkali-kali tanpa mematikan apa pun.
  */
-export async function initPrices(): Promise<void> {
+export function initPrices(): void {
   const { priceRegistry: address } = requireContracts();
   priceRegistry = new ethers.Contract(address, loadAbi('PriceRegistry'), submitter);
+  log.info({ priceRegistry: address, feeds: FEEDS.map((f) => f.pair) }, 'jalur harga siap');
+}
+
+/**
+ * Aggregator yang TERBUKTI tidak dipercaya PriceRegistry, dalam huruf kecil.
+ *
+ * Diisi hanya oleh jawaban on-chain yang definitif — tidak pernah oleh kegagalan
+ * RPC, karena feed yang belum sempat diperiksa harus tetap disegarkan seperti
+ * biasa.
+ *
+ * Melewatinya di putaran penyegaran adalah perbaikan tersendiri. Sebelumnya
+ * verifikasi hanya MENCATAT ketidakpercayaan lalu `continue`, sementara
+ * `refreshPricesOnce` tetap mengiterasi seluruh `FEEDS`: proof untuk aggregator
+ * tak tepercaya tetap dibeli, lalu dibuang diam-diam oleh `recordPrice` yang
+ * memang sengaja melewati emitter asing. Biaya terbayar, nol harga tercatat,
+ * nol error.
+ */
+const untrustedAggregators = new Set<string>();
+
+/**
+ * Kapan putaran verifikasi terakhir selesai UTUH. `0` = belum pernah.
+ *
+ * Diulang berkala, bukan dikunci sekali. Alasannya operasional dan konkret:
+ * feed baru ditambahkan ke `FEEDS` lebih dulu, lalu dipercayai on-chain lewat
+ * `prices:trust` beberapa menit kemudian. Kalau verifikasi mengunci hasilnya
+ * selamanya, feed itu masuk `untrustedAggregators` saat boot dan tetap
+ * DILEWATI sampai proses di-restart — padahal kontraknya sudah mempercayainya.
+ * Rotasi aggregator oleh Chainlink punya bentuk yang sama, hanya arah
+ * sebaliknya.
+ *
+ * Biayanya sepele: dua eth_call per feed, sekali per 30 menit.
+ */
+let lastVerifiedAt = 0;
+const REVERIFY_INTERVAL_MS = 30 * 60_000;
+
+/**
+ * Verifikasi yang dulu ada di `initPrices`, sekarang best-effort dan idempoten.
+ *
+ * Dua hal yang diperiksa gagal secara SENYAP kalau tidak diperiksa: log dari
+ * aggregator tak tepercaya dilewati `recordPrice` tanpa revert, dan aggregator
+ * yang sudah dirotasi Chainlink berhenti memancarkan log sama sekali. Keduanya
+ * terlihat sama dari luar — "harga tidak pernah terbarui" — dan tidak satu pun
+ * muncul di log error.
+ *
+ * Tiap feed dibungkus sendiri supaya satu feed yang bermasalah tidak
+ * membatalkan pemeriksaan feed lain. `feedsVerified` baru disetel kalau SELURUH
+ * putaran lolos tanpa kegagalan jaringan; kalau tidak, ia dicoba lagi putaran
+ * berikutnya.
+ */
+async function verifyFeedsOnce(): Promise<void> {
+  if (lastVerifiedAt !== 0 && Date.now() - lastVerifiedAt < REVERIFY_INTERVAL_MS) return;
 
   const proxyAbi = ['function aggregator() view returns (address)'];
+  let complete = true;
 
   for (const feed of FEEDS) {
-    const trusted = (await registry().getFunction('assetOfAggregator')(
-      feed.aggregator,
-    )) as string;
+    try {
+      const trusted = (await registry().getFunction('assetOfAggregator')(
+        feed.aggregator,
+      )) as string;
 
-    if (trusted === ethers.ZeroAddress) {
-      log.error(
-        { pair: feed.pair, aggregator: feed.aggregator, registry: address },
-        'aggregator TIDAK dipercaya PriceRegistry — proof-nya akan dibeli lalu dibuang; ' +
-          'panggil trustAggregator(asset, aggregator, 8) sebagai CURATOR_ROLE',
-      );
-      continue;
-    }
+      if (trusted === ethers.ZeroAddress) {
+        untrustedAggregators.add(feed.aggregator.toLowerCase());
+        log.error(
+          { pair: feed.pair, aggregator: feed.aggregator },
+          'aggregator TIDAK dipercaya PriceRegistry — feed ini DILEWATI supaya proof-nya ' +
+            'tidak dibeli lalu dibuang; jalankan `pnpm --filter @corolary/indexer prices:trust`',
+        );
+        continue;
+      }
 
-    if (ethers.getAddress(trusted) !== ethers.getAddress(feed.asset)) {
-      log.error(
-        { pair: feed.pair, expected: feed.asset, onChain: trusted },
-        'aggregator dipetakan ke aset LAIN di kontrak — feeds.ts dan registry tidak sepakat',
-      );
+      if (ethers.getAddress(trusted) !== ethers.getAddress(feed.asset)) {
+        untrustedAggregators.add(feed.aggregator.toLowerCase());
+        log.error(
+          { pair: feed.pair, expected: feed.asset, onChain: trusted },
+          'aggregator dipetakan ke aset LAIN di kontrak — feeds.ts dan registry tidak sepakat',
+        );
+        continue;
+      }
+
+      untrustedAggregators.delete(feed.aggregator.toLowerCase());
+    } catch (err) {
+      // Kegagalan JARINGAN, bukan jawaban on-chain. Feed ini tidak boleh masuk
+      // daftar tak-tepercaya karena kita belum tahu apa-apa tentangnya.
+      complete = false;
+      log.warn({ pair: feed.pair, err: String(err) }, 'gagal memeriksa kepercayaan aggregator');
       continue;
     }
 
     // Deteksi rotasi. Ini kegagalan yang paling sulit terlihat, jadi ia harus
-    // berisik justru saat semuanya tampak baik-baik saja.
+    // berisik justru saat semuanya tampak baik-baik saja. Tidak menandai feed
+    // sebagai tak-tepercaya: aggregator lama masih dipercaya kontrak, ia hanya
+    // berhenti memancarkan.
     try {
       const live = await ethCall('aggregator', async (p) => {
         const proxy = new ethers.Contract(feed.proxy, proxyAbi, p);
@@ -138,25 +214,86 @@ export async function initPrices(): Promise<void> {
         );
       }
     } catch (err) {
+      complete = false;
       log.warn({ pair: feed.pair, err: String(err) }, 'gagal memeriksa rotasi aggregator');
     }
   }
 
-  // Mirror disamakan dengan chain saat start. Tanpa ini, database yang di-reset
-  // akan tampak tidak punya harga sama sekali sampai ronde berikutnya terbit —
-  // padahal harga terbuktinya sudah ada di kontrak sepanjang waktu.
+  // Mirror disamakan dengan chain. Tanpa ini, database yang di-reset akan tampak
+  // tidak punya harga sama sekali sampai ronde berikutnya terbit — padahal harga
+  // terbuktinya sudah ada di kontrak sepanjang waktu.
   for (const feed of FEEDS) {
     try {
       await mirrorPrice(feed, null);
     } catch (err) {
+      complete = false;
       log.warn({ pair: feed.pair, err: String(err) }, 'gagal menyamakan mirror harga');
     }
   }
 
-  log.info({ priceRegistry: address, feeds: FEEDS.map((f) => f.pair) }, 'jalur harga siap');
+  // Hanya putaran yang UTUH yang memajukan penanda waktu. Putaran yang tersandung
+  // RPC dicoba lagi di putaran loop berikutnya, bukan 30 menit kemudian.
+  if (complete) {
+    lastVerifiedAt = Date.now();
+    log.info({ untrusted: [...untrustedAggregators] }, 'verifikasi feed selesai');
+  }
+}
+
+/**
+ * Umur harga terbukti PER FEED, dibaca langsung dari kontrak.
+ *
+ * Sengaja TIDAK dari tabel `prices` dan tidak dari cache di memori. Mirror
+ * Postgres bisa terlihat sehat sementara registry on-chain kosong — itu sudah
+ * pernah terjadi — dan cache di memori bernilai kosong justru pada satu-satunya
+ * kasus yang penting: loop harga yang tidak pernah berjalan sama sekali.
+ *
+ * `budgetSeconds` diambil dari kontrak juga (`maxPriceAgeOf` per aset, jatuh ke
+ * `maxPriceAge` global kalau nol) supaya ambangnya tidak pernah menyimpang dari
+ * yang benar-benar berlaku. Terukur 2026-08-30: global 10.800 detik, dengan
+ * override 100.800 khusus USDC.
+ */
+export interface FeedFreshness {
+  pair: string;
+  ageSeconds: number | null;
+  budgetSeconds: number;
+  /** Sisa anggaran; negatif berarti aset ini sudah basi di mata kontrak. */
+  slackSeconds: number | null;
+}
+
+export async function priceFreshness(): Promise<FeedFreshness[]> {
+  const globalBudget = Number(await registry().getFunction('maxPriceAge')());
+  const now = Math.floor(Date.now() / 1000);
+  const out: FeedFreshness[] = [];
+
+  for (const feed of FEEDS) {
+    const p = (await registry().getFunction('priceDataOf')(
+      feed.asset,
+    )) as unknown as OnChainPrice;
+    const specific = Number(await registry().getFunction('maxPriceAgeOf')(feed.asset));
+    const budget = specific > 0 ? specific : globalBudget;
+
+    const age = p.roundId === 0n ? null : Math.max(0, now - Number(p.updatedAt));
+    out.push({
+      pair: feed.pair,
+      ageSeconds: age,
+      budgetSeconds: budget,
+      slackSeconds: age === null ? null : budget - age,
+    });
+  }
+  return out;
 }
 
 export async function refreshPricesOnce(): Promise<void> {
+  // Verifikasi feed dipanggil DARI SINI, bukan dari `initPrices`, dan dibungkus
+  // sendiri. Itu perbedaan yang membuat jalur harga tidak bisa lagi mati saat
+  // boot: verifikasi yang gagal dicoba lagi putaran berikutnya alih-alih
+  // membatalkan penjadwalan loop.
+  try {
+    await verifyFeedsOnce();
+  } catch (err) {
+    log.warn({ err: String(err) }, 'verifikasi feed gagal — dicoba lagi putaran berikutnya');
+  }
+
   const head = await ethCall('getBlock', (p) => p.getBlock('finalized'));
   if (!head) return;
 
@@ -166,11 +303,58 @@ export async function refreshPricesOnce(): Promise<void> {
   const submittedThisPass = new Set<string>();
 
   for (const feed of FEEDS) {
+    if (untrustedAggregators.has(feed.aggregator.toLowerCase())) continue;
     try {
       await refreshFeed(feed, head.number, submittedThisPass);
     } catch (err) {
       log.warn({ pair: feed.pair, err: String(err) }, 'penyegaran feed gagal');
     }
+  }
+
+  await reportFreshness();
+}
+
+/**
+ * Denyut nadi jalur harga: satu baris per putaran yang selalu membawa umur
+ * harga terbukti, dibaca dari kontrak.
+ *
+ * Ini yang absen selama 91,8 jam pada kejadian 2026-08-30. Loop harga yang mati
+ * tidak menghentikan apa pun yang lain — fakta terus mengalir, watcher tetap di
+ * head — jadi satu-satunya cara ia bisa terlihat adalah kalau ada baris yang
+ * MEMANG diharapkan muncul dan berhenti muncul, dan kalau umurnya naik ke
+ * `error` sebelum pasar membeku.
+ *
+ * Ambangnya diturunkan dari anggaran kontrak, bukan dipilih bulat: 50% anggaran
+ * = `warn`, 80% = `error`. Untuk WETH/WBTC anggarannya 10.800 detik, untuk USDC
+ * 100.800 — ambang tunggal apa pun akan salah untuk salah satunya.
+ */
+async function reportFreshness(): Promise<void> {
+  let feeds: FeedFreshness[];
+  try {
+    feeds = await priceFreshness();
+  } catch (err) {
+    log.warn({ err: String(err) }, 'gagal membaca kesegaran harga dari kontrak');
+    return;
+  }
+
+  const worst = feeds.reduce<FeedFreshness | null>((acc, f) => {
+    if (f.slackSeconds === null) return f; // registry kosong: seburuk-buruknya
+    if (acc === null || acc.slackSeconds === null) return acc ?? f;
+    return f.slackSeconds < acc.slackSeconds ? f : acc;
+  }, null);
+
+  const line = { feeds };
+  if (!worst || worst.slackSeconds === null || worst.slackSeconds <= worst.budgetSeconds * 0.2) {
+    log.error(
+      line,
+      'harga terbukti nyaris/sudah basi — setiap operasi pasar akan revert. ' +
+        'Verifikasi dengan `cast call tryToUsd1e18`, BUKAN lewat /v1/prices ' +
+        '(itu mirror Postgres dan bisa tetap terlihat sehat)',
+    );
+  } else if (worst.slackSeconds <= worst.budgetSeconds * 0.5) {
+    log.warn(line, 'harga terbukti menua');
+  } else {
+    log.info(line, 'harga terbukti segar');
   }
 }
 

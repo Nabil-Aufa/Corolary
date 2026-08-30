@@ -12,7 +12,8 @@
     "mirror:rebuild": "tsx src/mirror-rebuild.ts",
     "prices:once": "tsx src/prices/once.ts",
     "t3": "tsx src/t3-invalid-member.ts",
-    "test": "tsx --test"
+    "test": "tsx --test",
+    "prices:trust": "tsx src/prices/trust.ts"
   },
   "dependencies": {
     "@corolary/shared": "workspace:*",

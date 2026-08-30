@@ -17,7 +17,16 @@
  *   ETH/USD  aggregator 0x7d4E…6Fb5  update terakhir 30 blok lalu
  *   BTC/USD  aggregator 0x4a34…84f1  update terakhir 196 blok lalu
  *   USDC/USD aggregator 0xc9E1…e9d7  update terakhir 55 blok lalu
- * Ketiganya berdesimal 8.
+ *
+ * Ditambahkan dan diverifikasi live 2026-08-30, keduanya lewat `aggregator()`
+ * pada proxy resmi dan `description()` yang mengonfirmasi pasangan harganya:
+ *   USDT/USD aggregator 0x0d5F…4Df5
+ *   DAI/USD  aggregator 0x7097…72A3
+ * Kelimanya berdesimal 8.
+ *
+ * Keduanya menutup 3.490 fakta yang sebelumnya tampil tanpa nilai USD — USDT
+ * saja 3.307. Menambahkannya TIDAK butuh redeploy: `trustAggregator` adalah
+ * setter ber-`CURATOR_ROLE`, dan deployer memegang role itu.
  */
 export interface FeedConfig {
   /** Label untuk log dan untuk kolom `pair` di API. */
@@ -41,6 +50,20 @@ export interface FeedConfig {
    * ETH/USD dan BTC/USD (heartbeat 1 jam) terisi normal dalam hitungan menit.
    */
   lookbackBlocks?: number;
+  /**
+   * Anggaran kesegaran on-chain khusus aset ini, dalam detik. Kosong = pakai
+   * `maxPriceAge` global (terbaca 10.800 detik / 3 jam pada 2026-08-30).
+   *
+   * Dipasang `prices:trust` lewat `setMaxPriceAgeFor`. Ada di sini, bukan
+   * hanya di `Deploy.s.sol`, karena ia harus berpasangan dengan
+   * `lookbackBlocks`: keduanya turunan dari HEARTBEAT feed yang sama, dan
+   * memisahkannya berarti dua tempat yang harus tetap sepakat selamanya.
+   *
+   * Anggaran yang lebih PENDEK dari heartbeat berarti harga aset itu basi
+   * secara berkala tanpa ada yang salah — `tryToUsd1e18` menjawab `false` dan
+   * pasar membeku diam-diam sampai ronde berikutnya masuk.
+   */
+  maxPriceAgeSeconds?: number;
 }
 
 /**
@@ -81,5 +104,34 @@ export const FEEDS: FeedConfig[] = [
     // CTC untuk SATU ronde — sepele, dan hanya terjadi saat bootstrap registry
     // kosong. Feed cepat tetap memakai jendela ketat.
     lookbackBlocks: 9_000,
+    // 28 jam = plafon heartbeat 24 jam + 4 jam kelonggaran operasional
+    // (attestation ~8 menit, lalu prove dan submit).
+    maxPriceAgeSeconds: 100_800,
+  },
+  {
+    pair: 'USDT/USD',
+    proxy: '0x3E7d1eAB13ad0104d2750B8863b489D65364e32D',
+    aggregator: '0x0d5F4aADf3fde31BBB55dB5F42C080F18aD54Df5',
+    asset: '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT
+    // Feed PALING LAMBAT dari semua yang dipantau. Terukur live 2026-08-30 di
+    // rentang yang sama: ETH 31 ronde per 9.000 blok, DAI 30, USDC 2, USDT 1.
+    // Jendela default 6.000 blok (~20 jam) karena itu bisa berada di bawah
+    // jarak antar ronde USDT, dan pada registry kosong itu berarti buntu
+    // permanen — bukan hipotesis, persis yang terjadi pada USDC saat cutover
+    // 2026-08-26.
+    lookbackBlocks: 9_000,
+    // Sama seperti USDC dan untuk alasan yang sama: heartbeat 24 jam melawan
+    // anggaran global 3 jam. Tanpa ini USDT praktis SELALU basi di mata
+    // kontrak — bukan karena ada yang rusak, melainkan karena anggarannya
+    // diukur untuk feed yang berbeda.
+    maxPriceAgeSeconds: 100_800,
+  },
+  {
+    pair: 'DAI/USD',
+    proxy: '0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9',
+    aggregator: '0x709783ab12b65fD6cd948214EEe6448f3BdD72A3',
+    asset: '0x6B175474E89094C44Da98b954EedeAC495271d0F', // DAI
+    // Jendela dan anggaran default keduanya cukup: 30 ronde per 9.000 blok,
+    // sekelas ETH/USD. Heartbeat 1 jam, jauh di dalam anggaran global 3 jam.
   },
 ];

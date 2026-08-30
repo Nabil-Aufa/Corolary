@@ -11,7 +11,7 @@ import { logger } from '../logger.js';
 import { initPrices, refreshPricesOnce } from './run.js';
 
 await reconcileNonce();
-await initPrices();
+initPrices();
 await refreshPricesOnce();
 logger.info('putaran harga selesai');
 await closeDb();
