@@ -51,6 +51,35 @@ const INITIAL_CHUNK = 10_000;
 const MIN_CHUNK = 500;
 
 /**
+ * Di bawah ini backfill BERHENTI untuk protokol ini (dan melewati sisa
+ * protokol lain di run yang sama), bukan terus merangkak selamanya.
+ *
+ * Aritmetika: kasus terpanjang yang benar-benar dipakai adalah 24 bulan
+ * (lihat komentar `BackfillOptions.untilMonths` — dompet nyata dipindai 24
+ * bulan lintas protokol). Itu ≈ 24 × 30,44 × 24 × 3600 / 12 = 5.260.032 blok.
+ * `chunk` TIDAK PERNAH membesar kembali setelah menyusut (tidak ada logika
+ * yang menaikkannya) — jadi begitu ia menyentuh sebuah nilai, nilai itu
+ * berlaku untuk SISA seluruh rentang, bukan sesaat.
+ *
+ * Pada ambang 2.000 blok: 5.260.032 / 2.000 ≈ 2.631 panggilan HANYA untuk
+ * SATU protokol SATU filter tersisa. Pada laju sehat terukur (~525
+ * panggilan/protokol/tahun dalam ~20 menit lintas 4 protokol → ~1,75
+ * panggilan/detik, lihat komentar `scanProtocol` di bawah), itu ≈25 menit
+ * dalam kondisi TERBAIK — dan chunk yang sudah turun sejauh ini justru
+ * membuktikan kondisinya BUKAN terbaik (RPC sedang menolak berulang kali,
+ * itu sebabnya ia menyusut). Pada `MIN_CHUNK` (500, lantai keras di bawah
+ * konstanta ini), sisa panggilan untuk rentang yang sama sudah 10.520 —
+ * >3 jam bahkan pada laju sehat, dan job ini berbagi rate-limit RPC yang
+ * sama dengan watcher live serta loop harga yang TIDAK BOLEH berhenti.
+ *
+ * Insiden yang memicu ini: chunk pernah menciut sampai 7 blok di produksi.
+ * Pada ukuran itu, backfill 6 bulan (1.315.008 blok) = 1.315.008 / 7 ≈
+ * 187.858 panggilan — praktis tidak akan pernah selesai, dan terus bersaing
+ * dengan watcher/loop harga sepanjang percobaan sia-sia itu.
+ */
+const MIN_VIABLE_CHUNK_BLOCKS = 2_000;
+
+/**
  * Jeda antar panggilan RPC.
  *
  * Bukan kehati-hatian berlebihan: 780 panggilan paralel membuat drpc membalas
@@ -143,6 +172,15 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
   let inserted = 0;
 
   /**
+   * Sekali RPC terbukti tidak sanggup (chunk turun ke bawah
+   * `MIN_VIABLE_CHUNK_BLOCKS`) untuk satu protokol, mencoba protokol
+   * berikutnya dari nol tidak akan berbeda hasilnya — provider yang menolak,
+   * bukan protokolnya. Melewati sisanya TANPA memanggil RPC lagi mencegah run
+   * yang sudah terbukti sia-sia membebani RPC yang sedang tertekan lebih jauh.
+   */
+  let unviable = false;
+
+  /**
    * Transaksi yang sudah ada SEBELUM run ini menulis apa pun.
    *
    * Harus dikumpulkan di sini, bukan di `report()`. Karena insert terjadi per
@@ -154,6 +192,29 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
   const preExisting = opts.dryRun ? null : new Set<string>();
 
   for (const target of targets) {
+    if (unviable) {
+      // Tidak mencoba sama sekali — lihat komentar `unviable` di atas.
+      failures.push({
+        protocol: target.protocol.name,
+        from: floor,
+        to: ceiling,
+        reason:
+          'dilewati tanpa dicoba — RPC sudah terbukti tidak sanggup pada protokol sebelumnya di run yang sama',
+      });
+      found.push({ protocolName: target.protocol.name, protocolAddress: target.protocol.address, logs: [] });
+      if (!opts.dryRun) {
+        await recordCoverage({
+          subject,
+          protocol: target.protocol.address,
+          fromBlock: floor,
+          toBlock: ceiling,
+          logsFound: 0,
+          complete: false,
+        });
+      }
+      continue;
+    }
+
     const failedBefore = failures.length;
     const onChunk = opts.dryRun
       ? null
@@ -178,7 +239,7 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
           });
         };
 
-    const logs = await scanProtocol(target, subject, floor, ceiling, onChunk, failures);
+    const { logs, aborted } = await scanProtocol(target, subject, floor, ceiling, onChunk, failures);
     found.push({
       protocolName: target.protocol.name,
       protocolAddress: target.protocol.address,
@@ -189,6 +250,11 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
     // Pemindaian empat protokol makan ~20 menit; kalau prosesnya mati di
     // protokol ketiga, dua protokol pertama sudah dibayar penuh dan tidak boleh
     // dilupakan hanya karena run-nya tidak sempat mencapai baris terakhir.
+    //
+    // `complete` otomatis `false` untuk protokol yang baru saja menyerah
+    // karena chunk tidak layak: `scanProtocol` sudah men-push satu `FailedRange`
+    // ke `failures` sebelum kembali, jadi `failures.length` di sini sudah
+    // bertambah dan syarat `=== failedBefore` gagal dengan sendirinya.
     if (!opts.dryRun) {
       await recordCoverage({
         subject,
@@ -199,6 +265,8 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
         complete: failures.length === failedBefore,
       });
     }
+
+    if (aborted) unviable = true;
   }
 
   await report(found, subject, preExisting, failures.length);
@@ -254,11 +322,12 @@ async function scanProtocol(
   head: number,
   onChunk: ((logs: ethers.Log[]) => Promise<void>) | null,
   failures: FailedRange[],
-): Promise<ethers.Log[]> {
+): Promise<{ logs: ethers.Log[]; aborted: boolean }> {
   const padded = ethers.zeroPadValue(subject, 32);
   const seen = new Map<string, ethers.Log>();
   const startedAt = Date.now();
   let calls = 0;
+  let aborted = false;
 
   // Ukuran yang sudah terbukti dipakai ulang untuk potongan berikutnya, bukan
   // direset ke 10.000 tiap kali. Tanpa ini setiap potongan mengulang kegagalan
@@ -266,7 +335,7 @@ async function scanProtocol(
   // kali lipat panggilan untuk setiap potongan sepanjang sisa pemindaian.
   let chunk = INITIAL_CHUNK;
 
-  for (let to = head; to >= floor; to -= chunk) {
+  outer: for (let to = head; to >= floor; to -= chunk) {
     const from = Math.max(floor, to - chunk + 1);
     const chunkLogs: ethers.Log[] = [];
 
@@ -291,6 +360,27 @@ async function scanProtocol(
           'rentang dikecilkan untuk blok yang lebih tua',
         );
         chunk = Math.max(MIN_CHUNK, workedAt);
+
+        // Lihat komentar `MIN_VIABLE_CHUNK_BLOCKS` untuk aritmetikanya. Rentang
+        // [floor, to] yang belum terselesaikan dicatat sebagai SATU FailedRange
+        // — sama seperti kegagalan biasa dari `fetchRange` — supaya rerun
+        // nanti tahu persis apa yang masih perlu dipindai ulang, dan supaya
+        // `recordCoverage` di pemanggil otomatis mencatat `complete: false`.
+        if (chunk <= MIN_VIABLE_CHUNK_BLOCKS) {
+          const remainingBlocks = to - floor + 1;
+          const estimatedCalls = Math.ceil(remainingBlocks / chunk);
+          const reason =
+            `chunk adaptif turun ke ${chunk} blok (ambang minimum ${MIN_VIABLE_CHUNK_BLOCKS}) — ` +
+            `sisa ${remainingBlocks} blok pada ukuran ini butuh ~${estimatedCalls} panggilan RPC ` +
+            `lagi untuk protokol ini saja, dan chunk tidak pernah membesar kembali`;
+          log.error(
+            { protocol: target.protocol.name, chunk, remainingBlocks, estimatedCalls },
+            'backfill dihentikan — chunk adaptif di bawah ambang layak',
+          );
+          failures.push({ protocol: target.protocol.name, from: floor, to, reason });
+          aborted = true;
+          break outer;
+        }
       }
 
       // Satu log bisa cocok dua filter kalau posisinya kebetulan sama-sama
@@ -319,10 +409,10 @@ async function scanProtocol(
     a.blockNumber !== b.blockNumber ? a.blockNumber - b.blockNumber : a.index - b.index,
   );
   log.info(
-    { protocol: target.protocol.name, logs: out.length, rpcCalls: calls, durationMs: Date.now() - startedAt },
+    { protocol: target.protocol.name, logs: out.length, rpcCalls: calls, durationMs: Date.now() - startedAt, aborted },
     'protokol dipindai',
   );
-  return out;
+  return { logs: out, aborted };
 }
 
 /**
