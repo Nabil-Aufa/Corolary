@@ -118,6 +118,11 @@ export async function proveOnce(): Promise<void> {
           // hilang begitu event masuk batch, dan submitter kembali FIFO.
           priority: Math.max(...batch.map((t) => t.priority)),
           payload: sql.json(payload as unknown as Parameters<typeof sql.json>[0]),
+          // Disimpan terpisah dari payload karena payload dikosongkan begitu
+          // batch mencapai `done` (migrasi 0013). Dua angka ini yang tetap
+          // dibutuhkan /v1/facts/:factId selamanya.
+          continuity_roots_count: payload.sharedContinuityProof.roots.length,
+          merkle_siblings_count: payload.merkleProofs[0]?.siblings.length ?? 0,
           status: 'ready',
         })}
         ON CONFLICT (batch_id) DO NOTHING
@@ -188,6 +193,11 @@ async function fallbackToSingles(batch: ProvableTx[], reason: string): Promise<b
           tx_count: 1,
           priority: member.priority,
           payload: sql.json(payload as unknown as Parameters<typeof sql.json>[0]),
+          // Disimpan terpisah dari payload karena payload dikosongkan begitu
+          // batch mencapai `done` (migrasi 0013). Dua angka ini yang tetap
+          // dibutuhkan /v1/facts/:factId selamanya.
+          continuity_roots_count: payload.sharedContinuityProof.roots.length,
+          merkle_siblings_count: payload.merkleProofs[0]?.siblings.length ?? 0,
           status: 'ready',
         })}
         ON CONFLICT (batch_id) DO NOTHING

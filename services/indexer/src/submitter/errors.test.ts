@@ -108,6 +108,17 @@ test('"Merkle proof validation failed" pada BATCH -> dipecah, bukan retry', () =
   assert.equal(v.reason, 'Merkle proof validation failed');
 });
 
+test('NoRelevantLogs -> skip, bukan fatal/retryable', () => {
+  // 188-215 dari ~32.000 event produksi jatuh ke sini: transaksi sumber sah
+  // dan sukses, tapi tidak memuat log dari protokol terdaftar. Hasilnya
+  // sudah pasti dan BENAR, bukan kegagalan — sebelum ditambahkan ke
+  // SKIP_ERRORS, ini dihitung `failed` dan membuat dashboard terlihat jauh
+  // lebih buruk dari kenyataan.
+  const v = classifySubmitError(ethersError({ revert: { name: 'NoRelevantLogs' } }), false);
+  assert.equal(v.verdict, 'skip');
+  assert.equal(v.revertName, 'NoRelevantLogs');
+});
+
 test('proof tidak cocok pada transaksi TUNGGAL -> beli proof baru', () => {
   // Memecah sesuatu yang sudah tunggal itu mustahil, dan mengirim ulang payload
   // yang sama akan gagal dengan cara yang sama.

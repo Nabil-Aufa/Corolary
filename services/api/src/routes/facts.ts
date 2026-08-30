@@ -23,22 +23,45 @@ const SELECT = sql`
   LEFT JOIN prices p ON p.asset  = f.asset
 `;
 
+/** Maksimum elemen per parameter berdaftar-koma (`kind=1,2`, `protocol=0xa,0xb`). */
+const MAX_LIST_PARAM = 10;
+
+/**
+ * Memecah `?kind=1,2` atau `?protocol=0xaaa,0xbbb` jadi daftar tervalidasi,
+ * sambil tetap kompatibel mundur dengan nilai tunggal (`?kind=1`). Dibatasi
+ * `MAX_LIST_PARAM` supaya query tidak bisa dibuat sewenang-wenang besar oleh
+ * daftar koma yang panjang.
+ */
+function parseList<T>(
+  raw: string | undefined,
+  paramName: string,
+  validate: (element: string) => T,
+): T[] | null {
+  if (raw === undefined) return null;
+  const parts = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+  if (parts.length === 0) invalidParam(`${paramName} tidak boleh kosong`);
+  if (parts.length > MAX_LIST_PARAM) {
+    invalidParam(`${paramName} maksimum ${MAX_LIST_PARAM} elemen, dapat ${parts.length}`);
+  }
+  return parts.map(validate);
+}
+
+function parseKind(raw: string): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n > 4) {
+    invalidParam(`kind harus 0..4, dapat "${raw}"`);
+  }
+  return n;
+}
+
 facts.get('/facts', async (c) => {
   const q = c.req.query();
   const limit = parseLimit(q['limit']);
   const cursor = decodeCursor(q['cursor']);
 
   const subject = q['subject'] !== undefined ? parseAddress(q['subject']) : null;
-  const protocol = q['protocol'] !== undefined ? parseAddress(q['protocol']) : null;
-
-  let kind: number | null = null;
-  if (q['kind'] !== undefined) {
-    const n = Number(q['kind']);
-    if (!Number.isInteger(n) || n < 0 || n > 4) {
-      invalidParam(`kind harus 0..4, dapat "${q['kind']}"`);
-    }
-    kind = n;
-  }
+  const protocols = parseList(q['protocol'], 'protocol', (s) => parseAddress(s));
+  const kinds = parseList(q['kind'], 'kind', parseKind);
 
   // Ambil satu lebih banyak dari limit: kehadiran baris ke-(limit+1) adalah
   // cara mengetahui ada halaman berikutnya tanpa COUNT(*) di tabel besar.
@@ -46,8 +69,8 @@ facts.get('/facts', async (c) => {
     ${SELECT}
     WHERE true
       ${subject ? sql`AND f.subject = ${subject}` : sql``}
-      ${protocol ? sql`AND f.protocol = ${protocol}` : sql``}
-      ${kind !== null ? sql`AND f.kind = ${kind}` : sql``}
+      ${protocols ? sql`AND f.protocol = ANY(${protocols})` : sql``}
+      ${kinds ? sql`AND f.kind = ANY(${kinds})` : sql``}
       ${
         cursor
           ? sql`AND (f.block_height, f.tx_index, f.tx_log_index) <
@@ -86,13 +109,21 @@ facts.get('/facts/:factId', async (c) => {
   const row = rows[0];
   if (!row) notFound(`fakta ${factId}`);
 
-  const batchRows = await sql<{ tx_count: number; payload: unknown }[]>`
-    SELECT tx_count, payload FROM proof_batches WHERE batch_id = ${row.batch_id}
+  // Dibaca dari KOLOM, bukan dari `payload`. Payload sebuah batch dikosongkan
+  // begitu ia mencapai `done` (migrasi 0013): ~18 KB per batch, 116 MB dari
+  // database 216 MB, disimpan selamanya demi dua integer yang tidak pernah
+  // berubah. Kedua angka itu sekarang ditulis prover saat batch dibuat.
+  const batchRows = await sql<
+    {
+      tx_count: number;
+      continuity_roots_count: number | null;
+      merkle_siblings_count: number | null;
+    }[]
+  >`
+    SELECT tx_count, continuity_roots_count, merkle_siblings_count
+    FROM proof_batches WHERE batch_id = ${row.batch_id}
   `;
   const batch = batchRows[0];
-  const payload = batch?.payload as
-    | { sharedContinuityProof?: { roots?: string[] }; merkleProofs?: { siblings?: unknown[] }[] }
-    | undefined;
 
   const observedAt = Number(row.observed_at);
   const recordedAt = Number(row.recorded_at);
@@ -104,8 +135,8 @@ facts.get('/facts/:factId', async (c) => {
       // membuat proof ~12x lebih mahal. Angka ini yang membuktikan janji itu
       // ditepati untuk fakta ini, bukan sekadar diklaim di dokumen.
       provedWithinHours: Math.max(0, Math.round(((recordedAt - observedAt) / 3600) * 10) / 10),
-      continuityProofRootsCount: payload?.sharedContinuityProof?.roots?.length ?? 0,
-      merkleProofSiblingsCount: payload?.merkleProofs?.[0]?.siblings?.length ?? 0,
+      continuityProofRootsCount: batch?.continuity_roots_count ?? 0,
+      merkleProofSiblingsCount: batch?.merkle_siblings_count ?? 0,
       batchId: row.batch_id,
       batchSize: batch?.tx_count ?? 1,
       verifiedAtBlock: Number(row.creditcoin_block),

@@ -33,6 +33,14 @@ const SKIP_ERRORS = new Set([
   'SourceTransactionReverted',
   'UnsupportedTransactionType',
   'InvalidSubject',
+  // Transaksi sumber sah dan sukses, tapi tidak memuat satu pun log dari
+  // protokol terdaftar (FactRegistry.sol:63). Hasilnya sudah pasti dan BENAR
+  // — tidak ada apa pun yang seharusnya dicatat — bukan kegagalan. Sebelum
+  // ini ditambahkan, 188-215 dari ~32.000 event di produksi jatuh ke
+  // `fatal`/`retryable` lewat cabang "custom error tak dikenal", membuat
+  // dashboard terlihat jauh lebih buruk dari kenyataan padahal lajunya
+  // stabil dan sebabnya sama persis di setiap kejadian.
+  'NoRelevantLogs',
 ]);
 
 /** Custom error yang menandakan proof atau susunan batch bermasalah. */
