@@ -567,6 +567,38 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   salah secara teknis, dan justru itu masalahnya — ia versi API dari kekeliruan
   yang sudah berulang empat kali di proyek ini: menyamakan jendela pemindaian
   dengan riwayat yang benar-benar ada.
+- **Loop yang tidak pernah DIJADWALKAN lebih berbahaya daripada loop yang
+  menggantung.** `ITERATION_TIMEOUT_MS` hanya menyelamatkan iterasi yang macet;
+  ia tidak bisa menyentuh loop yang `setTimeout`-nya tidak pernah dipasang. Di
+  `main.ts`, `initPrices()` dulu berbagi satu `try` dengan `initSubmitter()`
+  yang loop-nya sudah dinyalakan di baris sebelumnya — jadi satu `assetOfAggregator`
+  yang gagal saat boot melewati `loop('prices')` untuk SEUMUR HIDUP proses.
+  Terukur 2026-08-30: 91,8 jam nol `recordPrice`, `tryToUsd1e18` `false` untuk
+  tUSDC maupun tWETH, sementara fakta terus mengalir dan setiap dashboard hijau.
+  Aturannya: fungsi init tidak boleh menyentuh jaringan. Verifikasi yang butuh
+  RPC hidup DI DALAM loop, di mana kegagalan berarti dicoba lagi.
+- **`maxPriceAge` GLOBAL di registry yang hidup adalah 10.800 detik (3 jam),
+  bukan 28 jam.** Yang 100.800 adalah override per-aset `maxPriceAgeOf`, dan ia
+  hanya dipasang untuk USDC — satu-satunya feed berheartbeat 24 jam. WETH dan
+  WBTC memakai anggaran 3 jam. Ambang operasional apa pun yang diturunkan dari
+  "28 jam" karena itu delapan kali terlalu longgar dan tidak akan pernah menyala
+  sebelum pasar sudah membeku. Baca `maxPriceAge()` DAN `maxPriceAgeOf(asset)`;
+  jangan mengutip `Deploy.s.sol`, chain yang berhak menjawab.
+- **`proof_batches.payload` disimpan selamanya demi DUA INTEGER.** 116 MB dari
+  database 216 MB, dan satu-satunya pembacanya setelah batch masuk chain adalah
+  `/v1/facts/:factId` yang cuma butuh `roots.length` dan `siblings.length`.
+  Sekarang kedua angka itu kolom sendiri di `proof_batches` (migrasi 0013) dan
+  payload dikosongkan saat batch mencapai `done`/`stale`. Catatan operasional:
+  `SET payload = NULL` TIDAK mengembalikan ruang ke disk — ia hanya menandai
+  tuple mati. Volume yang benar-benar penuh butuh `VACUUM FULL` (mengunci tabel
+  dan sempat butuh ruang 2x) atau `pg_repack`.
+- **Keluaran `cast logs` DIINDENTASI, jadi `grep -c '^blockNumber'` selalu
+  menjawab nol.** Terjadi 2026-08-30 saat memeriksa apakah aggregator USDT/DAI
+  memancarkan `AnswerUpdated`: hasilnya terbaca sebagai "feed ini tidak memakai
+  event yang kita decode" — temuan yang akan mengubah keputusan desain — padahal
+  keduanya memancarkan normal. Sekeluarga dengan jebakan `set -- $VAR` di zsh:
+  perintah verifikasi WAJIB disertai KONTROL yang hasilnya sudah diketahui.
+
 - **Token testnet dinilai lewat `PriceRegistry.setPriceAlias`.** `tUSDC`/`tWETH`
   tidak punya feed Chainlink sendiri, dan satu aggregator hanya bisa menunjuk satu
   aset. Alias membuat mereka memakai harga mainnet yang benar-benar dibuktikan —

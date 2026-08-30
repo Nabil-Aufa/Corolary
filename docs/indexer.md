@@ -1048,6 +1048,44 @@ watcher live sudah memindai MAJU; memundurkannya akan membuat watcher memindai
 ulang berbulan-bulan sebagai lalu lintas live, pada tarif eager, untuk seluruh
 chain.
 
+#### Dua rem: berhenti kalau chunk sudah tidak layak, tunda kalau pipeline tertekan
+
+Diamati 2026-08-30: tiga job backfill berjalan bersamaan dengan watcher dan
+loop harga, berbagi satu RPC (drpc free). Pemecah rentang adaptif (§ di atas)
+menciutkan chunk sampai beberapa blok untuk keempat protokol — di ukuran itu,
+backfill 6 bulan (~1,3 juta blok) butuh ratusan ribu panggilan RPC dan praktis
+tidak akan pernah selesai, sambil terus bersaing dengan watcher dan loop harga.
+`oldestUnprovenAgeSeconds` sempat 90+ jam, jauh di luar jendela eager-proving
+24 jam.
+
+**Rem 1 — di dalam backfill (`backfill/run.ts`).** `chunk` yang menyusut lewat
+`workedAt` TIDAK PERNAH membesar kembali; begitu ia turun ke bawah
+`MIN_VIABLE_CHUNK_BLOCKS` (2.000 blok — lihat komentar konstanta untuk
+aritmetika lengkapnya), `scanProtocol` berhenti untuk protokol itu, mencatat
+SATU `FailedRange` yang menutupi seluruh sisa `[floor, to]`, dan
+`backfillSubject` melewati protokol-protokol berikutnya **tanpa mencobanya**
+(sinyalnya sudah jelas: providernya yang tidak sanggup, bukan protokolnya).
+Ini bukan pengecualian dari aturan "tulis per potongan, laporkan kegagalan di
+baris ringkasan": setiap protokol yang sudah selesai sebelum penghentian tetap
+tercatat lewat `recordCoverage`, dan `failedRanges` di ringkasan (§ Ketahanan
+di atas) tetap jujur — `runBackfillJobs` menandai job `partial`, bukan
+`complete`.
+
+**Rem 2 — di depan backfill (`jobs/backfill.ts`).** Sebelum mengklaim job
+`pending`, `runBackfillJobs` mengecek kesehatan pipeline lewat query Postgres
+saja (tanpa RPC tambahan):
+
+| Sinyal | Ambang | Sumber |
+|---|---|---|
+| Watcher tertinggal | cursor mana pun basi > 300 detik (20× interval watcher 15 detik) | `source_cursors.updated_at` |
+| Backlog proving menua | `oldestUnprovenAgeSeconds()` > `CRITICAL_AGE_SECONDS` (20 jam) | `metrics.ts` |
+| Harga mendekati basi | mirror `prices` menunjukkan feed mana pun > 24 jam sejak `updated_at` on-chain (di bawah budget on-chain 28 jam) | tabel `prices` (MIRROR — bukan verifikasi pasar sungguhan, lihat catatan `maxPriceAge` di CLAUDE.md) |
+
+Kalau salah satu menyala, job **ditunda** — bukan digagalkan: `status` tetap
+`pending`, `attempts` tidak naik, `run_after` didorong 5 menit ke depan, dan
+`log.warn` sekali (di-rate-limit ke sekali per 5 menit) menyebut sinyal mana
+yang menyala beserta angkanya.
+
 ---
 
 ### 13.3 Trade-off Biaya
@@ -1261,6 +1299,66 @@ bersamaan dengan indexer — keduanya mengklaim nonce dari kunci yang sama.
 | Dua instance indexer berjalan bersamaan (mis. deploy ganda) | `indexer_submitter_nonce_gap` tidak nol/naik aneh, error nonce di log | Lapis dedup §7 (DB unique constraint + `processedQueries` on-chain) mencegah duplikasi data; tapi ini kondisi yang harus diperbaiki di level deploy (pastikan `replicas: 1`), bukan sesuatu yang didesain untuk ditoleransi permanen |
 | Chainlink aggregator berganti di balik proxy | Event `AnswerUpdated` datang dari alamat baru yang belum ada di himpunan tepercaya | `ChainlinkAdapter` (`packages/contracts`) me-resolve `aggregator()` dari proxy secara berkala dan memperbarui himpunan tepercaya — sisi indexer memantau event dari **kedua** aggregator (lama & baru) selama masa transisi supaya tidak ada gap harga (lihat `architecture.md` §11) |
 | Adapter decode gagal (ABI mismatch/bug) | Exception saat decode log jenis event yang seharusnya dikenali | Non-retryable → `failed`, alert kritikal — ini bug kode, retry tidak akan memperbaikinya |
+| Batch/event jadi yatim SETELAH boot (§15.1) | Antrean yang tidak pernah habis, tanpa error apa pun | Disapu berkala dari dalam `submitOnce()`, bukan hanya saat `initSubmitter()` |
+
+### 15.1 Sweep yatim berkala, bukan hanya saat boot
+
+`reclaimOrphanedBatches()` dan `requeueOrphanedEvents()` (`submit.ts`) dulu HANYA
+dipanggil dari `initSubmitter()` — sekali saat proses menyala. Jebakannya:
+apa pun yang jadi yatim SETELAH proses berjalan (batch induk ditandai `stale`
+sementara event anggotanya masih tertinggal `submitting`) menunggu restart
+berikutnya untuk disapu, dan sampai saat itu tidak ada gejala apa pun selain
+antrean yang tidak pernah habis. Terukur di produksi: 24 event tersangkut
+permanen (`stale`, "Continuity proof does not match attestation or
+checkpoint") dan DUA restart tidak menyapunya karena mereka jadi yatim
+SETELAH restart terakhir — kejadian identik dengan 57 event pada 25 Agustus.
+
+Sekarang `submitOnce()` memanggil `sweepOrphans()` di awal, SEBELUM memilih
+batch (bukan setelah `if (!row) return`) — event yatim justru menumpuk paling
+parah saat antrean batch kosong. Dibatasi interval seperti
+`checkSubmitterBalance()` (§12), berjalan paling cepat sekali per 60 detik.
+
+`reclaimOrphanedBatches()` versi boot aman TANPA syarat umur karena saat
+proses baru menyala tidak ada pengiriman yang sedang berlangsung. Dipanggil
+berkala dari dalam loop, itu tidak berlaku lagi: `submitBatch` menahan status
+`submitting` selama `tx.wait()` berjalan. Karena itu versi berkalanya
+(`reclaimOrphanedBatchesPeriodic()`) menambah syarat
+`updated_at < now() - interval '10 minutes'` — tanpa itu, sweep berkala akan
+mencuri batch yang sedang benar-benar in-flight dan menyebabkan pengiriman
+ganda, persis masalah yang seharusnya ia sembuhkan.
+
+### 15.2 `NoRelevantLogs` adalah `skip`, bukan kegagalan
+
+`NoRelevantLogs` (`FactRegistry.sol:63`) di-revert saat transaksi sumber sah
+dan sukses tapi tidak memuat satu pun log dari protokol terdaftar. Sebelum
+ditambahkan ke `SKIP_ERRORS` (`errors.ts`), itu jatuh ke cabang "custom error
+tak dikenal" (§8.2) dan dihitung `fatal`/`failed` — 188-215 dari ~32.000
+event produksi, semuanya sebab yang sama, semuanya hasil yang BENAR. Migrasi
+`0012` memperbaiki baris lama:
+`UPDATE observed_events SET status='skipped' WHERE status='failed' AND last_error ILIKE '%NoRelevantLogs%'`.
+
+Catatan yang belum diperbaiki (didokumentasikan, bukan diabaikan): di jalur
+BATCH (`submitBatch`), verdict `skip` menandai proof_batches `done` dan
+seluruh event anggota `recorded` — akurat untuk `QueryAlreadyProcessed`
+(faktanya memang sudah di chain), tapi TIDAK akurat untuk `NoRelevantLogs`
+di level batch (kasus langka: seluruh anggota nihil log relevan sekaligus).
+Lihat komentar di `submit.ts` pada cabang `verdict.verdict === 'skip'`.
+
+### 15.3 `proof_batches.payload` dikosongkan untuk batch `stale`, bukan `done`
+
+`payload` menyimpan seluruh argumen `recordFactBatch` dan mendominasi ukuran
+database (116 MB dari 216 MB, 6.282 baris terukur). Saat batch ditandai
+`stale` (proof kedaluwarsa permanen, tidak akan pernah dikirim ulang), `submit.ts`
+sekarang menge-set `payload = NULL` di statement UPDATE yang sama — migrasi
+`0012` juga membersihkan baris lama yang sudah `stale`.
+
+Batch `done` SENGAJA tidak disentuh: `services/api/src/routes/facts.ts`
+membaca `proof_batches.payload` untuk batch `done` guna menghitung
+`continuityProofRootsCount`/`merkleProofSiblingsCount` di
+`/v1/facts/:factId`. Mengosongkannya akan membuat endpoint itu diam-diam
+melaporkan nol untuk kedua angka pada setiap fakta — butuh perubahan API
+(mis. memindahkan kedua angka itu ke tabel `facts` saat `persistReceipt`)
+sebelum aman dilakukan.
 
 ---
 
