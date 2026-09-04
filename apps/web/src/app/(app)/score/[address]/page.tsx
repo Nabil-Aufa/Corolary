@@ -5,7 +5,10 @@ import { useParams } from 'next/navigation';
 import { isAddress } from 'viem';
 import { ExternalLink } from 'lucide-react';
 import { BASELINE_COLLATERAL_RATIO_BPS, TIER_LABEL } from '@corolary/shared';
+import { BackfillPanel } from '@/components/score/BackfillPanel';
 import { ComponentBreakdown } from '@/components/score/ComponentBreakdown';
+import { NextTierGuidance } from '@/components/score/NextTierGuidance';
+import { ScoreHistoryChart } from '@/components/score/ScoreHistoryChart';
 import { ScoreDial } from '@/components/score/ScoreDial';
 import { TierLadder } from '@/components/score/TierLadder';
 import { AddressDisplay } from '@/components/shared/AddressDisplay';
@@ -69,15 +72,23 @@ export default function ScorePage() {
         // Bukan dial berisi 0. Alamat tanpa riwayat terbukti belum punya skor —
         // menampilkan angka nol seolah itu penilaian adalah kebohongan kecil
         // yang merusak satu-satunya klaim produk ini.
-        <EmptyState
-          title="No proven history for this address yet"
-          description="Corolary only scores lending activity on Ethereum mainnet that has been proven through Attestcoin. This wallet has no indexed events."
-          action={
-            <Link href="/proofs">
-              <Button variant="secondary">Browse proven facts</Button>
-            </Link>
-          }
-        />
+        <div className="grid gap-6">
+          {/* Kalimat lama berbunyi "wallet ini tidak punya event terindeks",
+              yang terbaca seolah dompetnya memang kosong. Itu kekeliruan yang
+              sama yang berulang di proyek ini: menyamakan jendela pemindaian
+              dengan riwayat yang benar-benar ada. Panel di bawahnya sekarang
+              menawarkan jalan keluarnya, jadi kalimatnya bisa jujur. */}
+          <EmptyState
+            title="Nothing indexed for this address yet"
+            description="Corolary only scores Ethereum mainnet lending activity that has been proven through Attestcoin. This wallet has not been scanned, which is not the same as having no history."
+            action={
+              <Link href="/proofs">
+                <Button variant="secondary">Browse proven facts</Button>
+              </Link>
+            }
+          />
+          <BackfillPanel address={raw as Address} />
+        </div>
       ) : (
         <>
           <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
@@ -106,7 +117,7 @@ export default function ScorePage() {
                 <p className="mt-3 max-w-md text-body text-ink-500">
                   Against a{' '}
                   <span className="num">{formatRatio(BASELINE_COLLATERAL_RATIO_BPS)}</span> baseline
-                  for wallets with no proven history — that is{' '}
+                  for wallets with no proven history, which is{' '}
                   <span className="num text-ink-900">
                     {(BASELINE_COLLATERAL_RATIO_BPS - data.collateralRatioBps) / 100}
                   </span>{' '}
@@ -123,6 +134,27 @@ export default function ScorePage() {
             How this score is built
           </h2>
           <ComponentBreakdown components={data.components} subject={raw as Address} />
+
+          <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
+            What happens next
+          </h2>
+          <NextTierGuidance score={data} />
+
+          <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
+            How it got here
+          </h2>
+          <ScoreHistoryChart address={raw as Address} />
+
+          {/* Skor yang sudah ada TIDAK berarti riwayatnya sudah lengkap.
+              `firstFactAt` adalah minimum lintas protokol, jadi satu protokol
+              yang dipindai lebih dangkal menahan seluruh angka: dompet demo
+              pernah dibaca "mentok 8 bulan" padahal ada dua transaksi Morpho
+              91 hari lebih tua, dan memindainya menggeser skor 797 -> 813.
+              Karena itu panelnya ada di kedua cabang, bukan cuma yang kosong. */}
+          <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
+            Deepen this history
+          </h2>
+          <BackfillPanel address={raw as Address} />
         </>
       )}
     </main>
