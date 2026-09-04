@@ -8,7 +8,9 @@ import {
   type ActionGroup,
 } from '@/components/market/MarketActionDialog';
 import { HealthFactorBar } from '@/components/market/HealthFactorBar';
+import { FaucetButton, FaucetDialog } from '@/components/market/FaucetDialog';
 import { PositionTable } from '@/components/market/PositionTable';
+import { PriceProvenance } from '@/components/market/PriceProvenance';
 import { ReserveTable } from '@/components/market/ReserveTable';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ErrorState } from '@/components/shared/ErrorState';
@@ -28,6 +30,7 @@ export default function MarketPage() {
   // Aset DAN pasangan aksi dipegang bersama: dialognya tidak punya keadaan
   // "terbuka tanpa aset", jadi menutupnya cukup dengan mengosongkan satu nilai.
   const [action, setAction] = useState<{ reserve: Reserve; group: ActionGroup } | null>(null);
+  const [faucetOpen, setFaucetOpen] = useState(false);
 
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-12 md:px-8">
@@ -36,6 +39,10 @@ export default function MarketPage() {
         description="Borrow against collateral, priced by a score that is derived entirely from proven history."
         aside={
           <div className="flex flex-wrap items-center gap-3">
+            {/* Tanpa token, tak satu pun aksi di halaman ini bisa dicoba —
+                jadi jalan mendapatkannya berdiri di header, bukan terkubur di
+                dalam salah satu dialog aksi. */}
+            <FaucetButton onClick={() => setFaucetOpen(true)} />
             <StatPill
               label="Total supplied"
               value={summary.data ? formatUsd(summary.data.totalSuppliedUsd) : null}
@@ -101,6 +108,14 @@ export default function MarketPage() {
         </div>
       </div>
 
+      {/* Ditaruh SESUDAH tabel reserve dan SEBELUM posisi: ia menjelaskan dari
+          mana angka USD di atasnya berasal, dan memperingatkan sebelum
+          seseorang mencoba bertransaksi di bawahnya. */}
+      <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
+        Prices behind these numbers
+      </h2>
+      <PriceProvenance />
+
       <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">Your position</h2>
 
       {address === undefined ? (
@@ -129,6 +144,12 @@ export default function MarketPage() {
           description="Supply an asset to begin. Your collateral ratio is already set by your proven score."
         />
       )}
+
+      <FaucetDialog
+        open={faucetOpen}
+        onClose={() => setFaucetOpen(false)}
+        reserves={reserves.data ?? []}
+      />
 
       {action !== null && (
         <MarketActionDialog

@@ -32,6 +32,12 @@ const MESSAGES: Record<string, string> = {
   NothingToRepay: 'You have no debt in this asset.',
   PositionHealthy: 'That position is healthy and cannot be liquidated.',
   CloseFactorExceeded: 'That repayment is larger than a single liquidation allows.',
+
+  // FaucetToken, bukan EfficiencyMarket. Satu peta untuk semua kontrak yang
+  // dipanggil dari UI: memisahkannya per kontrak berarti setiap penambahan
+  // harus memilih peta yang benar lebih dulu, dan yang terlewat jatuh ke pesan
+  // generik tanpa ada yang menyadarinya.
+  ClaimTooSoon: 'The faucet allows one claim per hour for each wallet. Try again later.',
 };
 
 /**
