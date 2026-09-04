@@ -197,8 +197,18 @@ export interface IndexerQueue {
   awaitingAttestation: number;
   proving: number;
   submitting: number;
+  /**
+   * Fakta yang KITA catat dalam 24 jam terakhir, dari `facts.recorded_at`
+   * (stempel blok Creditcoin saat fakta ditulis).
+   *
+   * BUKAN disaring dari `observed_at`, yang merupakan stempel blok Ethereum
+   * sumber. Keduanya sama hanya ketika pipeline sedang mengejar head; saat
+   * mengejar backlog, versi `observed_at` jatuh ke nol sementara submitter
+   * mencatat puluhan fakta per menit.
+   */
   recorded24h: number;
   failed: number;
+  /** Event yang PERTAMA TERLIHAT dalam 24 jam terakhir dan berakhir `skipped`. */
   skipped24h: number;
 }
 
@@ -260,6 +270,17 @@ export interface Reserve {
   supplyApyBps: number;
   borrowApyBps: number;
   utilizationBps: number;
+  /**
+   * Apakah aset ini boleh DIPINJAM. Menyetornya sebagai kolateral tetap boleh
+   * walau ini `false`.
+   *
+   * Dipisah dari `active` karena keduanya berbeda: reserve yang tidak aktif
+   * menolak segalanya, sedangkan reserve kolateral-saja menerima setoran tapi
+   * menolak `borrow` dengan `BorrowDisabled`. tWETH di CC3 Testnet adalah yang
+   * kedua — dan tanpa field ini, klien tidak punya cara mengetahuinya selain
+   * mencoba lalu gagal.
+   */
+  borrowEnabled: boolean;
   priceUsd: UsdPrice | null;
   /**
    * Transaksi Ethereum yang membuktikan `priceUsd` — null bila harga tak
@@ -272,9 +293,23 @@ export interface PositionEntry {
   asset: Address;
   symbol: string;
   decimals: number;
+  /**
+   * Saldo di sisi PEMBERI PINJAMAN (`supplyBalanceOf`).
+   *
+   * Berbunga lewat `liquidityIndex` dan menyediakan likuiditas pasar, tapi
+   * TIDAK menopang pinjaman. Ember yang terpisah dari `collateral` di kontrak,
+   * dengan aturan yang berbeda — dan menggabungkan keduanya jadi satu angka
+   * membuat "tarik semua" maupun "lunasi semua" mustahil dijawab dengan benar.
+   */
   supplied: TokenAmount;
   borrowed: TokenAmount;
-  collateralEnabled: boolean;
+  /**
+   * Saldo di sisi PEMINJAM (`collateralBalanceOf`).
+   *
+   * Menopang pinjaman, tidak berbunga. Menarik ini saat masih punya utang
+   * diperiksa terhadap health factor; menarik `supplied` tidak.
+   */
+  collateral: TokenAmount;
 }
 
 export interface AccountPositions {
@@ -331,8 +366,24 @@ export interface PriceEntry {
    */
   sourceTxHash: Hex;
   updatedAt: UnixSeconds;
-  /** Melewati maxPriceAge (24 jam) → pasar membeku. */
+  /**
+   * Umur ronde ini. Bandingkan dengan `maxAgeSeconds`, JANGAN dengan angka
+   * tetap — anggarannya berbeda per aset.
+   */
   ageSeconds: number;
+  /**
+   * Anggaran kesegaran yang BERLAKU untuk aset ini, dibaca dari kontrak.
+   *
+   * `PriceRegistry` punya `maxPriceAge()` global dan override per aset lewat
+   * `maxPriceAgeOf(asset)`; yang kedua menang bila bukan nol. Di CC3 Testnet
+   * globalnya **10.800 detik (3 jam)** dan satu-satunya override adalah USDC
+   * pada 100.800 detik (28 jam) — satu-satunya feed berheartbeat 24 jam.
+   *
+   * Angka 24 jam yang dulu tertulis di sini SALAH dan berbahaya secara khusus:
+   * ia delapan kali lebih longgar dari kenyataan, jadi peringatan apa pun yang
+   * diturunkan darinya tidak akan pernah menyala sebelum pasar sudah membeku.
+   */
+  maxAgeSeconds: number;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -428,6 +479,17 @@ export interface BackfillJob {
    * jumlah fakta baru: sebagian besar bisa saja sudah ada di registry.
    */
   logsFound: number | null;
+  /**
+   * Kenapa job ini masih `pending` padahal indexer hidup.
+   *
+   * Backfill ditunda ketika pipeline sedang tertekan — misalnya backlog proving
+   * sudah menua melewati ambang kritis. Job-nya tetap `pending` dan dicoba lagi
+   * tiap beberapa menit, jadi tanpa field ini "menunggu antrean" dan "ditahan
+   * karena pipeline penuh" terlihat persis sama dari luar: sama-sama diam.
+   *
+   * `null` berarti tidak sedang ditunda.
+   */
+  postponedReason: string | null;
   createdAt: UnixSeconds;
   updatedAt: UnixSeconds;
 }

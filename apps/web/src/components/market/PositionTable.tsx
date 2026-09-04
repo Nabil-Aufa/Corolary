@@ -1,10 +1,14 @@
 import { Card } from '@/components/ui/card';
-import { formatTokenAmount } from '@/lib/format';
 import type { PositionEntry } from '@/types';
+import { formatTokenAmount } from '@/lib/format';
 
 const COLS = 'grid-cols-[1fr_8rem_8rem_7rem]';
 
-export function PositionTable({ positions }: { positions: PositionEntry[] }) {
+export function PositionTable({
+  positions,
+}: {
+  positions: PositionEntry[];
+}) {
   return (
     <Card>
       <div
@@ -28,8 +32,8 @@ export function PositionTable({ positions }: { positions: PositionEntry[] }) {
           <span className="num text-right text-small text-ink-900">
             {formatTokenAmount(p.borrowed, p.decimals)}
           </span>
-          <span className="text-right text-small text-ink-500">
-            {p.collateralEnabled ? 'Enabled' : '—'}
+          <span className="num text-right text-small text-ink-900">
+            {formatTokenAmount(p.collateral, p.decimals)}
           </span>
         </div>
       ))}

@@ -93,13 +93,32 @@ status.get('/indexer/status', async (c) => {
   const q = Object.fromEntries(queueRows.map((r) => [r.status, Number(r.n)]));
 
   const dayAgo = Math.floor(Date.now() / 1000) - 86_400;
-  const recent = await sql<{ status: string; n: string }[]>`
-    SELECT status, count(*) AS n FROM observed_events
-    WHERE chain_key = ${config.ETHEREUM_CHAIN_KEY}
-      AND status IN ('recorded','skipped') AND observed_at >= ${dayAgo}
-    GROUP BY status
+
+  // `facts.recorded_at`, BUKAN `observed_events.observed_at`.
+  //
+  // `observed_at` adalah stempel blok ETHEREUM SUMBER, jadi menyaringnya ke 24
+  // jam terakhir menjawab "berapa banyak aktivitas Ethereum sehari terakhir yang
+  // sudah tercatat" — bukan "berapa banyak yang kita catat sehari terakhir".
+  // Keduanya sama hanya ketika pipeline sedang mengejar head. Saat mengejar
+  // backlog, hitungannya jatuh ke NOL sementara submitter mencatat puluhan
+  // fakta per menit: terukur 2026-09-04, `recorded24h` 0 sementara antrean
+  // `recorded` naik dari 11.469 ke 11.643 dalam dua menit. Label "Recorded 24h"
+  // di UI karena itu membaca sebagai throughput dan menampilkan kesegaran.
+  // Sekeluarga dengan aturan di CLAUDE.md: `observedAt` bukan waktu pencatatan.
+  const recordedRows = await sql<{ n: string }[]>`
+    SELECT count(*)::text AS n FROM facts WHERE recorded_at >= ${dayAgo}
   `;
-  const r24 = Object.fromEntries(recent.map((x) => [x.status, Number(x.n)]));
+  const recorded24h = Number(recordedRows[0]?.n ?? 0);
+
+  // `skipped` tidak punya stempel waktu pencatatan sendiri — satu-satunya yang
+  // ada adalah `created_at`, saat watcher pertama kali melihat log-nya. Itu
+  // sudah cukup untuk metrik operasional ini dan tidak mengklaim lebih.
+  const skippedRows = await sql<{ n: string }[]>`
+    SELECT count(*)::text AS n FROM observed_events
+    WHERE chain_key = ${config.ETHEREUM_CHAIN_KEY}
+      AND status = 'skipped' AND created_at >= to_timestamp(${dayAgo})
+  `;
+  const skipped24h = Number(skippedRows[0]?.n ?? 0);
 
   // Metrik operasional paling penting di seluruh sistem: melewati 86400 detik
   // berarti biaya proof melonjak ~12x. Event backfill dikecualikan — umurnya
@@ -144,9 +163,9 @@ status.get('/indexer/status', async (c) => {
       awaitingAttestation: q['awaiting_attestation'] ?? 0,
       proving: q['proving'] ?? 0,
       submitting: q['submitting'] ?? 0,
-      recorded24h: r24['recorded'] ?? 0,
+      recorded24h,
       failed: q['failed'] ?? 0,
-      skipped24h: r24['skipped'] ?? 0,
+      skipped24h,
     },
     oldestUnprovenAgeSeconds: oldestAt
       ? Math.max(0, Math.floor(Date.now() / 1000) - Number(oldestAt))

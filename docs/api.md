@@ -927,6 +927,7 @@ curl -s https://api.corolary.xyz/v1/market/reserves
       "supplyApyBps": 0,
       "borrowApyBps": 0,
       "utilizationBps": 0,
+      "borrowEnabled": true,
       "priceUsd": "0.999949",
       "priceSourceTxHash": "0x25466b36fdf34cfe1b767e4a64b7389cd96b32ec80a1d3d105d1560c5525321c"
     },
@@ -939,6 +940,7 @@ curl -s https://api.corolary.xyz/v1/market/reserves
       "supplyApyBps": 0,
       "borrowApyBps": 0,
       "utilizationBps": 0,
+      "borrowEnabled": false,
       "priceUsd": "2511.240000",
       "priceSourceTxHash": "0x7f4c377c94034e24d8c9f49f579581ba8b1087605a6f6f319ba68f29ef18b659"
     }
@@ -946,6 +948,14 @@ curl -s https://api.corolary.xyz/v1/market/reserves
   "meta": { "total": 2 }
 }
 ```
+
+> **`borrowEnabled` bukan sinonim `active`.** Reserve yang tidak aktif menolak
+> segalanya; reserve kolateral-saja menerima setoran tapi menolak `borrow`
+> dengan custom error `BorrowDisabled`. Di CC3 Testnet tWETH adalah yang kedua
+> (`addReserve(tWeth, 1000, false)`), jadi alur yang dimaksudkan adalah
+> **menjaminkan tWETH lalu meminjam tUSDC**. Sebelum field ini ada, klien tidak
+> punya cara mengetahuinya selain mencoba dan gagal — dan tombol "Borrow" pada
+> baris tWETH adalah kontrol yang tidak pernah bisa berhasil.
 
 Contoh di atas adalah respons SUNGGUHAN dari CC3 Testnet (2026-08-25). Reserve-nya
 adalah token testnet karena `EfficiencyMarket` berjalan di CC3, di mana USDC/WETH
@@ -1018,17 +1028,17 @@ Contoh nyata dari CC3 Testnet: dompet deployer, punya kolateral tapi nol utang.
                 "asset": "0x66f5F2C577ec38CE5bb7BCb7054a531a72004d19",
                 "symbol": "tUSDC",
                 "decimals": 6,
-                "supplied": "9999500274",
+                "supplied": "9999999712",
                 "borrowed": "0",
-                "collateralEnabled": false
+                "collateral": "0"
             },
             {
                 "asset": "0x886E3d92314c037206bB789Ee3A9016EE67b661E",
                 "symbol": "tWETH",
                 "decimals": 18,
-                "supplied": "5000000000000000000",
+                "supplied": "0",
                 "borrowed": "0",
-                "collateralEnabled": true
+                "collateral": "5000000000000000000"
             }
         ],
         "updatedAt": 1787679291,
@@ -1036,6 +1046,21 @@ Contoh nyata dari CC3 Testnet: dompet deployer, punya kolateral tapi nol utang.
     }
 }
 ```
+
+> **`supplied` dan `collateral` adalah dua ember yang berbeda, bukan rincian
+> dari satu angka.** `supplied` (`supplyBalanceOf`) berbunga lewat
+> `liquidityIndex`, menyediakan likuiditas pasar, dan bisa ditarik bebas.
+> `collateral` (`collateralBalanceOf`) menopang pinjaman, tidak berbunga, dan
+> penarikannya diperiksa terhadap health factor bila alamat itu punya utang.
+> Respons di atas memperlihatkan keduanya murni: seluruh tUSDC ada di sisi
+> pemberi pinjaman, seluruh tWETH ada di sisi peminjam.
+>
+> Sampai 2026-09-04 API menjumlahkan keduanya jadi satu `supplied` dan
+> menyertakan boolean `collateralEnabled`. Bentuk itu membuat "tarik semua" dan
+> "lunasi semua" mustahil dijawab dengan benar dari sisi klien — pemanggil tidak
+> bisa tahu berapa yang ada di ember mana. Kekeliruan yang sama pernah terjadi
+> di luar API: melunasi dengan `min(utang, saldo)` gagal karena sebagian saldo
+> ternyata terkunci sebagai supply.
 
 ### Contoh Respons — Dompet Berskor Tinggi Tanpa Posisi
 
@@ -1128,7 +1153,8 @@ curl -s https://api.corolary.xyz/v1/prices
       "sourceBlock": 25830582,
       "sourceTxHash": "0x25466b36fdf34cfe1b767e4a64b7389cd96b32ec80a1d3d105d1560c5525321c",
       "updatedAt": 1787641259,
-      "ageSeconds": 2204
+      "ageSeconds": 2204,
+      "maxAgeSeconds": 100800
     },
     {
       "asset": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
@@ -1141,7 +1167,8 @@ curl -s https://api.corolary.xyz/v1/prices
       "sourceBlock": 25830441,
       "sourceTxHash": "0x57863a8ec71d04d0fe4928dbd9e3bfa97878e632aab9351b472f4f8909910806",
       "updatedAt": 1787639555,
-      "ageSeconds": 3908
+      "ageSeconds": 3908,
+      "maxAgeSeconds": 10800
     },
     {
       "asset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
@@ -1154,7 +1181,8 @@ curl -s https://api.corolary.xyz/v1/prices
       "sourceBlock": 25830607,
       "sourceTxHash": "0x7f4c377c94034e24d8c9f49f579581ba8b1087605a6f6f319ba68f29ef18b659",
       "updatedAt": 1787641559,
-      "ageSeconds": 1904
+      "ageSeconds": 1904,
+      "maxAgeSeconds": 10800
     }
   ],
   "meta": { "total": 3 }
@@ -1168,6 +1196,22 @@ bukan angka ilustrasi. `roundId` di sini kecil karena ia nomor ronde milik
 
 `roundId` adalah `uint80` di Chainlink — juga selalu string. `ageSeconds` dihitung
 server-side (`now - updatedAt`) saat respons dibentuk, bukan disimpan di DB.
+
+**`maxAgeSeconds` dibaca dari kontrak, bukan dari konstanta di API.**
+`PriceRegistry` punya `maxPriceAge()` global dan override per aset lewat
+`maxPriceAgeOf(asset)`; yang kedua menang bila bukan nol, dan nol berarti
+"pakai yang global" — bukan "tanpa anggaran". Terukur di registry yang hidup
+2026-09-04: global **10.800 detik (3 jam)**, dan satu-satunya override adalah
+USDC pada **100.800 detik (28 jam)** karena hanya feed itu yang berheartbeat
+24 jam. Perhatikan contoh di atas: WBTC dan WETH memakai anggaran 3 jam
+sementara USDC memakai 28 jam.
+
+Bandingkan `ageSeconds` dengan `maxAgeSeconds`, **jangan** dengan angka tetap.
+Versi sebelumnya mendokumentasikan ambang "24 jam" yang delapan kali lebih
+longgar dari kenyataan untuk WETH dan WBTC — peringatan apa pun yang diturunkan
+darinya tidak akan pernah menyala sebelum pasar sudah membeku. Melewati
+anggaran membuat `tryToUsd1e18` menjawab `false`, dan pasar membeku untuk
+operasi yang menambah risiko **tanpa satu pun error**.
 
 ### Respons Error
 
@@ -1509,11 +1553,24 @@ curl http://localhost:8080/v1/backfill/b38e5847-3430-40df-80ad-2ec0249d10f8
     "lastError": null,
     "failedRanges": 0,
     "logsFound": 0,
+    "postponedReason": null,
     "createdAt": 1787714719,
     "updatedAt": 1787714957
   }
 }
 ```
+
+> **`postponedReason` menjelaskan `pending` yang tidak bergerak.** Indexer
+> menolak memulai backfill ketika pipeline sedang tertekan — misalnya backlog
+> proving sudah menua melewati ambang kritis 72.000 detik — dan mendorong
+> `run_after` maju lima menit tanpa mengubah status. Tanpa field ini, job yang
+> ditahan berjam-jam tak terbedakan dari job yang baru saja diantre: keduanya
+> `pending`, `attempts` 0, `lastError` null. Terukur 2026-09-04 dengan backlog
+> 845.191 detik sesudah indexer mati sepuluh hari.
+>
+> Hanya diisi selama status masih `pending`. Setelah job benar-benar berjalan,
+> alasan penundaan terakhir cuma sisa sejarah dan akan terbaca seolah ia masih
+> ditahan.
 
 ### Status
 
@@ -1598,6 +1655,7 @@ curl -s "https://api.corolary.xyz/v1/backfill?subject=0x1234567890AbcdEF12345678
     "lastError": null,
     "failedRanges": null,
     "logsFound": null,
+    "postponedReason": null,
     "createdAt": 1787714719,
     "updatedAt": 1787714957
   }

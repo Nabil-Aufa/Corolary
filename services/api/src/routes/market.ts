@@ -153,6 +153,7 @@ marketRoutes.get('/market/reserves', async (c) => {
       ),
       borrowApyBps: borrowBps,
       utilizationBps: Number(utilization),
+      borrowEnabled: r.data.borrowEnabled,
       // Enam desimal, bukan dua: ini HARGA per unit, bukan nilai total. Dua
       // desimal membuat USDC $0,99994916 terbaca `"0.99"` — tak terbedakan
       // dari $0,99, selisih 1% pada aset yang seluruh gunanya menempel di $1.
@@ -182,9 +183,12 @@ marketRoutes.get('/market/positions/:address', async (c) => {
       asset: r.asset as Address,
       symbol: m?.symbol ?? '',
       decimals: m?.decimals ?? 18,
-      supplied: (supplied + collateral).toString(),
+      // Dilaporkan TERPISAH, bukan dijumlahkan. Keduanya ember berbeda di
+      // kontrak: `supplied` berbunga dan bisa ditarik bebas, `collateral`
+      // menopang utang dan penarikannya diperiksa terhadap health factor.
+      supplied: supplied.toString(),
       borrowed: borrowed.toString(),
-      collateralEnabled: collateral > 0n,
+      collateral: collateral.toString(),
     });
   }
 

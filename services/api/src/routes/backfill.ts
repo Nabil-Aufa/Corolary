@@ -156,7 +156,13 @@ backfill.get('/backfill', async (c) => {
     {
       id: string;
       status: string;
-      payload: { subject: string; months: number; failedRanges?: number; logsFound?: number };
+      payload: {
+        subject: string;
+        months: number;
+        failedRanges?: number;
+        logsFound?: number;
+        postponedReason?: string;
+      };
       attempts: number;
       last_error: string | null;
       created_at: Date;
@@ -185,6 +191,10 @@ backfill.get('/backfill', async (c) => {
     attempts: row.attempts,
     lastError: row.last_error,
     failedRanges: row.payload.failedRanges ?? null,
+    // Hanya berarti selama job-nya masih menunggu. Setelah ia benar-benar
+    // jalan, alasan penundaan terakhir cuma sisa sejarah dan akan terbaca
+    // seolah ia masih ditahan.
+    postponedReason: row.status === 'pending' ? (row.payload.postponedReason ?? null) : null,
     logsFound: row.payload.logsFound ?? null,
     createdAt: Math.floor(new Date(row.created_at).getTime() / 1000),
     updatedAt: Math.floor(new Date(row.updated_at).getTime() / 1000),
@@ -200,7 +210,13 @@ backfill.get('/backfill/:jobId', async (c) => {
     {
       id: string;
       status: string;
-      payload: { subject: string; months: number; failedRanges?: number; logsFound?: number };
+      payload: {
+        subject: string;
+        months: number;
+        failedRanges?: number;
+        logsFound?: number;
+        postponedReason?: string;
+      };
       attempts: number;
       last_error: string | null;
       created_at: Date;
@@ -219,6 +235,10 @@ backfill.get('/backfill/:jobId', async (c) => {
     attempts: row.attempts,
     lastError: row.last_error,
     failedRanges: row.payload.failedRanges ?? null,
+    // Hanya berarti selama job-nya masih menunggu. Setelah ia benar-benar
+    // jalan, alasan penundaan terakhir cuma sisa sejarah dan akan terbaca
+    // seolah ia masih ditahan.
+    postponedReason: row.status === 'pending' ? (row.payload.postponedReason ?? null) : null,
     logsFound: row.payload.logsFound ?? null,
     createdAt: Math.floor(new Date(row.created_at).getTime() / 1000),
     updatedAt: Math.floor(new Date(row.updated_at).getTime() / 1000),

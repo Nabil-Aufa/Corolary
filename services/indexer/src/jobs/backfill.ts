@@ -160,8 +160,15 @@ async function checkHealth(): Promise<HealthCheck> {
  * `runBackfillJobs` tidak memilihnya lagi sampai jendela penundaan lewat.
  */
 async function postponeNextJob(reason: string): Promise<void> {
+  // Alasannya ikut ditulis ke payload, bukan cuma ke log. Job yang ditunda
+  // tetap `pending`, jadi dari luar ia tak terbedakan dari job yang baru saja
+  // diantre — dan UI akan menampilkan "Queued" selama berjam-jam tanpa satu
+  // pun petunjuk kenapa. Penundaan yang tidak punya gejala selain waktu adalah
+  // persis bentuk kemacetan yang paling lama tidak ketahuan di proyek ini.
   const rows = await sql<{ id: string }[]>`
-    UPDATE jobs SET run_after = now() + make_interval(mins => ${POSTPONE_MINUTES}), updated_at = now()
+    UPDATE jobs SET run_after = now() + make_interval(mins => ${POSTPONE_MINUTES}),
+      payload = payload || ${sql.json({ postponedReason: reason })}::jsonb,
+      updated_at = now()
     WHERE id = (
       SELECT id FROM jobs
       WHERE kind = 'backfill' AND status = 'pending'
