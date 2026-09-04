@@ -20,6 +20,37 @@ const log = stageLogger('submitter');
  * kontrak dengan pasti.
  */
 
+/**
+ * Alamat token yang sudah pasti ada di tabel `assets`.
+ *
+ * `ensureAsset` dipanggil sekali per fakta, dan saat membangun ulang mirror itu
+ * puluhan ribu SELECT untuk himpunan token yang isinya cuma puluhan.
+ */
+const knownAssets = new Set<string>();
+
+/**
+ * Hash transaksi Ethereum per blok, dibatasi jumlahnya.
+ *
+ * Dipakai saat `observed_events` tidak lagi punya barisnya — lihat
+ * `txHashFor`. Satu blok mainnet memuat ~200 hash, jadi cache-nya dibatasi
+ * supaya rebuild panjang tidak menumbuhkan memori tanpa batas.
+ */
+const BLOCK_TX_CACHE_MAX = 256;
+const blockTxCache = new Map<number, readonly string[]>();
+
+async function blockTxHashes(height: number): Promise<readonly string[]> {
+  const hit = blockTxCache.get(height);
+  if (hit) return hit;
+  const block = await ethCall('getBlockTxHashes', (p) => p.getBlock(height));
+  const hashes = block ? [...block.transactions] : [];
+  if (blockTxCache.size >= BLOCK_TX_CACHE_MAX) {
+    const oldest = blockTxCache.keys().next().value;
+    if (oldest !== undefined) blockTxCache.delete(oldest);
+  }
+  blockTxCache.set(height, hashes);
+  return hashes;
+}
+
 let registryIface: ethers.Interface | null = null;
 let graphIface: ethers.Interface | null = null;
 let registry: ethers.Contract | null = null;
@@ -61,15 +92,37 @@ interface OnChainFact {
   recordedAt: bigint;
 }
 
+export interface PersistOptions {
+  /**
+   * Kalau diisi, skor TIDAK disegarkan di sini — subjeknya cuma dikumpulkan.
+   *
+   * Dipakai `mirror-rebuild`. Menyegarkan skor per-receipt berarti subjek yang
+   * sama dihitung ulang puluhan kali (empat panggilan RPC tiap kali), dan
+   * hasilnya toh ditimpa oleh perhitungan berikutnya. Menundanya ke akhir juga
+   * LEBIH BENAR: `scoreOf` selalu menjawab keadaan TERKINI, jadi menyimpannya
+   * dengan `at_block` sebuah receipt lama menulis skor hari ini ke dalam
+   * riwayat dengan stempel blok masa lalu.
+   */
+  collectSubjects?: Set<string>;
+}
+
+/**
+ * @returns jumlah fakta yang benar-benar DITULIS, bukan jumlah log FactRecorded
+ *          yang terbaca. Keduanya sempat sama, dan itu menyembunyikan fakta
+ *          yang dilewati: penghitungnya terus naik sementara tidak ada baris
+ *          yang masuk.
+ */
 export async function persistReceipt(
   receipt: ethers.TransactionReceipt,
   batchId: string | null,
+  opts: PersistOptions = {},
 ): Promise<number> {
   const { registryIface: iface, registry: reg } = ifaces();
+  const registryAddress = (await reg.getAddress()).toLowerCase();
   const factIds: string[] = [];
 
   for (const l of receipt.logs) {
-    if (l.address.toLowerCase() !== (await reg.getAddress()).toLowerCase()) continue;
+    if (l.address.toLowerCase() !== registryAddress) continue;
     let parsed: ethers.LogDescription | null;
     try {
       parsed = iface.parseLog({ topics: [...l.topics], data: l.data });
@@ -81,26 +134,26 @@ export async function persistReceipt(
 
   if (factIds.length === 0) return 0;
 
-  const subjects = new Set<string>();
+  // Berurutan, ini satu round-trip per fakta. ethers v6 menggabungkan panggilan
+  // yang berjalan bersamaan jadi satu JSON-RPC batch, dan node Creditcoin
+  // melayani batch sampai 100 (diukur) — jadi satu receipt berisi 10 fakta
+  // selesai dalam satu perjalanan, bukan sepuluh.
+  const raws = (await Promise.all(
+    factIds.map((id) => reg.getFunction('getFact')(id)),
+  )) as unknown as OnChainFact[];
 
-  for (const factId of factIds) {
-    const raw = (await reg.getFunction('getFact')(factId)) as unknown as OnChainFact;
+  const subjects = opts.collectSubjects ?? new Set<string>();
+  let written = 0;
+
+  for (let i = 0; i < factIds.length; i += 1) {
+    const factId = factIds[i] as string;
+    const raw = raws[i] as OnChainFact;
     const blockHeight = Number(raw.blockHeight);
     const txIndex = Number(raw.txIndex);
 
-    // txHash tidak ada di Fact on-chain — receipt Ethereum tidak memuatnya, dan
-    // kontrak memang tidak membutuhkannya. Diambil dari baris yang sudah kita
-    // punya untuk transaksi itu.
-    const rows = await sql<{ tx_hash: string; log_index: number }[]>`
-      SELECT tx_hash, log_index FROM observed_events
-      WHERE chain_key = ${ETH_CHAIN_KEY}
-        AND block_height = ${blockHeight}
-        AND tx_index = ${txIndex}
-      ORDER BY log_index ASC
-    `;
-    const txHash = rows[0]?.tx_hash;
-    if (!txHash) {
-      log.warn({ factId, blockHeight, txIndex }, 'fakta tanpa observed_event pasangannya');
+    const located = await txHashFor(blockHeight, txIndex, Number(raw.txLogIndex));
+    if (!located) {
+      log.warn({ factId, blockHeight, txIndex }, 'hash transaksi sumber tidak bisa dipulihkan');
       continue;
     }
 
@@ -112,15 +165,10 @@ export async function persistReceipt(
         fact_id: factId,
         chain_key: Number(raw.chainKey),
         block_height: blockHeight,
-        tx_hash: txHash,
+        tx_hash: located.txHash,
         tx_index: txIndex,
         tx_log_index: Number(raw.txLogIndex),
-        // logIndex block-wide hanya untuk tautan Etherscan. Dipetakan lewat
-        // urutan: log ke-n yang kita pantau di transaksi itu bersesuaian dengan
-        // fakta ke-n, karena FactRegistry memanen tepat himpunan log yang sama
-        // (emitter terdaftar) yang watcher pantau. Kalau tidak ketemu, NULL —
-        // tautan tingkat transaksi tetap benar tanpa ini.
-        log_index: rows[Number(raw.txLogIndex)]?.log_index ?? rows[0]?.log_index ?? null,
+        log_index: located.logIndex,
         kind: Number(raw.kind),
         subject: ethers.getAddress(raw.subject),
         protocol: ethers.getAddress(raw.protocol),
@@ -134,10 +182,53 @@ export async function persistReceipt(
       })}
       ON CONFLICT (fact_id) DO NOTHING
     `;
+    written += 1;
   }
 
-  await refreshScores([...subjects], receipt.blockNumber);
-  return factIds.length;
+  if (!opts.collectSubjects) await refreshScores([...subjects], receipt.blockNumber);
+  return written;
+}
+
+/**
+ * Hash transaksi Ethereum untuk sebuah fakta, plus `logIndex` kalau diketahui.
+ *
+ * `Fact` on-chain tidak memuat txHash — receipt Ethereum memang tidak
+ * membawanya, dan kontrak tidak membutuhkannya. Sumber pertamanya
+ * `observed_events`, yang gratis karena sudah ada di database kita.
+ *
+ * Tapi `observed_events` TIDAK boleh jadi satu-satunya sumber. Ia termasuk
+ * tabel yang hilang saat volume Postgres produksi di-wipe pada 2026-09-01, dan
+ * mirror-rebuild — satu-satunya jalan pulih dari kehilangan database — jadi
+ * ikut lumpuh: setiap fakta lama dilewati karena baris pasangannya tidak ada
+ * lagi, tanpa satu pun kegagalan yang terlihat. Karena itu ada jalur kedua:
+ * `(blockHeight, txIndex)` sudah cukup untuk menanyakan hash-nya langsung ke
+ * Ethereum. `logIndex` block-wide tidak bisa dipulihkan lewat jalur itu, dan
+ * memang tidak perlu — ia cuma memperhalus tautan Etherscan, dan tautan
+ * tingkat transaksi tetap benar tanpanya.
+ */
+async function txHashFor(
+  blockHeight: number,
+  txIndex: number,
+  txLogIndex: number,
+): Promise<{ txHash: string; logIndex: number | null } | null> {
+  const rows = await sql<{ tx_hash: string; log_index: number }[]>`
+    SELECT tx_hash, log_index FROM observed_events
+    WHERE chain_key = ${ETH_CHAIN_KEY}
+      AND block_height = ${blockHeight}
+      AND tx_index = ${txIndex}
+    ORDER BY log_index ASC
+  `;
+  const known = rows[0]?.tx_hash;
+  if (known) {
+    // Log ke-n yang kita pantau di transaksi itu bersesuaian dengan fakta ke-n,
+    // karena FactRegistry memanen tepat himpunan log yang sama (emitter
+    // terdaftar) yang watcher pantau.
+    return { txHash: known, logIndex: rows[txLogIndex]?.log_index ?? rows[0]?.log_index ?? null };
+  }
+
+  const hashes = await blockTxHashes(blockHeight);
+  const hash = hashes[txIndex];
+  return hash ? { txHash: hash, logIndex: null } : null;
 }
 
 /** Urutan komponen mengikuti CreditGraph.componentsOf (dan ScoreComponentKey). */
@@ -168,20 +259,25 @@ const COMPONENT_MAX = [300, 200, 200, 0, 100, 200] as const;
  * Menyalin rumus skoring ke TypeScript berarti dua implementasi yang harus
  * tetap sepakat selamanya, dan yang di UI-lah yang akan menyimpang diam-diam.
  */
-async function refreshScores(subjects: string[], atBlock: number): Promise<void> {
+export async function refreshScores(subjects: string[], atBlock: number): Promise<void> {
   if (subjects.length === 0) return;
   const g = await graphContract();
   if (!g) return;
 
   for (const subject of subjects) {
-    const [score, tier] = (await g.getFunction('scoreOf')(subject)) as [bigint, bigint];
-    const bps = (await g.getFunction('collateralRatioBpsOf')(subject)) as bigint;
-    const points = (await g.getFunction('componentsOf')(subject)) as bigint[];
-    const snap = (await g.getFunction('snapshotOf')(subject)) as unknown as {
-      firstFactAt: bigint;
-      lastFactAt: bigint;
-      factCount: bigint;
-    };
+    // Empat panggilan yang tidak saling bergantung. Berurutan mereka empat
+    // round-trip; bersamaan, ethers menggabungkannya jadi satu batch.
+    const [[score, tier], bps, points, snap] = (await Promise.all([
+      g.getFunction('scoreOf')(subject),
+      g.getFunction('collateralRatioBpsOf')(subject),
+      g.getFunction('componentsOf')(subject),
+      g.getFunction('snapshotOf')(subject),
+    ])) as [
+      [bigint, bigint],
+      bigint,
+      bigint[],
+      { firstFactAt: bigint; lastFactAt: bigint; factCount: bigint },
+    ];
 
     const components = COMPONENT_KEYS.map((key, i) => ({
       key,
@@ -231,8 +327,12 @@ const ERC20_ABI = [
  */
 export async function ensureAsset(asset: string): Promise<void> {
   const address = ethers.getAddress(asset);
+  if (knownAssets.has(address)) return;
   const existing = await sql`SELECT 1 FROM assets WHERE address = ${address}`;
-  if (existing.length > 0) return;
+  if (existing.length > 0) {
+    knownAssets.add(address);
+    return;
+  }
 
   let symbol = '';
   let decimals = 18;
@@ -256,4 +356,5 @@ export async function ensureAsset(asset: string): Promise<void> {
     INSERT INTO assets ${sql({ address, symbol, decimals })}
     ON CONFLICT (address) DO NOTHING
   `;
+  knownAssets.add(address);
 }
