@@ -29,11 +29,16 @@
   --color-verified: var(--color-verified);
   --color-verified-soft: var(--color-verified-soft);
 
+  --color-positive: var(--color-positive);
+  --color-positive-soft: var(--color-positive-soft);
+
   --color-warning: var(--color-warning);
   --color-warning-soft: var(--color-warning-soft);
 
   --color-danger: var(--color-danger);
   --color-danger-soft: var(--color-danger-soft);
+
+  --color-on-solid: var(--color-on-solid);
 
   --font-sans: var(--font-sans-family), system-ui, sans-serif;
 

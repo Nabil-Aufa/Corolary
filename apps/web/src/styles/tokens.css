@@ -31,6 +31,17 @@
   --color-verified: #0e8f7d;
   --color-verified-soft: #e3f5f1;
 
+  /* kewajiban lunas / arah membaik.
+   *
+   * SENGAJA hijau-kekuningan (hue 86), bukan hijau-daun (hue 137). Percobaan
+   * pertama memakai hijau daun dan lencana "REPAID" berdiri persis di sebelah
+   * "PROVEN" di halaman detail fakta — di ukuran micro keduanya terbaca
+   * sebagai satu warna. Teal `verified` menyandang satu-satunya klaim yang
+   * dijual produk ini; warna yang mengaburkannya melemahkan klaim itu.
+   * Hue 86 berjarak 86° dari teal dan 60° dari amber, dua tetangga terdekatnya. */
+  --color-positive: #3f6212;
+  --color-positive-soft: #edf7d9;
+
   /* peringatan */
   --color-warning: #b45309;
   --color-warning-soft: #fdf0dc;
@@ -38,6 +49,12 @@
   /* bahaya / likuidasi / tier turun */
   --color-danger: #c0233d;
   --color-danger-soft: #fce8ec;
+
+  /* Teks di atas lencana BERISI. Di terang, warna solidnya gelap sehingga
+     teks harus putih; di gelap, warna solidnya justru terang sehingga teks
+     harus mendekati hitam. Satu token yang berbalik per tema membuat kelima
+     lencana kind memakai aturan yang sama tanpa pengecualian. */
+  --color-on-solid: #ffffff;
 
   --color-focus-ring: #1d4fd8;
 
@@ -74,11 +91,16 @@
   --color-verified: #35c9ae;
   --color-verified-soft: #0e2a26;
 
+  --color-positive: #9fd93a;
+  --color-positive-soft: #1c2810;
+
   --color-warning: #f2b84b;
   --color-warning-soft: #3a2a12;
 
   --color-danger: #f2607a;
   --color-danger-soft: #3a1620;
+
+  --color-on-solid: #0a0d13;
 
   --color-focus-ring: #5b85ff;
 }
