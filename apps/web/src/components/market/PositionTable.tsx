@@ -1,13 +1,17 @@
 import { Card } from '@/components/ui/card';
-import type { PositionEntry } from '@/types';
 import { formatTokenAmount } from '@/lib/format';
+import type { Address, PositionEntry } from '@/types';
+import type { ActionGroup } from './MarketActionDialog';
+import { ActionMenu } from './ActionMenu';
 
-const COLS = 'grid-cols-[1fr_8rem_8rem_7rem]';
+const COLS = 'grid-cols-[1fr_7rem_7rem_7rem_4rem]';
 
 export function PositionTable({
   positions,
+  onAct,
 }: {
   positions: PositionEntry[];
+  onAct?: (asset: Address, group: ActionGroup) => void;
 }) {
   return (
     <Card>
@@ -18,6 +22,7 @@ export function PositionTable({
         <span className="text-right">Supplied</span>
         <span className="text-right">Borrowed</span>
         <span className="text-right">Collateral</span>
+        <span className="text-right">{onAct === undefined ? '' : 'Actions'}</span>
       </div>
 
       {positions.map((p) => (
@@ -35,8 +40,35 @@ export function PositionTable({
           <span className="num text-right text-small text-ink-900">
             {formatTokenAmount(p.collateral, p.decimals)}
           </span>
+
+          {/* Hanya ember yang benar-benar berisi yang dapat tombol. Tombol
+              "Repay" pada baris tanpa utang adalah kontrol yang tidak bisa
+              berbuat apa-apa — persis yang dilarang aturan nol-mock. */}
+          {onAct !== undefined && (
+            <span className="flex justify-end">
+              <ActionMenu
+                groups={groupsFor(p)}
+                onSelect={(group) => onAct(p.asset, group)}
+              />
+            </span>
+          )}
         </div>
       ))}
     </Card>
   );
+}
+
+/**
+ * Hanya ember yang benar-benar berisi yang muncul di menu.
+ *
+ * "Repay" pada baris tanpa utang adalah kontrol yang tidak bisa berbuat
+ * apa-apa — persis yang dilarang aturan nol-mock. Baris ini hanya ada karena
+ * salah satu dari ketiganya tidak nol, jadi menunya tidak akan pernah kosong.
+ */
+function groupsFor(p: PositionEntry): ActionGroup[] {
+  const groups: ActionGroup[] = [];
+  if (p.supplied !== '0') groups.push('lend');
+  if (p.collateral !== '0') groups.push('collateral');
+  if (p.borrowed !== '0') groups.push('debt');
+  return groups;
 }

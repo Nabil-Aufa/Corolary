@@ -24,6 +24,9 @@ const button = cva(
         md: 'h-10 px-4 text-body',
         lg: 'h-12 px-6 text-body',
         icon: 'h-10 w-10',
+        // Sepadan tinggi dengan `sm`, jadi tombol ikon dan tombol berteks bisa
+        // berdiri berdampingan di baris tabel yang sama tanpa saling menggeser.
+        iconSm: 'h-8 w-8',
       },
     },
     defaultVariants: { variant: 'primary', size: 'md' },

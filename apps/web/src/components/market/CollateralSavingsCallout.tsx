@@ -17,9 +17,11 @@ const EXAMPLE_BORROW_USD = 10_000n;
 export function CollateralSavingsCallout({
   collateralRatioBps,
   capitalSavedUsd,
+  className,
 }: {
   collateralRatioBps: number;
   capitalSavedUsd?: string;
+  className?: string;
 }) {
   const yours = (EXAMPLE_BORROW_USD * BigInt(collateralRatioBps)) / 10_000n;
   const baseline = (EXAMPLE_BORROW_USD * BigInt(BASELINE_COLLATERAL_RATIO_BPS)) / 10_000n;
@@ -27,7 +29,7 @@ export function CollateralSavingsCallout({
   const hasRealSavings = capitalSavedUsd !== undefined && capitalSavedUsd !== '0.00';
 
   return (
-    <Card>
+    <Card className={className}>
       <CardBody>
         <p className="text-micro uppercase tracking-wide text-ink-400">Collateral efficiency</p>
 
