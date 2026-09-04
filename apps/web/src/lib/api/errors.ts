@@ -37,7 +37,7 @@ export function isRetryable(error: unknown): boolean {
  *  yang punya padanan manusiawi — pesan API ditulis untuk developer. */
 export function humanMessage(error: unknown): string {
   if (error instanceof NetworkError) {
-    return "Can't reach the Corolary API. It may be starting up — try again in a moment.";
+    return "Can't reach the Corolary API. It may be starting up, so try again in a moment.";
   }
   if (error instanceof ApiError) {
     switch (error.code) {

@@ -14,7 +14,7 @@ import { formatBps, formatCount, formatDuration } from '@/lib/format';
 import type { Tier } from '@/types';
 
 const STEPS = [
-  'A borrower repays a loan on Aave, Morpho, Compound, or Spark — on Ethereum mainnet.',
+  'A borrower repays a loan on Ethereum mainnet: Aave, Morpho, Compound, or Spark.',
   'Attestcoin attestors reach consensus on the block containing that transaction.',
   'A proof is built inside the cheap window, under 24 hours, batched ten at a time.',
   'FactRegistry verifies it on Creditcoin and stores the fact permanently.',
@@ -39,8 +39,8 @@ export default function HomePage() {
           Reputation that follows from proof.
         </h1>
         <p className="mt-5 max-w-2xl text-body text-ink-500">
-          Lending history from Aave, Morpho, Compound, and Spark on Ethereum mainnet — proven
-          cryptographically through Attestcoin, and used to cut required collateral from 150% to
+          Lending history from Aave, Morpho, Compound, and Spark on Ethereum mainnet, proven
+          cryptographically through Attestcoin and used to cut required collateral from 150% to
           110%.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
@@ -58,7 +58,7 @@ export default function HomePage() {
       </section>
 
       {/* Setiap angka di bawah datang dari API. Kalau salah satu gagal diambil,
-          yang muncul adalah `—`, bukan angka contoh. */}
+          yang muncul adalah `–`, bukan angka contoh. */}
       <section className="flex flex-wrap gap-3 border-y border-border py-6">
         <StatPill
           label="Facts recorded 24h"
@@ -123,7 +123,7 @@ export default function HomePage() {
           Tiered efficiency, not unsecured lending
         </h2>
         <p className="mt-3 max-w-2xl text-body text-ink-500">
-          Every loan stays over-collateralized. A proven borrower simply locks far less capital —
+          Every loan stays over-collateralized. A proven borrower simply locks far less capital,
           which is why the protocol stays solvent without identity or legal recourse.
         </p>
 

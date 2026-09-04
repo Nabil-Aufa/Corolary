@@ -53,7 +53,7 @@ export function WalletButton() {
                 <p className="font-medium text-ink-900">Wrong network</p>
                 <p className="mt-1">
                   Your wallet is connected to a different chain. Reading proofs and scores still
-                  works — supplying, borrowing, and repaying do not.
+                  works. Supplying, borrowing, and repaying do not.
                 </p>
                 <p className="mt-2 text-ink-500">
                   Corolary runs on {creditcoinTestnet.name}{' '}

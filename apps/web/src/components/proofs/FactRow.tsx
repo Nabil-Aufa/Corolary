@@ -27,7 +27,7 @@ export function FactRow({ fact }: { fact: Fact }) {
       <span className="num truncate text-small text-ink-500">{shortenAddress(fact.subject)}</span>
 
       {/* Jumlah token di atas, nilai USD terbukti di bawahnya — pola dua baris
-          dari Morpho. `—` berarti tidak ada harga terbukti saat itu, dan kita
+          dari Morpho. `–` berarti tidak ada harga terbukti saat itu, dan kita
           menyebutnya begitu alih-alih menaksir. */}
       <span className="flex items-center justify-end gap-2.5">
         <span className="text-right">

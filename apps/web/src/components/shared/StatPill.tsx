@@ -24,7 +24,7 @@ export function StatPill({
         // `—` saat data gagal diambil. TIDAK PERNAH angka terakhir yang masih
         // diingat, dan tidak pernah nilai contoh — aturan nol-mock berlaku
         // paling ketat justru di angka ringkasan seperti ini.
-        <span className="num text-body font-semibold text-ink-900">{value ?? '—'}</span>
+        <span className="num text-body font-semibold text-ink-900">{value ?? '–'}</span>
       )}
       <span className="whitespace-nowrap text-small text-ink-500">{label}</span>
     </div>

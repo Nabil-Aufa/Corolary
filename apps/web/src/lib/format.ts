@@ -38,7 +38,7 @@ export function formatTokenAmount(
   try {
     raw = formatUnits(BigInt(amount), decimals);
   } catch {
-    return '—';
+    return '–';
   }
 
   const negative = raw.startsWith('-');
@@ -62,7 +62,7 @@ export function formatTokenAmount(
 }
 
 /** UsdAmount (2 desimal, sudah didesimalkan API) → "$1,199.94". */
-export function formatUsd(amountUsd: UsdAmount | null, fallback = '—'): string {
+export function formatUsd(amountUsd: UsdAmount | null, fallback = '–'): string {
   if (amountUsd === null || amountUsd === undefined) return fallback;
   const [whole = '0', frac = '00'] = amountUsd.split('.');
   const neg = whole.startsWith('-');
@@ -77,7 +77,7 @@ export function formatUsd(amountUsd: UsdAmount | null, fallback = '—'): string
  * membuat USDC $0,99994916 terbaca "$0.99" — tak terbedakan dari $0,99,
  * selisih 1% pada aset yang seluruh gunanya menempel di $1.
  */
-export function formatUsdPrice(price: UsdPrice | null, fallback = '—'): string {
+export function formatUsdPrice(price: UsdPrice | null, fallback = '–'): string {
   if (price === null || price === undefined) return fallback;
   const [whole = '0', frac = ''] = price.split('.');
   const grouped = groupThousands(whole);
@@ -101,7 +101,7 @@ export function formatRatio(bps: number): string {
  * healthFactorBps → "1.83". `null` berarti tidak punya utang, dan itu BUKAN
  * kesehatan tak terhingga yang perlu ditampilkan sebagai angka raksasa.
  */
-export function formatHealthFactor(bps: number | null, fallback = '—'): string {
+export function formatHealthFactor(bps: number | null, fallback = '–'): string {
   if (bps === null) return fallback;
   return (bps / 10_000).toFixed(2);
 }

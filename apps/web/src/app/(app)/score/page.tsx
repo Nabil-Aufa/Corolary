@@ -53,7 +53,7 @@ export default function ScoreEntryPage() {
       <h1 className="text-h1 font-semibold tracking-tight text-ink-900">Look up a proven score</h1>
       <p className="mt-2 text-body text-ink-500">
         Any Ethereum address. Scores are derived only from lending activity that has been
-        cryptographically proven — nothing is estimated.
+        cryptographically proven. Nothing is estimated.
       </p>
 
       <form

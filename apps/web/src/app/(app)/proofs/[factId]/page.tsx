@@ -109,7 +109,7 @@ export default function FactDetailPage() {
                   ['Log index (in tx)', String(data.txLogIndex)],
                   ['Asset', data.asset],
                   ['Protocol', data.protocol],
-                  ['Batch', data.proof.batchId ?? '—'],
+                  ['Batch', data.proof.batchId ?? '–'],
                 ] as const
               ).map(([label, value]) => (
                 <div key={label} className="min-w-0">
