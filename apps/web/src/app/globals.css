@@ -72,6 +72,27 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Preflight Tailwind v4 menyetel `cursor: default` untuk <button>, berbeda
+     dari v3. Akibatnya SETIAP tombol di aplikasi ini — termasuk yang jelas
+     interaktif seperti Connect dan menu filter — tidak menunjukkan tangan saat
+     dilewati kursor, dan itu satu-satunya isyarat "ini bisa diklik" sebelum
+     seseorang benar-benar mengklik. <a> tidak terpengaruh; browser sudah
+     memberinya pointer. Yang disabled sengaja dikecualikan: tangan di atas
+     kontrol mati adalah janji palsu. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  label[for],
+  summary,
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role='button'][aria-disabled='true'],
+  select:disabled {
+    cursor: not-allowed;
+  }
+
   /* docs/frontend.md §9: tidak pernah `outline: none` tanpa pengganti. */
   :focus-visible {
     outline: 2px solid var(--color-focus-ring);
