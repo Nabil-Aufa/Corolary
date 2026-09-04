@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { Route } from 'next';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { FactFilters } from '@/components/proofs/FactFilters';
 import { FACT_COLUMNS, FactRow } from '@/components/proofs/FactRow';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -13,6 +13,7 @@ import { StatPill } from '@/components/shared/StatPill';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ProveDialog } from '@/components/proofs/ProveDialog';
 import { useFacts, useIndexerStatus } from '@/hooks/useApi';
 import {
   filtersToQuery,
@@ -45,6 +46,7 @@ function ProofsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isFullscreen, setFullscreen] = useState(false);
+  const [proveOpen, setProveOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -142,14 +144,25 @@ function ProofsContent() {
           title="Proofs"
           description="Every row is a real Ethereum mainnet transaction, cryptographically proven through Attestcoin and recorded permanently on Creditcoin."
           aside={
-            <StatPill
-              label="Recorded 24h"
-              value={status.data ? String(status.data.queue.recorded24h) : null}
-              isLoading={status.isPending}
-            />
+            <div className="flex items-center gap-3">
+              <StatPill
+                label="Recorded 24h"
+                value={status.data ? String(status.data.queue.recorded24h) : null}
+                isLoading={status.isPending}
+              />
+              {/* Di header, bukan sebagai kartu di dalam halaman: /proofs
+                  sengaja setinggi viewport dan tidak bisa di-scroll, jadi apa
+                  pun yang ditambahkan ke badannya memakan tinggi daftar. */}
+              <Button variant="secondary" onClick={() => setProveOpen(true)}>
+                <Sparkles size={15} strokeWidth={1.75} />
+                Prove a transaction
+              </Button>
+            </div>
           }
         />
       )}
+
+      <ProveDialog open={proveOpen} onClose={() => setProveOpen(false)} />
 
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <FactFilters
@@ -215,7 +228,7 @@ function ProofsContent() {
               )}
               {!hasNextPage && (
                 <p className="py-5 text-center text-small text-ink-400">
-                  End of results — {facts.length} facts
+                  End of results · {facts.length} facts
                 </p>
               )}
             </>
