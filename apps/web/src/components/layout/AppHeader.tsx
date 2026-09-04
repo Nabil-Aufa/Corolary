@@ -4,14 +4,16 @@ import { CorolaryLogo } from '@/components/brand/CorolaryLogo';
 import { NavLink } from './NavLink';
 import { WalletButton } from './WalletButton';
 
-// Skor lebih dulu: itu yang dicari pengunjung. Bukti datang setelah ada klaim
-// yang perlu dibuktikan. Juri digiring ke /proofs lewat CTA di landing, bukan
-// dengan membalik urutan menu.
+// Urutannya mengikuti alur produk, bukan kepentingan halamannya: bukti lebih
+// dulu, lalu pasar yang memakainya, lalu posisi milik sendiri. Score duduk
+// paling kanan, tepat di sebelah tombol wallet, karena ia satu-satunya menu
+// yang menanyakan "alamat siapa" dan karena itu berpasangan dengan dompet yang
+// sedang tersambung.
 const NAV: { href: Route; label: string }[] = [
-  { href: '/score', label: 'Score' },
   { href: '/proofs', label: 'Proofs' },
   { href: '/market', label: 'Market' },
   { href: '/portfolio', label: 'Portfolio' },
+  { href: '/score', label: 'Score' },
 ];
 
 /**
