@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ExternalLink, RotateCw, Wallet } from 'lucide-react';
 import { useAccount, useConnect, useConnectors, type Connector } from 'wagmi';
+import { creditcoinTestnet } from '@corolary/shared/chains';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
@@ -58,8 +59,56 @@ function WalletMark({ connector, size = 28 }: { connector: Connector; size?: num
   );
 }
 
-/** Cincin biru yang berjalan mengelilingi logo wallet selagi menunggu. */
-function ConnectingMark({ connector }: { connector: Connector }) {
+/**
+ * Kenapa koneksinya gagal, dalam kalimat yang bisa ditindaklanjuti.
+ *
+ * Layar ini dulu menulis "The request was rejected or timed out" untuk SETIAP
+ * kegagalan. Itu keliru dua kali: tidak ada timeout di jalur ini — `useConnect`
+ * menunggu selamanya — dan penolakan pengguna bukan satu-satunya sebab. Yang
+ * hilang justru satu-satunya hal yang bisa menolong: pesan error aslinya.
+ */
+function reasonFor(error: Error): string {
+  // Bukan error wagmi maupun viem: `sendMessage` milik `chrome.runtime`, jadi
+  // ini datang dari DALAM ekstensi wallet — content script-nya kehilangan jalur
+  // ke service worker miliknya sendiri. Terjadi saat ekstensi di-update atau
+  // di-reload sementara tab ini tetap terbuka. Providernya masih tersuntik di
+  // `window.ethereum`, jadi wallet tetap TERDETEKSI dan baru gagal ketika
+  // benar-benar dipanggil — yang membuatnya terbaca seperti bug aplikasi.
+  if (
+    error.message.includes('sendMessage') ||
+    error.message.includes('Extension context invalidated')
+  ) {
+    return 'Your wallet extension lost its link to the browser, usually after an update. Reload this page, then try again.';
+  }
+
+  switch (error.name) {
+    case 'UserRejectedRequestError':
+      return 'You declined the request in your wallet.';
+    case 'ResourceUnavailableRpcError':
+      // -32002. Permintaan sebelumnya masih menggantung di ekstensi, dan
+      // permintaan baru tidak akan pernah dijawab sampai yang itu dibereskan.
+      return 'Your wallet already has a pending request. Open the extension, finish it, then try again.';
+    case 'ConnectorAlreadyConnectedError':
+      return 'This wallet is already connected. Close this dialog and reload the page.';
+    case 'ChainNotConfiguredError':
+      return `Add ${creditcoinTestnet.name} (chainId ${creditcoinTestnet.id}) to your wallet, then try again.`;
+    default:
+      return 'shortMessage' in error && typeof error.shortMessage === 'string'
+        ? error.shortMessage
+        : error.message;
+  }
+}
+
+/**
+ * Cincin di sekeliling logo wallet: berjalan selagi menunggu, DIAM begitu gagal.
+ *
+ * Sebelumnya ia berputar tanpa syarat. Akibatnya kegagalan terlihat persis
+ * seperti masih memuat — cincin yang sama, gerak yang sama — dan satu-satunya
+ * pembedanya sebaris teks abu di bawahnya. Itu yang dilaporkan sebagai
+ * "connect-nya muter-muter terus": koneksinya sudah gagal, layarnya saja yang
+ * masih berlagak menunggu.
+ */
+function ConnectingMark({ connector, failed }: { connector: Connector; failed: boolean }) {
   return (
     <div className="relative mx-auto flex h-[92px] w-[92px] items-center justify-center">
       <svg viewBox="0 0 92 92" className="absolute inset-0 h-full w-full" aria-hidden="true">
@@ -70,12 +119,12 @@ function ConnectingMark({ connector }: { connector: Connector }) {
           height="86"
           rx="26"
           fill="none"
-          stroke="var(--color-accent)"
+          stroke={failed ? 'var(--color-danger)' : 'var(--color-accent)'}
           strokeWidth="3"
           strokeLinecap="round"
           pathLength={100}
-          strokeDasharray="26 74"
-          className="ring-travel"
+          strokeDasharray={failed ? '100 0' : '26 74'}
+          className={failed ? undefined : 'ring-travel'}
         />
       </svg>
       <WalletMark connector={connector} size={56} />
@@ -136,15 +185,15 @@ export function WalletDialog({ open, onClose }: { open: boolean; onClose: () => 
         // Layar kedua: satu tugas, satu pesan. Semua yang tidak membantu
         // pengguna menyelesaikan persetujuan di wallet-nya dihilangkan.
         <div key="connecting" className="dialog-view px-6 pb-8 pt-4 text-center">
-          <ConnectingMark connector={pendingWallet} />
+          <ConnectingMark connector={pendingWallet} failed={error !== null} />
 
           <p className="mt-6 text-h3 font-semibold text-ink-900">
-            Continue in {pendingWallet.name}
-          </p>
-          <p className="mt-1 text-small text-ink-500">
             {error === null
-              ? 'Accept the connection request in your wallet'
-              : 'The request was rejected or timed out'}
+              ? `Continue in ${pendingWallet.name}`
+              : `Couldn\u2019t connect ${pendingWallet.name}`}
+          </p>
+          <p className="mx-auto mt-1 max-w-[20rem] text-small text-ink-500">
+            {error === null ? 'Accept the connection request in your wallet' : reasonFor(error)}
           </p>
 
           <Button variant="secondary" className="mt-5" onClick={() => attempt(pendingWallet)}>
