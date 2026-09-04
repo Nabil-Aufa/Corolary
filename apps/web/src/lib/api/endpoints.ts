@@ -13,6 +13,8 @@ import type {
   IndexerStatus,
   MarketSummary,
   PriceEntry,
+  ProveJob,
+  ProveJobAccepted,
   Reserve,
   ScoreHistoryPoint,
 } from '@/types';
@@ -48,10 +50,36 @@ export const endpoints = {
 
   prices: () => apiFetch<PriceEntry[]>('/prices'),
 
+  /**
+   * "Dompet ini sedang dipindai?" — dijawab tanpa perlu memegang `jobId`.
+   *
+   * `jobId` hanya hidup di satu browser. Siapa pun yang membuka alamat yang
+   * sama dari tempat lain tidak memilikinya, akan melihat tombol Scan biasa,
+   * dan mengantrekan pemindaian KEDUA untuk subjek yang sudah punya job
+   * berjalan. Endpoint inilah yang menutup celah itu — lihat komentar di
+   * services/api/src/routes/backfill.ts.
+   */
+  backfillBySubject: (address: Address) =>
+    apiFetch<BackfillJob | null>(`/backfill${toQuery({ subject: address })}`),
+
   startBackfill: (address: Address, months?: number) =>
     apiFetch<BackfillJobAccepted>('/backfill', {
       method: 'POST',
       body: JSON.stringify(months === undefined ? { address } : { address, months }),
     }),
   backfillJob: (jobId: string) => apiFetch<BackfillJob>(`/backfill/${jobId}`),
+
+  /**
+   * Membuktikan satu transaksi Ethereum mainnet atas permintaan.
+   *
+   * `chainKey` sengaja TIDAK dikirim: API menolak apa pun selain chainKey
+   * Ethereum mainnet, dan mengirimkannya dari klien hanya menambah satu nilai
+   * yang bisa salah tanpa menambah kemampuan apa pun.
+   */
+  startProve: (txHash: Hex) =>
+    apiFetch<ProveJobAccepted>('/prove', {
+      method: 'POST',
+      body: JSON.stringify({ txHash }),
+    }),
+  proveJob: (jobId: string) => apiFetch<ProveJob>(`/prove/${jobId}`),
 };

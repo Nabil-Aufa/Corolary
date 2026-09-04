@@ -1,6 +1,6 @@
 'use client';
 
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { endpoints, type FactsQuery } from '@/lib/api/endpoints';
 import { queryKeys } from '@/lib/api/query-keys';
 import { isRetryable } from '@/lib/api/errors';
@@ -111,5 +111,80 @@ export function usePrices() {
     staleTime: 15_000,
     refetchInterval: 20_000,
     retry,
+  });
+}
+
+/**
+ * Status pemindaian riwayat untuk sebuah alamat, di-poll selagi berjalan.
+ *
+ * Ditanyakan per SUBJEK, bukan per `jobId`. `jobId` cuma ada di browser yang
+ * memulai pemindaian; alamat yang sama dibuka dari tab lain akan melihat
+ * tombol Scan biasa dan mengantre pemindaian kedua di atas yang sedang jalan.
+ */
+export function useBackfillStatus(address: Address | undefined) {
+  return useQuery({
+    queryKey: queryKeys.backfillBySubject(address),
+    queryFn: () => endpoints.backfillBySubject(address as Address),
+    enabled: address !== undefined,
+    // Job yang masih hidup ditanya tiap 10 detik; yang sudah selesai tidak
+    // pernah berubah lagi, jadi polling-nya berhenti sendiri.
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
+      return status === 'pending' || status === 'running' ? 10_000 : false;
+    },
+    retry,
+  });
+}
+
+export function useStartBackfill(address: Address | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (months: number) => endpoints.startBackfill(address as Address, months),
+    onSuccess: (accepted) => {
+      // Respons POST membawa kedalaman JOB-nya, yang bisa berbeda dari yang
+      // diminta bila ada job lain yang sudah berjalan untuk subjek ini. Ditulis
+      // apa adanya ke cache supaya UI tidak pernah menampilkan angka yang
+      // diminta sebagai kalau itu yang sedang dikerjakan.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.backfillBySubject(address),
+      });
+      if (accepted.status === 'covered') {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.score(address) });
+      }
+    },
+  });
+}
+
+/**
+ * Status satu job proving, di-poll selagi belum tuntas.
+ *
+ * Jauh lebih lambat daripada terasa: attestation Attestcoin sendiri butuh
+ * ~8 menit, jadi polling per detik hanya membebani API untuk melihat status
+ * yang sama berulang kali.
+ */
+export function useProveJob(jobId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.proveJob(jobId),
+    queryFn: () => endpoints.proveJob(jobId as string),
+    enabled: jobId !== null,
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
+      if (status === undefined) return 10_000;
+      return status === 'recorded' || status === 'failed' || status === 'skipped' ? false : 10_000;
+    },
+    retry,
+  });
+}
+
+export function useStartProve() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (txHash: Hex) => endpoints.startProve(txHash),
+    onSuccess: () => {
+      // Fakta baru muncul di daftar mana pun yang sedang terbuka begitu
+      // job-nya tuntas; membatalkan di sini menangkap kasus `recorded`
+      // seketika — transaksi yang ternyata sudah lama jadi fakta.
+      void queryClient.invalidateQueries({ queryKey: ['api', 'facts'] });
+    },
   });
 }

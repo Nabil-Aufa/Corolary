@@ -20,4 +20,7 @@ export const queryKeys = {
   positions: (address: Address | undefined) => ['api', 'positions', address] as const,
   prices: () => ['api', 'prices'] as const,
   backfillJob: (jobId: string | null) => ['api', 'backfill', jobId] as const,
+  proveJob: (jobId: string | null) => ['api', 'prove', jobId] as const,
+  backfillBySubject: (address: Address | undefined) =>
+    ['api', 'backfill-subject', address] as const,
 };
