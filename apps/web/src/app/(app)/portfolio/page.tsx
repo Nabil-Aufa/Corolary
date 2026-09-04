@@ -1,11 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { TIER_LABEL } from '@corolary/shared';
 import { HealthFactorBar } from '@/components/market/HealthFactorBar';
+import {
+  MarketActionDialog,
+  type ActionGroup,
+} from '@/components/market/MarketActionDialog';
 import { PositionTable } from '@/components/market/PositionTable';
 import { FactRow } from '@/components/proofs/FactRow';
+import { BackfillPanel } from '@/components/score/BackfillPanel';
+import { NextTierGuidance } from '@/components/score/NextTierGuidance';
 import { ScoreDial } from '@/components/score/ScoreDial';
 import { TierLadder } from '@/components/score/TierLadder';
 import { AddressDisplay } from '@/components/shared/AddressDisplay';
@@ -16,14 +23,21 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFacts, usePositions, useScore } from '@/hooks/useApi';
+import { useFacts, useMarketReserves, usePositions, useScore } from '@/hooks/useApi';
 import { formatCount } from '@/lib/format';
+import type { Address } from '@/types';
 
 export default function PortfolioPage() {
   const { address } = useAccount();
   const score = useScore(address);
   const positions = usePositions(address);
   const facts = useFacts(address === undefined ? {} : { subject: address, limit: 10 });
+  // Baris posisi tahu asetnya, tapi dialog butuh harga, APY, dan likuiditas —
+  // semuanya hidup di reserve, bukan di posisi. Dicocokkan di sini supaya
+  // PositionTable tetap tidak perlu tahu apa pun soal pasar.
+  const reserves = useMarketReserves();
+  const [action, setAction] = useState<{ asset: Address; group: ActionGroup } | null>(null);
+  const activeReserve = reserves.data?.find((r) => r.asset === action?.asset);
 
   // Halaman ini sengaja TIDAK menerima alamat lewat URL. /score/[address]
   // adalah explorer publik; ini "punyaku", dan pembedaan itu yang membuat
@@ -91,13 +105,25 @@ export default function PortfolioPage() {
         </Card>
       </div>
 
+      {/* Halaman ini yang dispesifikasikan sebagai "apa yang harus saya
+          lakukan selanjutnya". TierLadder menunjukkan POSISI; panel ini yang
+          menjawab caranya. */}
+      {score.data !== undefined && score.data.factCount > 0 && (
+        <div className="mt-6">
+          <NextTierGuidance score={score.data} />
+        </div>
+      )}
+
       <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">Positions</h2>
       {positions.data && positions.data.positions.length > 0 ? (
         <>
           <div className="pb-4">
             <HealthFactorBar healthFactorBps={positions.data.healthFactorBps} />
           </div>
-          <PositionTable positions={positions.data.positions} />
+          <PositionTable
+            positions={positions.data.positions}
+            onAct={(asset, group) => setAction({ asset, group })}
+          />
         </>
       ) : (
         <EmptyState
@@ -123,9 +149,22 @@ export default function PortfolioPage() {
       ) : facts.isPending ? (
         <Skeleton className="h-40" />
       ) : (
-        <EmptyState
-          title="No proven history for this wallet"
-          description="Corolary only scores Ethereum mainnet lending activity that has been proven through Attestcoin."
+        <div className="grid gap-6">
+          <EmptyState
+            title="Nothing indexed for this wallet yet"
+            description="Corolary only scores Ethereum mainnet lending activity that has been proven through Attestcoin. This wallet has not been scanned, which is not the same as having no history."
+          />
+          <BackfillPanel address={address} />
+        </div>
+      )}
+
+      {action !== null && activeReserve !== undefined && (
+        <MarketActionDialog
+          open
+          onClose={() => setAction(null)}
+          reserve={activeReserve}
+          group={action.group}
+          account={positions.data}
         />
       )}
     </main>
