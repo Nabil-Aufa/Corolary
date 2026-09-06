@@ -95,7 +95,13 @@ export function guidanceFor(score: CreditScore): Guidance {
     const needed = inputFor(target, half, c.maxPoints) - now;
     // `now === 0` berarti belum ada apa-apa di komponen ini — awal kurva, dan
     // di sana tiap masukan bernilai paling besar. Rasio tidak berlaku.
-    const worthwhile = now === 0 || needed <= now * SATURATION_RATIO;
+    //
+    // `target <= c.points` terjadi tepat satu poin di bawah maksimum: langit-langit
+    // `maxPoints - 1` menjepit target ke nilai sekarang, dan tuasnya akan berbunyi
+    // "+0 points from 0 more repayments". Itu bukan saran, itu baris kosong —
+    // dan komponen yang tinggal satu poin lagi memang sudah jenuh.
+    const worthwhile =
+      target > c.points && (now === 0 || needed <= now * SATURATION_RATIO);
     return { target, needed, worthwhile };
   }
 
