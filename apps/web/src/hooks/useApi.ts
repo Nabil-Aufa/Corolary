@@ -34,20 +34,38 @@ export function useScore(address: Address | undefined) {
   });
 }
 
-export function useScoreHistory(address: Address | undefined, range: ScoreRange) {
+/**
+ * Batas atas yang benar-benar dihormati server.
+ *
+ * `docs/api.md` §7 menulis default 500 dan maksimum 1000, tapi
+ * `services/api/src/routes/score.ts` memanggil `parseLimit(…, 50, 200)` —
+ * jadi 200 adalah angka tertinggi yang nyata. Tanpa menyebutkannya kita dapat
+ * 50, dan penyaringan rentang di klien hanya akan bekerja atas 50 titik
+ * terbaru tanpa ada yang tahu.
+ */
+const SCORE_HISTORY_LIMIT = 200;
+
+/**
+ * Riwayat skor, DIAMBIL SEKALI untuk seluruh rentang.
+ *
+ * Parameter `from`/`to` dijanjikan `docs/api.md` §7 tapi tidak pernah dibaca
+ * implementasinya — rutenya hanya mengurai `limit`. Mengirimkannya tetap
+ * membuat pemilih 30d/90d/1y terlihat bekerja sambil mengembalikan data yang
+ * persis sama untuk keempat pilihan, dan itu tepat jenis kontrol yang
+ * `check:no-mocks` peringatkan harus diperiksa manusia: terlihat aktif,
+ * tidak melakukan apa-apa.
+ *
+ * Jadi penyaringannya dipindah ke klien, di mana ia benar-benar terjadi.
+ * Kalau nanti server mendukung `from`, ini tetap benar — hanya jadi mubazir.
+ */
+export function useScoreHistory(address: Address | undefined) {
   return useQuery({
-    queryKey: queryKeys.scoreHistory(address, range),
-    queryFn: () => endpoints.scoreHistory(address as Address, rangeToParams(range)),
+    queryKey: queryKeys.scoreHistory(address),
+    queryFn: () => endpoints.scoreHistory(address as Address, { limit: SCORE_HISTORY_LIMIT }),
     enabled: address !== undefined,
     staleTime: 60_000,
     retry,
   });
-}
-
-function rangeToParams(range: ScoreRange): { from?: number } {
-  if (range === 'all') return {};
-  const days = range === '30d' ? 30 : range === '90d' ? 90 : 365;
-  return { from: Math.floor(Date.now() / 1000) - days * 86_400 };
 }
 
 export function useFact(factId: Hex | undefined) {

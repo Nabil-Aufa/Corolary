@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -29,10 +29,27 @@ const RANGES = [
 /** Batas tier, digambar sebagai garis acuan. 0 dilewati — itu dasar sumbu. */
 const TIER_LINES = [1, 2, 3, 4] as const;
 
+const RANGE_DAYS: Record<Exclude<ScoreRange, 'all'>, number> = { '30d': 30, '90d': 90, '1y': 365 };
+
+/**
+ * Penyaringan rentang terjadi DI SINI, bukan di server.
+ *
+ * `GET /v1/score/:address/history` menjanjikan `from`/`to` di `docs/api.md` §7
+ * tapi rutenya tidak pernah membacanya, jadi mengirimkannya membuat keempat
+ * pilihan mengembalikan data yang sama sambil terlihat bekerja. Lihat
+ * `useScoreHistory`.
+ */
+function withinRange(points: ScoreHistoryPoint[], range: ScoreRange): ScoreHistoryPoint[] {
+  if (range === 'all') return points;
+  const cutoff = Date.now() / 1000 - RANGE_DAYS[range] * 86_400;
+  return points.filter((p) => p.atTime >= cutoff);
+}
+
 export function ScoreHistoryChart({ address }: { address: Address }) {
   const [range, setRange] = useState<ScoreRange>('all');
-  const history = useScoreHistory(address, range);
-  const points = history.data ?? [];
+  const history = useScoreHistory(address);
+  const all = history.data;
+  const points = useMemo(() => withinRange(all ?? [], range), [all, range]);
 
   return (
     <Card>

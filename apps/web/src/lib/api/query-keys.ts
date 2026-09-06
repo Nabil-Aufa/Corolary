@@ -13,8 +13,9 @@ export const queryKeys = {
   facts: (q: FactsQuery) => ['api', 'facts', q] as const,
   fact: (factId: Hex) => ['api', 'fact', factId] as const,
   score: (address: Address | undefined) => ['api', 'score', address] as const,
-  scoreHistory: (address: Address | undefined, range: string) =>
-    ['api', 'score-history', address, range] as const,
+  // Sengaja TANPA rentang. Satu alamat = satu permintaan, dan pemilih
+  // 30d/90d/1y disaring di klien — lihat komentar di useScoreHistory.
+  scoreHistory: (address: Address | undefined) => ['api', 'score-history', address] as const,
   marketSummary: () => ['api', 'market-summary'] as const,
   marketReserves: () => ['api', 'market-reserves'] as const,
   positions: (address: Address | undefined) => ['api', 'positions', address] as const,
