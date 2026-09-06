@@ -54,7 +54,13 @@ export function NextTierGuidance({ score }: { score: CreditScore }) {
 
         {levers.length === 0 ? (
           <p className="mt-4 text-body text-ink-500">
-            Every component is already at its maximum.
+            {/* "Sudah maksimum" dan "sudah jenuh" adalah dua hal yang berbeda,
+                dan menyebut keduanya dengan kalimat yang sama akan menabrak
+                catatan saturasi tepat di bawahnya: satu bilang tidak ada sisa,
+                satunya lagi menjelaskan sisa yang tidak layak dikejar. */}
+            {saturated.length === 0
+              ? 'Every component is already at its maximum.'
+              : 'Nothing is left that returns more than it costs to pull.'}
           </p>
         ) : (
           <ul className="mt-5 space-y-4">
