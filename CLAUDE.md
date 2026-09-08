@@ -612,11 +612,26 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   drpc KELIMA, dan satu-satunya yang **tidak transien** — jangan diperlakukan
   seperti 400 yang lama. Akibatnya `SCAN_CHUNK_BLOCKS` 3.000 mustahil, jalur
   harga mati total, dan failover menolak persis seperti dirancang (300
-  permintaan > `FALLBACK_MAX_SPLITS` 50). Tidak ada penggantinya yang gratis:
-  Alchemy free tetap 10 blok inklusif, publicnode dan ankr menuntut token, 1rpc
-  maks 50, llamarpc tidak menjawab JSON. Memperkecil chunk ke 110 berarti ~27x
-  permintaan dan hampir pasti kena rate limit — kapasitas RPC sekarang keputusan
-  anggaran, bukan tuning konstanta.
+  permintaan > `FALLBACK_MAX_SPLITS` 50). **Sudah diselesaikan tanpa biaya**:
+  primary pindah ke mevblocker, drpc turun jadi cadangan — lihat bullet di bawah.
+- **`https://rpc.mevblocker.io` adalah RPC utama sejak 2026-09-08, tanpa API
+  key.** Terukur: `eth_getLogs` 5.000 blok (8.112 log Aave), arsip sampai blok
+  19jt, batch JSON-RPC 12 permintaan, 30 permintaan berurutan tanpa satu pun
+  rate limit. Ia lolos syarat yang gagal dipenuhi SEMUA opsi gratis lain, dan
+  **berbayar tidak diperlukan** — kesimpulan "ini keputusan anggaran" yang
+  sempat ditulis di sini salah, sebabnya hanya provider yang belum dicoba.
+  Divalidasi sesuai aturan: bukan cuma "tidak error", tapi cocok **sidik
+  jarinya** dengan drpc di jendela 46 blok — 92 log, himpunan
+  `txHash:logIndex` identik. Mencocokkan JUMLAH saja tidak akan menangkap
+  llamarpc, yang menjawab `[]` dengan status sukses.
+  Batasnya: hard cap **10.000 blok**, dan `"query returned more than 10000
+  results"` pada kontrak padat. `flashbots` menjawab benar (998 log, sama
+  persis) tapi sering balas kosong — jangan diandalkan.
+- **Kepadatan log, bukan ukuran protokol, yang menentukan `chunkSize`.** Diukur
+  2026-09-08 di rentang yang sama: Morpho 5.487 log per 2.000 blok, LEBIH PADAT
+  daripada Aave (3.357) dan satu-satunya yang menabrak plafon 10.000 hasil di
+  5.000 blok. Spark dan Compound justru sanggup 9.000. Menebak dari "seberapa
+  besar protokolnya" akan membalik urutannya.
 - **Indexer bisa mati berhari-hari tanpa satu pun gejala di API.** Terukur
   2026-09-08: seluruh indexer berhenti 2026-09-04 12:52 UTC, dan
   `/v1/market/reserves` tetap menyajikan `priceUsd` sehat dari mirror Postgres

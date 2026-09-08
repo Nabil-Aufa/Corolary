@@ -776,25 +776,38 @@ di `.env` selama berminggu-minggu tanpa dibaca kode mana pun — memberi rasa am
 yang palsu.
 
 **Kenapa bukan `ethers.FallbackProvider`:** ia mengasumsikan para provider setara.
-Terukur pada rentang 2.000 blok kontrak Aave V3, 2026-08-26:
+Diukur ulang pada kontrak Aave V3, **2026-09-08**, setelah drpc free runtuh dari
+3.000 blok ke ~50:
 
 | Provider | Hasil |
 |---|---|
-| **drpc** | 2.602 log dalam 0,9 detik |
+| **mevblocker** | 3.357 log / 2,3 detik pada 2.000 blok; 8.112 pada 5.000; arsip s/d blok 19jt; batch 12 |
+| flashbots | jawaban BENAR (998 log, identik) tapi sering balas kosong — tidak andal |
+| drpc | RUNTUH ke ~50 blok — dulu terbaik, kini cadangan |
 | Alchemy free | ditolak — `eth_getLogs` maks **10 blok** |
 | publicnode | ditolak — archive butuh token |
 | ankr | ditolak — butuh autentikasi |
 | 1rpc | ditolak — maks 50 blok |
 | llamarpc | tidak menjawab JSON sama sekali |
 
-Tidak ada provider gratis kedua yang menyamai drpc untuk `eth_getLogs` rentang
-lebar. Jadi failover-nya bertingkat menurut kemampuan:
+mevblocker dijadikan utama hanya SETELAH dicocokkan **sidik jarinya** dengan drpc
+di jendela 46 blok: 92 log, himpunan `txHash:logIndex` identik. Mencocokkan
+jumlahnya saja tidak akan menangkap llamarpc, yang menjawab `[]` dengan status
+sukses.
+
+Batas mevblocker yang terukur: hard cap **10.000 blok** per permintaan, dan
+`"query returned more than 10000 results"` pada kontrak padat. Karena itu
+`chunkSize` tetap per protokol.
+
+Jadi failover-nya bertingkat menurut kemampuan:
 
 - **`getBlock`, `getTransactionReceipt`, `eth_call`** — cadangan melayani penuh
   (`ethCall()` di `chain/providers.ts`).
-- **`eth_getLogs`** — cadangan hanya sanggup <= 10 blok, jadi `ethGetLogs()`
+- **`eth_getLogs`** — cadangan hanya sanggup <= **50** blok, jadi `ethGetLogs()`
   memecah rentangnya. Di atas **50 potongan** ia MENOLAK dengan sebab yang jelas
-  alih-alih membanjiri provider yang justru sedang kita andalkan.
+  alih-alih membanjiri provider yang justru sedang kita andalkan. Konsekuensinya
+  chunk `spark` dan `compound-v3` (9.000 blok) melebihi kapasitas cadangan —
+  diterima sadar, karena keduanya protokol tersepi.
 
 **Ia tidak pernah mengembalikan array kosong saat cadangan tidak sanggup.**
 Provider yang menjawab kosong tanpa error sudah pernah menipu proyek ini

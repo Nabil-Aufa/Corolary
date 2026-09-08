@@ -193,7 +193,8 @@ Karena kedua service memang dijalankan oleh `tsx` saat runtime, tempatnya di
 
 ### Env (indexer)
 ```bash
-ETHEREUM_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/xxx   # WAJIB archive
+ETHEREUM_RPC_URL=https://rpc.mevblocker.io                  # archive + getLogs lebar
+ETHEREUM_RPC_URL_FALLBACK=https://eth.drpc.org              # cadangan, ~50 blok
 ETHEREUM_CHAIN_KEY=3
 CREDITCOIN_RPC_URL=https://rpc.cc3-testnet.creditcoin.network
 CREDITCOIN_CHAIN_ID=102031

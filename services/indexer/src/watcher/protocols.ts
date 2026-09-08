@@ -18,9 +18,17 @@ export interface ProtocolWatchConfig {
   /** topic0 event yang dipetakan adapter. Log lain diabaikan sejak RPC. */
   topics: string[];
   /**
-   * Rentang blok maksimum per eth_getLogs. drpc menolak rentang lebar pada
-   * kontrak sibuk dengan "Request timeout on the free plan" — diukur, bukan
-   * ditebak: Morpho gagal di 2000 blok tapi lolos di 464.
+   * Rentang blok maksimum per eth_getLogs.
+   *
+   * Per protokol, bukan global, karena biayanya ditentukan KEPADATAN LOG
+   * kontraknya — dan penyedia membatasi hasil, bukan lebar rentang. mevblocker
+   * menolak dengan "query returned more than 10000 results" pada kontrak padat
+   * sementara melayani 10.000 blok tanpa keluhan pada kontrak sepi.
+   *
+   * Semua angka di bawah DIUKUR pada mevblocker 2026-09-08, di rentang yang
+   * sama persis (head-5, mundur), tanpa filter topic — jadi hitungan lognya
+   * batas ATAS: query sungguhan memfilter topic dan mengembalikan jauh lebih
+   * sedikit. Itu marginnya, dan disengaja.
    */
   chunkSize: number;
 }
@@ -66,13 +74,18 @@ export const PROTOCOLS: ProtocolWatchConfig[] = [
     name: 'aave-v3',
     address: '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2',
     topics: AAVE_STYLE_TOPICS,
-    chunkSize: 500,
+    // 2.000 -> 3.357 log / 2,3 detik. 5.000 -> 8.112 log / 7,5 detik, sudah
+    // terlalu dekat ke plafon 10.000 hasil untuk kontrak yang kepadatannya
+    // melonjak saat pasar bergerak.
+    chunkSize: 2000,
   },
   {
     name: 'spark',
     address: '0xC13e21B648A5Ee794902342038FF3aDAB66BE987',
     topics: AAVE_STYLE_TOPICS,
-    chunkSize: 2000,
+    // 9.000 -> 698 log / 2,2 detik. Sinyal Aave dengan lalu lintas sepersepuluh;
+    // 9.000 dipilih, bukan 10.000, supaya masih ada margin di bawah hard cap.
+    chunkSize: 9000,
   },
   {
     name: 'morpho-blue',
@@ -84,12 +97,16 @@ export const PROTOCOLS: ProtocolWatchConfig[] = [
       MORPHO_SUPPLY_COLLATERAL,
       MORPHO_WITHDRAW_COLLATERAL,
     ],
-    chunkSize: 400,
+    // 2.000 -> 5.487 log / 5,8 detik; 5.000 DITOLAK "more than 10000 results".
+    // Morpho lebih PADAT daripada Aave, jadi chunk-nya lebih kecil — kebalikan
+    // dari dugaan yang wajar kalau menilai dari ukuran protokolnya.
+    chunkSize: 1500,
   },
   {
     name: 'compound-v3',
     address: '0xc3d688B66703497DAA19211EEdff47f25384cdc3',
     topics: [COMET_SUPPLY_COLLATERAL, COMET_WITHDRAW_COLLATERAL, COMET_ABSORB_DEBT],
-    chunkSize: 2000,
+    // 9.000 -> 292 log / 1,8 detik. Kontrak tersepi dari keempatnya.
+    chunkSize: 9000,
   },
 ];

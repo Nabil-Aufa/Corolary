@@ -251,9 +251,12 @@ pnpm dev:api                         # http://localhost:8080
 ```
 
 **`ETHEREUM_RPC_URL` must satisfy two separate requirements:** archive-capable **and**
-able to serve `eth_getLogs` over wide block ranges. Verified working: `https://eth.drpc.org`
-(no signup). Alchemy's free tier is archive-capable but caps `eth_getLogs` at 10 blocks,
-which makes the indexer's chunking impossible.
+able to serve `eth_getLogs` over wide block ranges. Verified working: `https://rpc.mevblocker.io`
+(no signup) — 5,000-block ranges, archive back to block 19M, and its results match drpc
+fingerprint-for-fingerprint on a window both can serve. `https://eth.drpc.org` used to be
+the primary but its free tier now caps `eth_getLogs` near 50 blocks, so it is the fallback.
+Alchemy's free tier is archive-capable but caps `eth_getLogs` at 10 blocks, which makes the
+indexer's chunking impossible.
 
 Contracts and quality gates:
 

@@ -208,24 +208,34 @@ data yang dibaca). Errornya biasanya `"query returned more than 10000 results"` 
 `"the method eth_getLogs does not exist/is not available"` karena node full/pruned
 tidak menyimpan histori log jauh ke belakang.
 
-Pilih salah satu provider archive-capable:
+**Archive saja TIDAK cukup — ini dua syarat terpisah.** Provider bisa menyimpan
+seluruh riwayat dan tetap menolak `eth_getLogs` rentang lebar, dan justru itu yang
+terjadi pada rekomendasi paling umum. Diukur 2026-09-08 pada Aave V3 Pool:
 
-| Provider | Free tier | Catatan |
+| Provider | Perlu daftar? | `eth_getLogs` rentang lebar |
 |---|---|---|
-| **Alchemy** | Ya — cukup untuk dev (compute units/bulan) | https://www.alchemy.com — buat app "Ethereum Mainnet", salin HTTPS URL |
-| **Infura** | Ya — kuota request/hari | https://www.infura.io — buat project, pilih network "Ethereum Mainnet" |
-| **QuickNode** | Trial terbatas, tidak permanen gratis | https://www.quicknode.com — cocok kalau butuh throughput lebih tinggi |
+| **mevblocker** — `https://rpc.mevblocker.io` | **Tidak** | **5.000 blok OK** (8.112 log); arsip s/d blok 19jt; hard cap 10.000 |
+| drpc — `https://eth.drpc.org` | Tidak | ~50 blok — dulu 3.000, runtuh 2026-09-08. Cocok sebagai CADANGAN |
+| Alchemy free | Ya | **10 blok** — archive OK tapi chunking indexer jadi mustahil |
+| Infura free | Ya | belum diuji ulang setelah keruntuhan drpc |
+| flashbots | Tidak | jawaban benar tapi sering balas kosong — tidak andal |
+| publicnode / ankr | Ya (token) | archive butuh token |
+| 1rpc | Tidak | maks 50 blok |
+| llamarpc | Tidak | **`[]` tanpa error** — jangan dipakai, lihat CLAUDE.md |
 
-Langkah umum (contoh Alchemy):
+Default proyek ini tidak butuh pendaftaran sama sekali:
 
 ```bash
-# 1. Daftar di alchemy.com, buat app baru:
-#    Network = Ethereum Mainnet, tipe = HTTPS
-# 2. Salin URL, biasanya berbentuk:
-#    https://eth-mainnet.g.alchemy.com/v2/<API_KEY>
-# 3. Isi ke .env
-echo 'ETHEREUM_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/<API_KEY>' >> .env
+echo 'ETHEREUM_RPC_URL=https://rpc.mevblocker.io' >> .env
+echo 'ETHEREUM_RPC_URL_FALLBACK=https://eth.drpc.org' >> .env
 ```
+
+**Kalau mengganti provider, cocokkan SIDIK JARI hasilnya dengan provider kedua**,
+bukan sekadar memastikan "tidak error". llamarpc menjawab `[]` dengan status
+sukses untuk rentang yang benar-benar berisi ratusan log; indexer akan
+menyimpulkan protokolnya sepi dan melewatkan seluruh riwayat tanpa satu pun
+peringatan. Mencocokkan JUMLAH log pun belum cukup — bandingkan himpunan
+`txHash:logIndex`-nya.
 
 Verifikasi RPC benar-benar bisa membaca log historis (contoh: query event `Repay`
 Aave V3 di rentang blok lama):

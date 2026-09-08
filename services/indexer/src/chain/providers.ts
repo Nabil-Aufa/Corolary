@@ -5,35 +5,43 @@ import { getLogsWithFailover, withFailover } from './failover.js';
 // Backend memakai ethers v6 (frontend memakai viem/wagmi). Disengaja: SDK
 // Attestcoin memaksa ethers. Keduanya tidak pernah bertemu di satu file.
 /**
- * `batchMaxCount: 3` bukan angka sembarangan.
+ * Ukuran batch JSON-RPC dikunci PER PROVIDER, bukan sekali untuk semua.
  *
  * ethers v6 diam-diam menggabungkan permintaan yang berjalan bersamaan menjadi
  * SATU JSON-RPC batch. Begitu getBlock dijalankan paralel, ethers mengirim batch
- * berisi 12 permintaan dan drpc free plan menolak seluruh batch dengan HTTP 500:
+ * berisi 12 permintaan dan drpc free plan menolak SELURUH batch dengan HTTP 500:
  * "Batch of more than 3 requests are not allowed on free plan". Yang gagal bukan
  * satu permintaan, melainkan semuanya sekaligus — dan pesannya muncul sebagai
  * error server, bukan rate limit, sehingga mudah salah didiagnosis.
  *
- * Jadi paralelismenya dipertahankan (itu yang memangkas 39,6 detik per chunk),
- * tapi ukuran batch dikunci di bawah batas provider.
+ * mevblocker menerima batch 12 (diuji 2026-09-08, 12 respons semuanya ok), jadi
+ * yang utama tidak perlu ikut menanggung batas drpc. 10 dipilih, bukan 12, agar
+ * angka yang dipakai berada di bawah yang terbukti — bukan tepat di atasnya.
+ *
+ * Paralelismenya sendiri dipertahankan di kedua sisi: itu yang memangkas satu
+ * chunk Aave dari 39,6 detik ke 4,17 detik.
  */
+const PRIMARY_BATCH_MAX = 10;
+const FALLBACK_BATCH_MAX = 3;
+
 export const ethereum = new ethers.JsonRpcProvider(config.ETHEREUM_RPC_URL, 1, {
   staticNetwork: true,
-  batchMaxCount: 3,
+  batchMaxCount: PRIMARY_BATCH_MAX,
 });
 
 /**
  * RPC Ethereum cadangan. `null` kalau tidak dikonfigurasi.
  *
- * Kemampuannya TIDAK setara dengan yang utama — lihat `failover.ts`. Alchemy
- * free tier melayani semua metode kecuali `eth_getLogs` rentang > 10 blok, dan
- * tidak ada provider gratis kedua yang menyamai drpc untuk itu.
+ * Kemampuannya TIDAK setara dengan yang utama — lihat `failover.ts`. drpc free
+ * melayani semua metode kecuali `eth_getLogs` rentang > ~50 blok, dan batas
+ * batch-nya 3. Ia tetap cadangan TERBAIK yang tersedia tanpa API key: Alchemy
+ * free lebih sempit lagi (10 blok).
  */
 export const ethereumFallback: ethers.JsonRpcProvider | null =
   config.ETHEREUM_RPC_URL_FALLBACK
     ? new ethers.JsonRpcProvider(config.ETHEREUM_RPC_URL_FALLBACK, 1, {
         staticNetwork: true,
-        batchMaxCount: 3,
+        batchMaxCount: FALLBACK_BATCH_MAX,
       })
     : null;
 

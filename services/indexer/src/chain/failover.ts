@@ -7,21 +7,24 @@ const log = stageLogger('rpc');
  * Failover RPC Ethereum — SADAR KEMAMPUAN, bukan `FallbackProvider` buta.
  *
  * `ethers.FallbackProvider` mengasumsikan para provider setara. Di sini mereka
- * tidak setara sama sekali, dan itu terukur (2026-08-26, rentang 2.000 blok
- * pada kontrak Aave V3):
+ * tidak setara sama sekali, dan itu terukur ulang 2026-09-08 (Aave V3 Pool,
+ * rentang berakhir di head):
  *
- *   drpc        2.602 log dalam 0,9 detik
- *   Alchemy     DITOLAK — "Under the Free tier plan, you can make eth_getLogs
- *               requests with up to a 10 block range"
- *   publicnode  DITOLAK — archive butuh token
- *   ankr        DITOLAK — butuh autentikasi
- *   1rpc        DITOLAK — dibatasi 50 blok
+ *   mevblocker  3.357 log / 2,3 detik pada 2.000 blok; 8.112 pada 5.000;
+ *               arsip sampai blok 19jt; batch 12 permintaan diterima
+ *   flashbots   jawabannya BENAR (998 log, sama persis dengan mevblocker)
+ *               tapi sering balas kosong — tidak bisa diandalkan
+ *   drpc        RUNTUH dari 3.000 blok ke ~50 — dulu yang terbaik, kini cadangan
+ *   Alchemy     free tier 10 blok inklusif, lebih sempit dari drpc
+ *   publicnode  archive butuh token
+ *   ankr        butuh autentikasi
+ *   1rpc        maks 50 blok
  *   llamarpc    tidak menjawab JSON sama sekali
  *
- * Jadi tidak ada provider gratis kedua yang bisa menggantikan drpc untuk
- * `eth_getLogs` rentang lebar. Yang BISA dilakukan Alchemy adalah semua metode
- * lain (`eth_getBlockByNumber`, `eth_getTransactionReceipt`, `eth_call`) plus
- * `eth_getLogs` dalam potongan <= 10 blok.
+ * mevblocker dipakai sebagai utama hanya SETELAH dicocokkan sidik jarinya
+ * dengan drpc di jendela 46 blok: 92 log, himpunan `txHash:logIndex` identik.
+ * Mencocokkan JUMLAH saja tidak cukup — itu tidak akan menangkap llamarpc,
+ * yang menjawab `[]` dengan status sukses.
  *
  * Konsekuensinya failover di sini menyelamatkan sebagian, bukan semuanya — dan
  * itu dinyatakan terbuka daripada disembunyikan di balik provider yang
@@ -33,20 +36,32 @@ const log = stageLogger('rpc');
 /**
  * Batas rentang `eth_getLogs` provider cadangan, dalam blok.
  *
- * 10 adalah angka Alchemy free tier, diambil dari pesan errornya sendiri yang
- * bahkan menyebutkan rentang yang seharusnya dipakai. Inklusif: `from..to`
- * sepanjang 11 blok sudah ditolak.
+ * 50, angka drpc setelah keruntuhan 2026-09-08. Dipilih konservatif dari hasil
+ * ukur yang TIDAK konsisten di tepinya: 46 blok berhasil setiap kali, 110
+ * berhasil sekali lalu gagal, 105 dan 120 gagal. Batas yang diambil dari
+ * percobaan terbaik akan lolos di laptop dan gagal saat cadangan justru
+ * dibutuhkan.
+ *
+ * Inklusif: `from..to` sepanjang 51 blok sudah di luar anggaran.
  */
-export const FALLBACK_MAX_LOG_RANGE = 10;
+export const FALLBACK_MAX_LOG_RANGE = 50;
 
 /**
  * Batas jumlah sub-permintaan saat memecah untuk provider cadangan.
  *
- * Tanpa batas ini, satu chunk Compound 2.000 blok menjadi 200 permintaan
+ * Tanpa batas ini, satu chunk Compound 9.000 blok menjadi 180 permintaan
  * beruntun ke provider yang justru sedang kita andalkan karena yang utama
  * bermasalah — cara tercepat membuat cadangan ikut kena rate limit. Di atas
  * batas ini kita MENOLAK dengan sebab yang jelas, bukan mencoba dan gagal
  * setengah jalan.
+ *
+ * Konsekuensi yang dinyatakan terbuka: 50 x 50 blok = 2.500 blok, jadi chunk
+ * `spark` dan `compound-v3` (9.000) MELEBIHI kapasitas cadangan dan akan
+ * ditolak saat degradasi. Itu diterima karena keduanya protokol tersepi —
+ * kehilangan sementara di sana jauh lebih murah daripada memperkecil chunk
+ * keduanya dan membayar 4,5x permintaan pada jalur normal. Yang penting,
+ * penolakannya MELEMPAR dengan sebabnya; ia tidak pernah mengembalikan array
+ * kosong, karena itu akan membuat cursor maju melewati event yang tak terbaca.
  */
 export const FALLBACK_MAX_SPLITS = 50;
 
