@@ -3,7 +3,7 @@
 > Register hidup. Setiap entri: apa masalahnya, kenapa penting, dan **solusinya**.
 > Yang sudah beres tetap dicatat di §1 supaya tidak "ditemukan ulang" lalu diperdebatkan lagi.
 >
-> Terakhir diperbarui: 2026-08-25
+> Terakhir diperbarui: 2026-09-08
 
 ---
 
@@ -835,6 +835,98 @@ RPC tambahan untuk angka yang bergerak sangat lambat.
 
 ---
 
+### T9 · Watcher live memungut SELURUH mainnet, antrean tumbuh lebih cepat daripada dikuras 🟠 **DITUNDA — sadar, bukan terlupakan**
+
+**Masalah.** `watchOnce` memfilter log per protokol dan per `topic0`, tapi **tidak per
+subjek**. Jadi setiap `Borrow`/`Repay`/`Supply`/`Withdraw` milik siapa pun di Aave,
+Spark, Morpho, dan Compound masuk `observed_events`. Prover dan submitter tidak
+sanggup mengejarnya.
+
+Terukur 2026-09-08:
+
+| | |
+|---|---|
+| `pending` | **69.293 event**, 55.752 tx, 35.471 blok |
+| Rentang | 2026-08-28 → 2026-09-08 (**11 hari**, bukan 4) |
+| Per protokol | Aave 54.700 · Morpho 11.821 · Spark 2.352 · Compound 535 |
+| Menyentuh dompet berskor | 29.384 (42%) — **batas ATAS**, lihat catatan di bawah |
+| Biaya menghabiskannya | **~20 CTC** (gas 2,55 + proof lazy 17,45) dari saldo 482 |
+
+Antrean ini **bukan** akibat indexer mati 4 September; ia sudah tertinggal sejak
+28 Agustus. Matinya indexer memperburuk, bukan menyebabkan.
+
+**Kenapa ditunda, bukan dikerjakan.** Antrean yang membengkak tidak merusak apa pun
+yang terlihat juri — skor, pasar, proof, dan API semuanya jalan — dan menghabiskannya
+cuma 4% saldo. Sedangkan perbaikannya menyentuh jalur paling berbahaya di indexer,
+dengan mode kegagalan yang **senyap** (lihat "posisi topic" di bawah). Perbandingan
+risikonya tidak seimbang menjelang submit.
+
+**Solusi, kalau dikerjakan.** Subjek adalah parameter ber-`indexed` di keempat
+protokol, jadi RPC menyaringnya di sisi server. Tapi tiga hal membuatnya lebih rumit
+daripada "tambahkan satu filter":
+
+1. **Posisi subjek berbeda per event, dan `eth_getLogs` memfilter secara POSISIONAL.**
+   Satu panggilan hanya punya satu filter topic, jadi "subjek S di posisi 2 **atau** 3"
+   MUSTAHIL diungkapkan dalam satu query.
+
+   | protokol | posisi 1 | posisi 2 | posisi 3 |
+   |---|---|---|---|
+   | Aave / Spark | — | Borrow, Repay, Supply, Withdraw | LiquidationCall |
+   | Morpho | — | Borrow, WithdrawCollateral | Repay, Liquidate, SupplyCollateral |
+   | Compound | WithdrawCollateral | SupplyCollateral, AbsorbDebt | — |
+
+   Jadi event dikelompokkan per posisi subjek: **4 protokol → 8 query** per iterasi.
+   Salah posisi TIDAK menghasilkan data salah — adapter tetap mencatat subjek yang
+   benar. Yang terjadi: filter memanen dompet LAIN, dan kita membayar proof untuk
+   riwayat orang asing. Persis jebakan yang sudah tercatat di `CLAUDE.md`, dan filter
+   ini memperbanyak kesempatan untuk kena.
+
+2. **Batas keras 1.000 alamat per posisi topic.** Diukur di mevblocker dengan
+   bisection 2026-09-08: **1.000 diterima, 1.001 ditolak** (`invalid argument 0:
+   exceed max topics`). Watchlist saat ini **1.341 dompet — sudah melewati batas**,
+   jadi query harus di-shard: 8 x 2 = **16 query per iterasi**, bertambah tiap 1.000
+   dompet baru.
+
+3. **Untungnya 57%, bukan 90%.** Diukur pada Aave, jendela 2.000 blok, filter 1.000
+   subjek teratas:
+
+   ```
+   tanpa filter : 1.525 log   840 blok unik
+   dengan filter:   663 log   361 blok unik   (-57%)
+   ```
+
+   Angka yang penting adalah **blok unik**, bukan log: biaya watcher ditentukan satu
+   `getBlock` per blok unik untuk timestamp, dan itulah yang memakan ~58 detik dari
+   tiap chunk Aave 2.000 blok. Tapi 57% berarti filter **memperlambat** pertumbuhan
+   antrean, **tidak membalikkannya** — 69 ribu jadi ~30 ribu, masih di atas laju
+   prover. Dan rasionya memburuk seiring watchlist membesar.
+
+**Yang dibutuhkan:** tabel `watchlist` (subjek + waktu bergabung) yang diisi otomatis
+saat backfill selesai; `PROTOCOLS` diperluas dengan pengelompokan posisi subjek;
+`watchOnce` melakukan sharding 1.000; cursor tetap **per protokol**, bukan per subjek —
+kalau per subjek, dompet yang baru bergabung akan memundurkan cursor bersama.
+Perkiraan setengah hari.
+
+**Konsekuensi produk, dan ini yang terpenting.** Hari ini registry mencatat fakta untuk
+**siapa saja** yang bertransaksi di keempat protokol. Dengan filter, ia hanya mencatat
+untuk dompet yang sudah dikenal, sehingga alurnya menjadi:
+
+> minta skor → backfill riwayatnya (`POST /v1/backfill`, sudah ada) → dompet masuk
+> watchlist → watcher live menjaganya mutakhir
+
+Itu desain yang koheren dan jauh lebih murah, tapi mengubah klaimnya: dari "riwayat
+kredit terbukti untuk seluruh Ethereum" menjadi "untuk dompet terdaftar". Untuk
+hackathon yang kedua justru lebih mudah didemokan dan dipertahankan — tapi itu
+keputusan posisi produk, bukan keputusan teknis, dan harus diambil sadar.
+
+**Catatan kejujuran soal angka 42%.** Ia dihitung dengan mencocokkan alamat dompet
+berskor di **posisi topic mana pun**, bukan di posisi subjek yang benar — mengekstrak
+subjek ulang di SQL berarti mengulang jebakan posisi topic di atas. Jadi 42% adalah
+**batas atas**: sebagiannya dompet yang muncul sebagai `repayer` atau likuidator, bukan
+sebagai subjek. Angka sebenarnya lebih rendah, tapi bukan nol.
+
+---
+
 ## 4. Peluang yang Sedang Dipantau
 
 ### O1 · Writability ternyata SUDAH ada di paket kontrak 🟢
@@ -874,6 +966,7 @@ untuk pembicaraan CEIP.
 | ✅ Diputuskan | **T8** Compound V3 — biarkan tidak dipetakan; 0,5% registry, nol di dompet demo | 2026-08-25 |
 | ✅ Selesai | **T6** watcher memakai tag `finalized` | 2026-08-25 |
 | ✅ Selesai | **T7** alert saldo submitter, ambang dari biaya terukur | 2026-08-25 |
+| 🟠 Ditunda | **T9** watcher live tanpa filter subjek — antrean 69.293 tumbuh lebih cepat daripada dikuras; menghabiskannya ~20 CTC dari 482, jadi tidak memblokir submit | setelah M5 |
 | 🟢 Pantau | **O1** kesiapan writability | berkala |
 
 > **Satu kalimat kalau harus memilih:** kerjakan **B5**. M1 sudah lama lewat — per
