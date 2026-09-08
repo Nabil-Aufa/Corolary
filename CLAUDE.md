@@ -627,6 +627,29 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   Batasnya: hard cap **10.000 blok**, dan `"query returned more than 10000
   results"` pada kontrak padat. `flashbots` menjawab benar (998 log, sama
   persis) tapi sering balas kosong — jangan diandalkan.
+- **mevblocker hanya melayani tag blok `latest` dan nomor.** `safe`,
+  `finalized`, dan `pending` dijawab halaman Cloudflare `error code: 1015` —
+  HTML, bukan JSON — yang diterjemahkan ethers jadi **504 Gateway Timeout**.
+  Gejalanya jauh lebih buruk daripada kedengarannya: `getBlock('finalized')`
+  adalah panggilan PERTAMA tiap iterasi watcher, jadi kegagalannya membatalkan
+  iterasi sebelum satu baris log watcher pun ditulis. Terukur 2026-09-08 —
+  keempat cursor beku sementara submitter, prover, dan jalur harga bekerja
+  normal, dan `stage:"watcher"` sama sekali ABSEN dari log. Sekeluarga dengan
+  loop harga yang tidak pernah dijadwalkan: **loop yang gagal di langkah
+  pertamanya tidak terlihat, karena ia tidak sempat melapor apa pun.** Kalau
+  sebuah tahap diam total, curigai panggilan pertamanya — bukan logikanya.
+  Sekarang tag itu dirutekan ke CADANGAN lewat `ethFinalizedBlock()`.
+- **Menguji RPC baru dengan `eth_getLogs` saja TIDAK cukup.** mevblocker lolos
+  setiap uji getLogs — lebar, arsip, sidik jari, rate limit — dan tetap
+  mematikan watcher karena tag `finalized`. Daftar uji minimum untuk RPC
+  pengganti: `eth_getLogs` (lebar + arsip + sidik jari lawan provider kedua),
+  `eth_getBlockByNumber` untuk **`latest` DAN `finalized`**, dan batch JSON-RPC.
+- **Satu chunk Aave 2.000 blok makan ~58 detik, dan yang mahal BUKAN
+  `eth_getLogs`.** Terukur 2026-09-08: 1.804 log dipungut cepat, sisanya habis
+  di `blockTimestamps` — satu `getBlock` per blok unik. Memperbesar chunk
+  karena itu TIDAK menaikkan throughput; ia hanya memperbesar satuan kerja dan
+  menunda penulisan cursor. Sejalan dengan catatan lama: biaya watcher
+  ditentukan jumlah BLOK UNIK, bukan lebar rentang.
 - **Kepadatan log, bukan ukuran protokol, yang menentukan `chunkSize`.** Diukur
   2026-09-08 di rentang yang sama: Morpho 5.487 log per 2.000 blok, LEBIH PADAT
   daripada Aave (3.357) dan satu-satunya yang menabrak plafon 10.000 hasil di
