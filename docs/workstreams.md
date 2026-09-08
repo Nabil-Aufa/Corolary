@@ -40,7 +40,9 @@ Urutannya:
    `dev-fixtures.ts` di balik `NEXT_PUBLIC_USE_FIXTURES=true`.
 3. **A menghidupkan endpoint satu per satu**, mengumumkan tiap kali satu siap.
    B mematikan fixture untuk endpoint tersebut.
-4. **Sebelum submit** `NEXT_PUBLIC_USE_FIXTURES=false` dan `pnpm check:no-mocks`
+4. **Sebelum submit** `NEXT_PUBLIC_USE_FIXTURES=false` dan `pnpm check:no-mocks:submit`
+   (varian `:submit`, bukan `check:no-mocks` polos — yang polos menjawab "LULUS
+   SEBAGIAN" dan exit 0 kalau frontend tidak ditemukan)
    memastikan tak ada fixture yang ikut ter-bundle.
 
 > Fixture adalah perancah pembangunan, **bukan** fitur produk. Ia mati secara default
@@ -166,7 +168,7 @@ dan mulai membangun tanpa bertanya apa pun.
 - [ ] Responsif, aksesibel
 - [ ] Keadaan loading/kosong/error di semua tampilan
 - [ ] Animasi masuk halaman
-- [ ] **Cabut semua fixture**, jalankan `pnpm check:no-mocks`
+- [ ] **Cabut semua fixture**, jalankan `pnpm check:no-mocks:submit`
 
 ---
 
@@ -179,7 +181,7 @@ dan mulai membangun tanpa bertanya apa pun.
 | **M2** | Skor hidup | CreditGraph memberi skor untuk alamat Ethereum nyata |
 | **M3** | Pasar jalan | Pinjam dengan rasio kolateral berbasis skor berhasil end-to-end |
 | **M4** | UI lengkap | Kelima halaman jalan dengan data nyata, fixture mati |
-| **M5** | Siap submit | Deploy, dokumentasi teknis, video demo, deck, `check:no-mocks` lulus |
+| **M5** | Siap submit | Deploy, dokumentasi teknis, video demo, deck, `check:no-mocks:submit` lulus |
 
 **M1 adalah momen paling penting.** Begitu satu fakta Ethereum mainnet nyata berhasil
 dibuktikan dan tercatat di Creditcoin, seluruh tesis proyek sudah terbukti dan sisanya

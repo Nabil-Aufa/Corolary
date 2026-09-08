@@ -61,8 +61,12 @@ jobs:
 
       - run: pnpm test
 
-      # Terakhir, dan tanpa --require-web: apps/web belum ada dan itu milik
-      # Dev B. Naikkan ke `check:no-mocks:submit` begitu frontend masuk —
-      # sampai saat itu gerbang ini hanya memeriksa separuh permukaan, dan
-      # keluarannya mengatakan begitu.
-      - run: pnpm check:no-mocks
+      # Terakhir, dan dengan --require-web (`:submit`): apps/web sudah masuk,
+      # jadi frontend yang HILANG kini kegagalan, bukan peringatan.
+      #
+      # Bedanya bukan kosmetik. Varian tanpa --require-web melaporkan "LULUS
+      # SEBAGIAN" dan exit 0 ketika root frontend tidak ditemukan — persis
+      # bentuk kegagalan yang pernah membuat gerbang ini lulus setelah
+      # memeriksa NOL berkas. Gerbang yang tidak menemukan apa pun harus
+      # gagal; sekarang CI menegakkan itu, bukan cuma skripnya.
+      - run: pnpm check:no-mocks:submit
