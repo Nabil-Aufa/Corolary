@@ -159,6 +159,29 @@ aplikasinya yang rusak. API sebaliknya: isi `/v1/health`.
 memproses event sama akan bertabrakan nonce; replay protection on-chain menyelamatkan
 konsistensi data, tapi transaksi terbuang dan CTC terkuras.
 
+> **Yang berbahaya adalah dua DATABASE, bukan dua proses.** `claimNextNonce`
+> satu `UPDATE ... RETURNING` atomik, jadi dua proses yang membaca baris
+> `submitter_state` yang SAMA tidak akan bertabrakan. Yang menabrak adalah dua
+> instance dengan `DATABASE_URL` BERBEDA: keduanya memegang kunci submitter yang
+> sama tapi menghitung nonce dari pembukuan sendiri-sendiri, dan keduanya akan
+> mengklaim nonce yang sama.
+>
+> **Ini konkret saat cutover, bukan hipotesis.** Selama pengembangan, indexer
+> berjalan di laptop Dev A terhadap Postgres lokal. Begitu indexer Railway
+> menyala dengan Postgres Railway, keduanya hidup di atas dua database berbeda
+> dengan satu kunci submitter. Urutannya karena itu WAJIB: **matikan indexer
+> laptop lebih dulu, verifikasi mati, baru nyalakan yang di Railway.**
+>
+> ```bash
+> # di laptop Dev A — pola prosesnya, bukan 'tsx src/main.ts' yang tidak cocok
+> pkill -f 'Corolary/services/indexer'
+> pgrep -f 'Corolary/services/indexer'   # harus kosong
+> ```
+>
+> Gejala kalau urutannya terbalik: transaksi `replacement transaction
+> underpriced` atau nonce yang lompat, dan sebagian batch hilang tanpa ada
+> pihak yang terlihat salah.
+
 
 ### Build & start command — Railway TIDAK bisa menebaknya
 
@@ -195,6 +218,10 @@ Karena kedua service memang dijalankan oleh `tsx` saat runtime, tempatnya di
 ```bash
 ETHEREUM_RPC_URL=https://rpc.mevblocker.io                  # archive + getLogs lebar
 ETHEREUM_RPC_URL_FALLBACK=https://eth.drpc.org              # cadangan, ~50 blok
+# KEDUANYA wajib diisi. `FALLBACK` bukan sekadar redundansi di sini: mevblocker
+# tidak melayani tag blok `finalized`, dan watcher memakainya tiap iterasi.
+# Tanpa cadangan, watcher gagal di panggilan PERTAMA tiap putaran dan diam total
+# tanpa satu baris log pun — lihat CLAUDE.md.
 ETHEREUM_CHAIN_KEY=3
 CREDITCOIN_RPC_URL=https://rpc.cc3-testnet.creditcoin.network
 CREDITCOIN_CHAIN_ID=102031
