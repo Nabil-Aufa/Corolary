@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import type { TransactionSql } from 'postgres';
 import { sql } from '../db/client.js';
-import { ETH_CHAIN_KEY, ethGetLogs, ethCall } from '../chain/providers.js';
+import { ETH_CHAIN_KEY, ethGetLogs, ethCall, ethFinalizedBlock } from '../chain/providers.js';
 import { stageLogger } from '../logger.js';
 import type { ProtocolWatchConfig } from './protocols.js';
 
@@ -18,7 +18,6 @@ const log = stageLogger('watcher');
  * Ongkosnya: watcher tertinggal head ~12-19 menit (2 epoch). Itu ~1,3% dari
  * anggaran 24 jam eager-proving, jadi murah.
  */
-const FINALIZED = 'finalized';
 
 /** Batas bawah saat cursor belum ada: mulai dari masa lalu dekat, bukan genesis. */
 const LIVE_START_LOOKBACK_BLOCKS = 300;
@@ -126,7 +125,7 @@ export async function insertLogs(
  * cursor bisa maju sementara log belum masuk, dan event itu hilang selamanya.
  */
 export async function watchOnce(cfg: ProtocolWatchConfig): Promise<void> {
-  const head = await ethCall('getBlock', (p) => p.getBlock(FINALIZED));
+  const head = await ethFinalizedBlock();
   if (!head) return; // RPC belum siap; coba lagi di iterasi berikutnya
 
   const stored = await readCursor(cfg.address);

@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { sql } from '../db/client.js';
-import { submitter, ETH_CHAIN_KEY, ethGetLogs, ethCall } from '../chain/providers.js';
+import { submitter, ETH_CHAIN_KEY, ethGetLogs, ethCall, ethFinalizedBlock } from '../chain/providers.js';
 import { loadAbi } from '../chain/abi.js';
 import { requireContracts } from '../config.js';
 import { stageLogger } from '../logger.js';
@@ -294,7 +294,7 @@ export async function refreshPricesOnce(): Promise<void> {
     log.warn({ err: String(err) }, 'verifikasi feed gagal — dicoba lagi putaran berikutnya');
   }
 
-  const head = await ethCall('getBlock', (p) => p.getBlock('finalized'));
+  const head = await ethFinalizedBlock();
   if (!head) return;
 
   // Satu transaksi Ethereum hanya boleh dikirim sekali per putaran: replay

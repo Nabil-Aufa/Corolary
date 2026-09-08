@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { sql } from '../db/client.js';
-import { ETH_CHAIN_KEY, ethGetLogs, ethCall } from '../chain/providers.js';
+import { ETH_CHAIN_KEY, ethGetLogs, ethCall, ethFinalizedBlock } from '../chain/providers.js';
 import { stageLogger } from '../logger.js';
 import { insertLogs, blockTimestamps } from '../watcher/watch.js';
 import { buildBatches, type ProvableTx } from '../prover/batching.js';
@@ -145,7 +145,7 @@ export async function backfillSubject(opts: BackfillOptions): Promise<BackfillRe
   const subject = ethers.getAddress(opts.subject);
   const targets = targetsFor(opts.protocols);
 
-  const head = await ethCall('getBlock', (p) => p.getBlock('finalized'));
+  const head = await ethFinalizedBlock();
   if (!head) throw new Error('RPC Ethereum tidak mengembalikan blok finalized');
 
   const blocks = Math.round((opts.months * 30.44 * 24 * 3600) / 12);

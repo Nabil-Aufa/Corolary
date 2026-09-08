@@ -84,12 +84,20 @@ test('primary gagal -> rentang dipecah ke batas cadangan', async () => {
         return [log(ff.fromBlock)];
       },
     }),
-    { fromBlock: 100, toBlock: 129 },
+    // Rentang DITURUNKAN dari batasnya, bukan ditulis sebagai angka mati.
+    // Versi lama mengunci 100..129 dengan harapan 3 potongan, jadi ia gagal
+    // begitu `FALLBACK_MAX_LOG_RANGE` naik 10 -> 50 — padahal yang diuji
+    // (pemecahan sampai batas cadangan) tetap benar. Tes yang ikut berubah
+    // bersama konstantanya menguji perilakunya, bukan angkanya.
+    { fromBlock: 100, toBlock: 100 + FALLBACK_MAX_LOG_RANGE * 3 - 1 },
   );
 
-  assert.equal(seen.length, 3, `30 blok / ${FALLBACK_MAX_LOG_RANGE} = 3 permintaan`);
-  assert.deepEqual(seen[0], [100, 109]);
-  assert.deepEqual(seen[2], [120, 129]);
+  assert.equal(seen.length, 3, `3 x ${FALLBACK_MAX_LOG_RANGE} blok = 3 permintaan`);
+  assert.deepEqual(seen[0], [100, 100 + FALLBACK_MAX_LOG_RANGE - 1]);
+  assert.deepEqual(seen[2], [
+    100 + FALLBACK_MAX_LOG_RANGE * 2,
+    100 + FALLBACK_MAX_LOG_RANGE * 3 - 1,
+  ]);
   // Hasil tiap potongan digabung, bukan hanya yang terakhir.
   assert.equal(out.length, 3);
 });

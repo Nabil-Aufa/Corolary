@@ -50,6 +50,41 @@ export function ethGetLogs(filter: ethers.Filter): Promise<ethers.Log[]> {
   return getLogsWithFailover(ethereum, ethereumFallback, filter);
 }
 
+/**
+ * Kepala rantai yang sudah FINAL, dengan rute yang sadar kemampuan.
+ *
+ * mevblocker — RPC utama — hanya melayani tag `latest` dan nomor blok. `safe`,
+ * `finalized`, dan `pending` dijawab halaman Cloudflare `error code: 1015`,
+ * yaitu HTML, bukan JSON; ethers menerjemahkannya jadi 504 Gateway Timeout.
+ * Gejalanya jauh lebih buruk daripada kedengarannya: `getBlock('finalized')`
+ * adalah panggilan PERTAMA di tiap iterasi watcher, jadi kegagalannya membatalkan
+ * iterasi sebelum satu baris log watcher pun ditulis. Terukur 2026-09-08 —
+ * cursor keempat protokol tidak bergerak sedetik pun sementara submitter dan
+ * jalur harga bekerja normal, dan `stage: "watcher"` sama sekali absen dari log.
+ *
+ * Karena itu tag ini dirutekan ke CADANGAN lebih dulu. Ini bukan failover —
+ * failover bereaksi setelah gagal, sedangkan di sini kita sudah TAHU siapa yang
+ * sanggup. Membiarkannya jatuh lewat failover berarti membayar satu 504 (dan
+ * satu peringatan DEGRADASI palsu) setiap iterasi, selamanya.
+ *
+ * Tanpa cadangan, kita tetap mencoba yang utama: gagal dengan sebab yang jelas
+ * lebih baik daripada diam-diam memakai `latest` — blok yang belum final bisa
+ * ter-reorg, dan fakta yang dibuktikan di atasnya tidak bisa ditarik kembali.
+ */
+export async function ethFinalizedBlock(): Promise<ethers.Block | null> {
+  if (ethereumFallback) {
+    try {
+      return await ethereumFallback.getBlock('finalized');
+    } catch (err) {
+      // Cadangan pun bisa jatuh; baru di sinilah yang utama patut dicoba.
+      return withFailover('getBlockFinalized', ethereum, null, (p) =>
+        p.getBlock('finalized'),
+      );
+    }
+  }
+  return ethereum.getBlock('finalized');
+}
+
 /** `getBlock`/`getTransactionReceipt`/`eth_call` — cadangan melayani penuh. */
 export function ethCall<T>(
   label: string,
