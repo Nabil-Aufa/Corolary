@@ -524,12 +524,14 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   mengembalikan `ok = false` dan pasar tUSDC membeku diam-diam sampai ronde
   berikutnya masuk. Dinaikkan ke **28 jam** (100.800 detik) di chain dan di
   `Deploy.s.sol` — tanpa yang kedua, redeploy mengembalikan bug-nya.
-- **Batas per-aset tidak bisa ditambahkan tanpa redeploy berantai.**
-  `EfficiencyMarket.priceRegistry` di-set di konstruktor dan tidak punya setter,
-  jadi mengganti `PriceRegistry` berarti men-deploy ulang `EfficiencyMarket` dan
-  `CreditGraph` juga — sekaligus membatalkan alamat yang sudah dipublikasikan di
-  README dan verifikasi Blockscout-nya. Periksa ada-tidaknya setter SEBELUM
-  merencanakan perbaikan yang menyentuh alamat kontrak.
+- **~~Batas per-aset tidak bisa ditambahkan tanpa redeploy berantai.~~ SUDAH
+  TIDAK BERLAKU** — `setPriceRegistry` kini ada (lihat bullet di bawah). Dulu
+  `EfficiencyMarket.priceRegistry` hanya di-set di konstruktor, jadi mengganti
+  `PriceRegistry` memaksa deploy ulang `EfficiencyMarket` dan `CreditGraph` juga
+  — sekaligus membatalkan alamat yang sudah dipublikasikan di README dan
+  verifikasi Blockscout-nya. Yang tetap berlaku adalah aturannya: periksa
+  ada-tidaknya setter SEBELUM merencanakan perbaikan yang menyentuh alamat
+  kontrak.
 - **Harga bukan jumlah uang, dan tidak boleh memakai formatter yang sama.**
   `wadToUsd` dua desimal membuat USDC $0,99994916 terbaca `"0.99"` — tak
   terbedakan dari $0,99, selisih 1% pada aset yang seluruh gunanya menempel di
@@ -598,6 +600,40 @@ Tiga lapis: **FactRegistry** (infrastruktur, inti produk) → **CreditGraph** (s
   event yang kita decode" — temuan yang akan mengubah keputusan desain — padahal
   keduanya memancarkan normal. Sekeluarga dengan jebakan `set -- $VAR` di zsh:
   perintah verifikasi WAJIB disertai KONTROL yang hasilnya sudah diketahui.
+
+- **Batas `eth_getLogs` drpc free RUNTUH dari 3.000 blok ke ~110.** Diukur
+  2026-09-08 dengan KONTROL kontrak ramai (USDC Transfer, agar "0 log" tidak
+  disalahartikan sebagai jebakan llamarpc): span 100 → 10.622 log, span 110 →
+  11.613 log, span 120 ke atas → HTTP 400 `"Can't route your request to suitable
+  provider"`, deterministik tiga kali berturut-turut. Bandingkan catatan
+  2026-08-25 di dokumen ini: 3.000 blok selesai <500 ms. Ini bentuk kegagalan
+  drpc KELIMA, dan satu-satunya yang **tidak transien** — jangan diperlakukan
+  seperti 400 yang lama. Akibatnya `SCAN_CHUNK_BLOCKS` 3.000 mustahil, jalur
+  harga mati total, dan failover menolak persis seperti dirancang (300
+  permintaan > `FALLBACK_MAX_SPLITS` 50). Tidak ada penggantinya yang gratis:
+  Alchemy free tetap 10 blok inklusif, publicnode dan ankr menuntut token, 1rpc
+  maks 50, llamarpc tidak menjawab JSON. Memperkecil chunk ke 110 berarti ~27x
+  permintaan dan hampir pasti kena rate limit — kapasitas RPC sekarang keputusan
+  anggaran, bukan tuning konstanta.
+- **Indexer bisa mati berhari-hari tanpa satu pun gejala di API.** Terukur
+  2026-09-08: seluruh indexer berhenti 2026-09-04 12:52 UTC, dan
+  `/v1/market/reserves` tetap menyajikan `priceUsd` sehat dari mirror Postgres
+  selama 96 jam sementara `tryToUsd1e18` menjawab `false` untuk tUSDC maupun
+  tWETH. Sekarang `Reserve.priceFresh` dan `IndexerStatus.marketFrozen` membaca
+  gerbang on-chain yang sama dengan `EfficiencyMarket._usdOrRevert` lewat helper
+  bersama `services/api/src/lib/price-freshness.ts` — SATU sumber, karena dua
+  definisi "segar" yang bisa menyimpang adalah cara membuat dashboard hijau di
+  atas pasar beku.
+- **Jangan simpulkan `maxPriceAgeOf` hilang dari "pasar beku".** Dugaan itu
+  muncul 2026-09-08 dan salah: override USDC 100.800 detik masih terpasang di
+  registry yang hidup, dan penyebabnya RPC, bukan ambang. Ambang dibaca dengan
+  `cast call maxAgeFor(address)` pada aset yang dipakai pasar — ia sudah
+  me-resolve alias dan override sekaligus, tidak seperti `maxPriceAgeOf` mentah
+  yang menjawab 0 untuk setiap aset tanpa override dan terbaca seperti hilang.
+- **`EfficiencyMarket.priceRegistry` PUNYA setter** — `setPriceRegistry(address)`,
+  ber-`DEFAULT_ADMIN_ROLE`, diverifikasi di sumber 2026-09-08. Mengganti
+  `PriceRegistry` karena itu TIDAK lagi menyeret redeploy `EfficiencyMarket` dan
+  `CreditGraph`.
 
 - **Token testnet dinilai lewat `PriceRegistry.setPriceAlias`.** `tUSDC`/`tWETH`
   tidak punya feed Chainlink sendiri, dan satu aggregator hanya bisa menunjuk satu

@@ -212,6 +212,22 @@ export interface IndexerQueue {
   skipped24h: number;
 }
 
+/**
+ * Satu reserve dan apakah KONTRAK masih menerima harganya.
+ *
+ * Duplikat sebagian dari `Reserve`, dan itu disengaja: `/v1/indexer/status`
+ * dipakai untuk memutuskan "apakah sistemnya sehat" tanpa harus ikut menarik
+ * seluruh state pasar. Yang tidak boleh menyimpang adalah SUMBER-nya — kedua
+ * endpoint membaca `PriceRegistry.tryToUsd1e18` lewat helper yang sama.
+ */
+export interface MarketFreshnessEntry {
+  asset: Address;
+  symbol: string;
+  priceFresh: boolean;
+  priceAgeSeconds: number | null;
+  priceMaxAgeSeconds: number;
+}
+
 export interface IndexerStatus {
   chainKey: number;
   latestEthereumBlock: number;
@@ -237,6 +253,21 @@ export interface IndexerStatus {
    * semuanya; lihat komentar `maxOnChainPriceAgeSeconds` di `status.ts`.
    */
   onChainPriceAgeSeconds: number | null;
+  /**
+   * `true` bila ADA satu saja reserve yang harganya sudah ditolak kontrak.
+   *
+   * Ini yang membedakan "indexer sehat" dari "produk bisa dipakai": jalur fakta
+   * bisa terus mengalir dengan seluruh antrean hijau sementara `borrow`,
+   * `withdraw`, dan `liquidate` semuanya revert dengan `MarketFrozenStalePrice`.
+   * Terjadi 2026-08-26 dan lagi 2026-08-30 (91,8 jam nol `recordPrice`), dan
+   * kedua kali tidak ada satu pun angka di status yang menyalakannya.
+   *
+   * Sengaja OR, bukan AND: satu aset beku sudah cukup membuat alur demo —
+   * jaminkan tWETH, pinjam tUSDC — mustahil diselesaikan.
+   */
+  marketFrozen: boolean;
+  /** Rincian per reserve, supaya "beku" bisa menyebut aset dan ambangnya. */
+  marketFreshness: MarketFreshnessEntry[];
 }
 
 export interface HealthStatus {

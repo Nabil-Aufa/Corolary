@@ -4,6 +4,7 @@ import { ok } from '../lib/envelope.js';
 import { parseAddress } from '../lib/validate.js';
 import { market, creditGraph, creditcoin, priceRegistry, scaledToActual, wadToUsd, wadToUsdPrice, usdOf, ensureCreditcoinAsset } from '../lib/chain.js';
 import { resolveAliasPrices, createAliasCache } from '../lib/alias.js';
+import { priceFreshnessOf } from '../lib/price-freshness.js';
 import type {
   AccountPositions, Address, Hex, MarketSummary, PositionEntry, Reserve, Tier,
 } from '@corolary/shared';
@@ -36,43 +37,6 @@ async function listReserves(): Promise<
 }
 
 interface AssetMeta { symbol: string; decimals: number; answer: string | null; priceDecimals: number | null; sourceTxHash: string | null }
-
-/**
- * Kesegaran harga MENURUT KONTRAK, dibaca per aset dari `PriceRegistry`.
- *
- * Ada karena `priceUsd` di respons datang dari mirror Postgres, dan mirror itu
- * tetap memperlihatkan angka yang sehat lama setelah kontrak berhenti
- * menerimanya — persis mode kegagalan yang terjadi saat cutover PriceRegistry:
- * UI normal, pasar beku. Satu-satunya jawaban jujur soal beku/tidak datang dari
- * chain, dan lewat gerbang yang PERSIS sama dengan yang ditegakkan pasar.
- */
-interface PriceFreshness {
-  fresh: boolean;
-  updatedAt: number | null;
-  ageSeconds: number | null;
-  maxAgeSeconds: number;
-}
-
-async function priceFreshness(asset: string, decimals: number): Promise<PriceFreshness> {
-  const [data, maxAge, age, usd] = await Promise.all([
-    priceRegistry.getFunction('priceDataOf')(asset) as Promise<{ roundId: bigint; updatedAt: bigint }>,
-    priceRegistry.getFunction('maxAgeFor')(asset) as Promise<bigint>,
-    priceRegistry.getFunction('priceAgeSeconds')(asset) as Promise<bigint>,
-    // Gerbang yang sama dengan `_usdOrRevert`. Jumlahnya satu unit penuh, bukan
-    // 1 wei: `tryToUsd1e18` menjawab `false` untuk amount != 0 pada aset yang
-    // desimalnya belum terdaftar, dan itu memang bagian dari gerbangnya.
-    priceRegistry.getFunction('tryToUsd1e18')(asset, 10n ** BigInt(decimals)) as Promise<
-      [bigint, boolean]
-    >,
-  ]);
-  const hasPrice = data.roundId !== 0n;
-  return {
-    fresh: usd[1],
-    updatedAt: hasPrice ? Number(data.updatedAt) : null,
-    ageSeconds: hasPrice ? Number(age) : null,
-    maxAgeSeconds: Number(maxAge),
-  };
-}
 
 async function assetMeta(addresses: string[]): Promise<Map<string, AssetMeta>> {
   if (addresses.length === 0) return new Map();
@@ -172,11 +136,7 @@ marketRoutes.get('/market/reserves', async (c) => {
   const freshness = new Map(
     await Promise.all(
       reserves.map(
-        async (r) =>
-          [
-            r.asset.toLowerCase(),
-            await priceFreshness(r.asset, meta.get(r.asset.toLowerCase())?.decimals ?? 18),
-          ] as const,
+        async (r) => [r.asset.toLowerCase(), await priceFreshnessOf(r.asset)] as const,
       ),
     ),
   );

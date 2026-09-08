@@ -4,7 +4,10 @@ import { ok } from '../lib/envelope.js';
 import { config, VERSION, STARTED_AT } from '../config.js';
 import { creditcoin, chainInfoProvider, priceRegistry } from '../lib/chain.js';
 import { protocolName } from '../lib/protocols.js';
-import type { Address, ChainStatus, HealthStatus, IndexerStatus } from '@corolary/shared';
+import { reservePriceFreshness } from '../lib/price-freshness.js';
+import type {
+  Address, ChainStatus, HealthStatus, IndexerStatus, MarketFreshnessEntry,
+} from '@corolary/shared';
 
 export const status = new Hono();
 
@@ -146,6 +149,7 @@ status.get('/indexer/status', async (c) => {
   const distinctSubjects = Number(totals[0]?.distinct_subjects ?? 0);
 
   const onChainPriceAgeSeconds = await maxOnChainPriceAgeSeconds();
+  const marketFreshness = await marketFreshnessEntries();
 
   const data: IndexerStatus = {
     chainKey: config.ETHEREUM_CHAIN_KEY,
@@ -173,6 +177,10 @@ status.get('/indexer/status', async (c) => {
     totalFacts,
     distinctSubjects,
     onChainPriceAgeSeconds,
+    // Kosong berarti reserve tidak bisa dibaca sama sekali, dan itu BUKAN
+    // "tidak beku". Lihat komentar di `marketFreshnessEntries`.
+    marketFrozen: marketFreshness.length === 0 || marketFreshness.some((m) => !m.priceFresh),
+    marketFreshness,
   };
   return ok(c, data);
 });
@@ -227,4 +235,39 @@ async function maxOnChainPriceAgeSeconds(): Promise<number | null> {
   }
 
   return maxAge;
+}
+
+/**
+ * Kesegaran harga per reserve, plus simbol dari mirror `assets` untuk label.
+ *
+ * Angkanya dari CHAIN; hanya simbolnya dari Postgres. Itu batas yang penting:
+ * simbol yang basi cuma salah label, sedangkan kesegaran yang basi adalah
+ * dashboard hijau di atas pasar yang beku.
+ *
+ * Kalau daftar reserve tidak bisa dibaca, fungsi ini mengembalikan array KOSONG
+ * dan pemanggilnya memvonis `marketFrozen: true`. Gagal ke arah "beku" disengaja:
+ * "kami tidak tahu" dan "semuanya baik" tidak boleh terlihat sama pada field
+ * yang seluruh gunanya adalah memperingatkan.
+ */
+async function marketFreshnessEntries(): Promise<MarketFreshnessEntry[]> {
+  let rows: { asset: string; freshness: Awaited<ReturnType<typeof reservePriceFreshness>>[number]['freshness'] }[];
+  try {
+    rows = await reservePriceFreshness();
+  } catch (err) {
+    console.error('reservePriceFreshness gagal:', err);
+    return [];
+  }
+
+  const symbols = await sql<{ address: string; symbol: string }[]>`
+    SELECT address, symbol FROM assets WHERE address = ANY(${rows.map((r) => r.asset)})
+  `;
+  const bySymbol = new Map(symbols.map((r) => [r.address.toLowerCase(), r.symbol]));
+
+  return rows.map((r) => ({
+    asset: r.asset as Address,
+    symbol: bySymbol.get(r.asset.toLowerCase()) ?? '',
+    priceFresh: r.freshness.fresh,
+    priceAgeSeconds: r.freshness.ageSeconds,
+    priceMaxAgeSeconds: r.freshness.maxAgeSeconds,
+  }));
 }

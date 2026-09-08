@@ -362,7 +362,24 @@ curl -s https://api.corolary.xyz/v1/indexer/status
     "oldestUnprovenAgeSeconds": 612,
     "totalFacts": 32481,
     "distinctSubjects": 1327,
-    "onChainPriceAgeSeconds": 4120
+    "onChainPriceAgeSeconds": 4120,
+    "marketFrozen": false,
+    "marketFreshness": [
+      {
+        "asset": "0x66f5F2C577ec38CE5bb7BCb7054a531a72004d19",
+        "symbol": "tUSDC",
+        "priceFresh": true,
+        "priceAgeSeconds": 4120,
+        "priceMaxAgeSeconds": 100800
+      },
+      {
+        "asset": "0x886E3d92314c037206bB789Ee3A9016EE67b661E",
+        "symbol": "tWETH",
+        "priceFresh": true,
+        "priceAgeSeconds": 951,
+        "priceMaxAgeSeconds": 10800
+      }
+    ]
   }
 }
 ```
@@ -377,6 +394,25 @@ Field kunci:
 | `totalFacts` | Jumlah baris `facts` KUMULATIF, seluruh riwayat — bukan 24 jam terakhir seperti `queue.recorded24h` |
 | `distinctSubjects` | Jumlah dompet berbeda yang punya minimal satu fakta terbukti |
 | `onChainPriceAgeSeconds` | Umur harga terbesar di antara aset kanonik (WETH/WBTC/USDC), dibaca LANGSUNG dari `PriceRegistry.priceDataOf` on-chain — bukan dari mirror Postgres `prices`. `null` kalau registry kosong untuk semua aset kanonik atau RPC gagal |
+| `marketFrozen` | `true` bila ADA satu saja reserve yang harganya sudah ditolak kontrak. Satu-satunya field di endpoint ini yang menjawab "produknya bisa dipakai atau tidak" |
+| `marketFreshness[]` | Rincian per reserve: `priceFresh` dari `tryToUsd1e18` on-chain, `priceAgeSeconds` vs `priceMaxAgeSeconds` (= `maxAgeFor(asset)`, berbeda antar aset) |
+
+> **Antrean hijau tidak berarti produknya hidup.** Jalur fakta dan jalur harga
+> berjalan terpisah, jadi seluruh `queue.*` bisa sehat dan `recorded24h` terus
+> naik sementara setiap `borrow`/`withdraw`/`liquidate` revert dengan
+> `MarketFrozenStalePrice`. Persis itu yang terjadi 2026-08-26 dan lagi
+> 2026-08-30 — 91,8 jam nol `recordPrice` dengan setiap dashboard hijau.
+> `marketFrozen` ada supaya keadaan itu punya SATU field yang menyalakannya.
+>
+> `marketFrozen` bernilai `true` juga ketika daftar reserve gagal dibaca
+> (`marketFreshness` kosong). Itu disengaja: "kami tidak tahu" dan "semuanya
+> baik" tidak boleh terlihat sama pada field yang seluruh gunanya memperingatkan.
+>
+> `onChainPriceAgeSeconds` menjawab pertanyaan yang MIRIP tapi bukan yang sama —
+> ia umur terbesar di antara aset KANONIK (WETH/WBTC/USDC), sementara
+> `marketFreshness` mengikuti reserve yang benar-benar terdaftar di pasar dan
+> membandingkannya dengan ambang masing-masing. Umur 20.000 detik adalah bencana
+> untuk tWETH (anggaran 10.800) dan sama sekali normal untuk tUSDC (100.800).
 
 ### Respons Error
 
