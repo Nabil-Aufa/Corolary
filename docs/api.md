@@ -929,7 +929,11 @@ curl -s https://api.corolary.xyz/v1/market/reserves
       "utilizationBps": 0,
       "borrowEnabled": true,
       "priceUsd": "0.999949",
-      "priceSourceTxHash": "0x25466b36fdf34cfe1b767e4a64b7389cd96b32ec80a1d3d105d1560c5525321c"
+      "priceSourceTxHash": "0x25466b36fdf34cfe1b767e4a64b7389cd96b32ec80a1d3d105d1560c5525321c",
+      "priceFresh": true,
+      "priceUpdatedAt": 1788508823,
+      "priceAgeSeconds": 4120,
+      "priceMaxAgeSeconds": 100800
     },
     {
       "asset": "0x886E3d92314c037206bB789Ee3A9016EE67b661E",
@@ -942,7 +946,11 @@ curl -s https://api.corolary.xyz/v1/market/reserves
       "utilizationBps": 0,
       "borrowEnabled": false,
       "priceUsd": "2511.240000",
-      "priceSourceTxHash": "0x7f4c377c94034e24d8c9f49f579581ba8b1087605a6f6f319ba68f29ef18b659"
+      "priceSourceTxHash": "0x7f4c377c94034e24d8c9f49f579581ba8b1087605a6f6f319ba68f29ef18b659",
+      "priceFresh": true,
+      "priceUpdatedAt": 1788524579,
+      "priceAgeSeconds": 951,
+      "priceMaxAgeSeconds": 10800
     }
   ],
   "meta": { "total": 2 }
@@ -967,6 +975,30 @@ milik kontrak, dan salinan kedua adalah salinan yang akan menyimpang.
 
 Saldo nol karena belum ada yang meminjam di pasar testnet; itu state sungguhan,
 bukan placeholder.
+
+> **`priceFresh` adalah satu-satunya field yang mengatakan pasar beku atau tidak.**
+> `priceUsd` datang dari mirror Postgres `prices`; ia tetap memperlihatkan angka
+> yang sehat berjam-jam setelah `PriceRegistry` berhenti menerimanya. `priceFresh`
+> dibaca dari `tryToUsd1e18` on-chain — gerbang yang PERSIS sama dengan yang
+> ditegakkan `EfficiencyMarket`. Ketika `false`, `borrow`, `withdraw`, dan
+> `liquidate` pada aset itu akan revert dengan `MarketFrozenStalePrice`, jadi
+> klien harus menonaktifkan kontrolnya, bukan membiarkan pengguna menemukannya
+> lewat transaksi gagal.
+>
+> Membekunya disengaja: harga basi MEMBEKUKAN pasar alih-alih dipakai apa adanya.
+> `priceAgeSeconds` dan `priceMaxAgeSeconds` ada supaya alasannya bisa dinyatakan
+> dengan angka ("basi 4 jam dari anggaran 3 jam") dan bukan sekadar "harga basi"
+> tanpa ambang.
+>
+> `priceMaxAgeSeconds` BERBEDA antar aset dan itu benar, bukan inkonsistensi:
+> ia `maxAgeFor(asset)`, yaitu anggaran global (10.800 detik) kecuali aset
+> kanoniknya punya override. tUSDC mewarisi override USDC 100.800 detik karena
+> heartbeat Chainlink USDC/USD adalah 24 jam; tWETH memakai anggaran global
+> karena heartbeat ETH/USD 1 jam.
+>
+> `priceUpdatedAt` adalah waktu ronde Chainlink — waktu Ethereum yang TERBUKTI,
+> ada di dalam log yang dibuktikan Merkle proof. Bukan waktu pencatatan di
+> Creditcoin. Bandingkan dengan `Fact.observedAt`, yang tidak terbukti.
 
 > **Catatan `priceUsd`:** desimal string non-integer, **bukan** uint256 mentah —
 > ini nilai yang sudah dibagi `decimals` feed (8) untuk keterbacaan UI. Nilai

@@ -287,6 +287,36 @@ export interface Reserve {
    * tersedia. Lihat PriceEntry.sourceTxHash: harga tidak punya factId.
    */
   priceSourceTxHash: Hex | null;
+  /**
+   * Apakah KONTRAK masih menerima harga aset ini. `false` berarti
+   * `EfficiencyMarket` membekukan reserve ini: `borrow`, `withdraw`, dan
+   * `liquidate` akan revert dengan `MarketFrozenStalePrice`.
+   *
+   * Dibaca dari `PriceRegistry.tryToUsd1e18` — gerbang yang PERSIS sama dengan
+   * yang ditegakkan pasar, bukan turunan dari `priceUsd`. `priceUsd` datang
+   * dari mirror Postgres dan tetap terlihat sehat berjam-jam setelah kontrak
+   * berhenti menerimanya; membiarkan UI menyimpulkan kesegaran dari sana
+   * berarti tombol Borrow yang menjanjikan sesuatu yang pasti revert.
+   */
+  priceFresh: boolean;
+  /**
+   * Waktu ronde Chainlink yang tercatat, detik Unix — waktu Ethereum yang
+   * TERBUKTI (ada di dalam log yang dibuktikan Merkle proof), bukan waktu
+   * pencatatan di Creditcoin. null bila belum ada harga sama sekali.
+   */
+  priceUpdatedAt: number | null;
+  /**
+   * Umur harga dalam detik menurut jam Creditcoin — inilah angka yang
+   * dibandingkan kontrak terhadap `priceMaxAgeSeconds`. null bila belum ada
+   * harga.
+   */
+  priceAgeSeconds: number | null;
+  /**
+   * Anggaran kesegaran yang BERLAKU untuk aset ini (`maxAgeFor`), sudah
+   * memperhitungkan override per aset dan resolusi alias. Ada supaya UI bisa
+   * mengatakan "basi 4 jam dari anggaran 3 jam" alih-alih "basi" tanpa ambang.
+   */
+  priceMaxAgeSeconds: number;
 }
 
 export interface PositionEntry {

@@ -37,6 +37,43 @@ async function listReserves(): Promise<
 
 interface AssetMeta { symbol: string; decimals: number; answer: string | null; priceDecimals: number | null; sourceTxHash: string | null }
 
+/**
+ * Kesegaran harga MENURUT KONTRAK, dibaca per aset dari `PriceRegistry`.
+ *
+ * Ada karena `priceUsd` di respons datang dari mirror Postgres, dan mirror itu
+ * tetap memperlihatkan angka yang sehat lama setelah kontrak berhenti
+ * menerimanya — persis mode kegagalan yang terjadi saat cutover PriceRegistry:
+ * UI normal, pasar beku. Satu-satunya jawaban jujur soal beku/tidak datang dari
+ * chain, dan lewat gerbang yang PERSIS sama dengan yang ditegakkan pasar.
+ */
+interface PriceFreshness {
+  fresh: boolean;
+  updatedAt: number | null;
+  ageSeconds: number | null;
+  maxAgeSeconds: number;
+}
+
+async function priceFreshness(asset: string, decimals: number): Promise<PriceFreshness> {
+  const [data, maxAge, age, usd] = await Promise.all([
+    priceRegistry.getFunction('priceDataOf')(asset) as Promise<{ roundId: bigint; updatedAt: bigint }>,
+    priceRegistry.getFunction('maxAgeFor')(asset) as Promise<bigint>,
+    priceRegistry.getFunction('priceAgeSeconds')(asset) as Promise<bigint>,
+    // Gerbang yang sama dengan `_usdOrRevert`. Jumlahnya satu unit penuh, bukan
+    // 1 wei: `tryToUsd1e18` menjawab `false` untuk amount != 0 pada aset yang
+    // desimalnya belum terdaftar, dan itu memang bagian dari gerbangnya.
+    priceRegistry.getFunction('tryToUsd1e18')(asset, 10n ** BigInt(decimals)) as Promise<
+      [bigint, boolean]
+    >,
+  ]);
+  const hasPrice = data.roundId !== 0n;
+  return {
+    fresh: usd[1],
+    updatedAt: hasPrice ? Number(data.updatedAt) : null,
+    ageSeconds: hasPrice ? Number(age) : null,
+    maxAgeSeconds: Number(maxAge),
+  };
+}
+
 async function assetMeta(addresses: string[]): Promise<Map<string, AssetMeta>> {
   if (addresses.length === 0) return new Map();
 
@@ -132,9 +169,21 @@ marketRoutes.get('/market/summary', async (c) => {
 marketRoutes.get('/market/reserves', async (c) => {
   const reserves = await listReserves();
   const meta = await assetMeta(reserves.map((r) => r.asset));
+  const freshness = new Map(
+    await Promise.all(
+      reserves.map(
+        async (r) =>
+          [
+            r.asset.toLowerCase(),
+            await priceFreshness(r.asset, meta.get(r.asset.toLowerCase())?.decimals ?? 18),
+          ] as const,
+      ),
+    ),
+  );
 
   const data: Reserve[] = reserves.map((r) => {
     const m = meta.get(r.asset.toLowerCase());
+    const f = freshness.get(r.asset.toLowerCase())!;
     const supplied = scaledToActual(r.data.totalSuppliedScaled, r.data.liquidityIndex);
     const borrowed = scaledToActual(r.data.totalBorrowedScaled, r.data.borrowIndex);
     const utilization = supplied === 0n ? 0n : (borrowed * 10_000n) / supplied;
@@ -161,6 +210,10 @@ marketRoutes.get('/market/reserves', async (c) => {
         ? wadToUsdPrice((BigInt(m.answer) * 10n ** 18n) / 10n ** BigInt(m.priceDecimals))
         : null,
       priceSourceTxHash: (m?.sourceTxHash ?? null) as Hex | null,
+      priceFresh: f.fresh,
+      priceUpdatedAt: f.updatedAt,
+      priceAgeSeconds: f.ageSeconds,
+      priceMaxAgeSeconds: f.maxAgeSeconds,
     };
   });
 
