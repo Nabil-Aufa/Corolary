@@ -64,6 +64,20 @@ export interface FeedConfig {
    * pasar membeku diam-diam sampai ronde berikutnya masuk.
    */
   maxPriceAgeSeconds?: number;
+  /**
+   * Heartbeat feed dalam detik — jarak MAKSIMUM antar ronde yang dijamin
+   * Chainlink, walau harganya tidak bergerak sama sekali.
+   *
+   * WAJIB, bukan opsional. Ia dipakai untuk memutuskan kapan "feed diam"
+   * berarti ada yang rusak, dan tidak ada nilai default yang benar: menebak
+   * 1 jam untuk feed 24 jam menghasilkan alarm palsu tiap hari, sedangkan
+   * menebak 24 jam untuk feed 1 jam membuat aggregator yang benar-benar mati
+   * tidak ketahuan sampai pasar membeku. Feed baru harus menyatakannya.
+   *
+   * Semua nilai di bawah DIUKUR dari jarak `updatedAt` ronde nyata di mainnet
+   * 2026-09-08, bukan disalin dari dokumentasi.
+   */
+  heartbeatSeconds: number;
 }
 
 /**
@@ -83,12 +97,18 @@ export const FEEDS: FeedConfig[] = [
     proxy: '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
     aggregator: '0x7d4E742018fb52E48b08BE73d041C18B21de6Fb5',
     asset: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
+    // 35 ronde per 9.000 blok, jarak maks DAN median 1,01 jam.
+    heartbeatSeconds: 3_600,
   },
   {
     pair: 'BTC/USD',
     proxy: '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c',
     aggregator: '0x4a3411ac2948B33c69666B35cc6d055B27Ea84f1',
     asset: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', // WBTC
+    // 32 ronde per 9.000 blok, jarak maks 1,01 jam. Sebelumnya heartbeat BTC
+    // tidak pernah dinyatakan di berkas ini — diukur, bukan diasumsikan sama
+    // dengan ETH karena "sama-sama aset volatil".
+    heartbeatSeconds: 3_600,
   },
   {
     pair: 'USDC/USD',
@@ -107,6 +127,11 @@ export const FEEDS: FeedConfig[] = [
     // 28 jam = plafon heartbeat 24 jam + 4 jam kelonggaran operasional
     // (attestation ~8 menit, lalu prove dan submit).
     maxPriceAgeSeconds: 100_800,
+    // Jarak maks terukur 23,01 jam — ronde heartbeat diselingi ronde
+    // pemicu-deviasi berjarak ~1 jam, sehingga MEDIAN-nya 0,99 jam. Yang
+    // relevan di sini jarak maks, bukan median: heartbeat adalah jaminan
+    // terburuk, bukan laju biasanya.
+    heartbeatSeconds: 86_400,
   },
   {
     pair: 'USDT/USD',
@@ -125,6 +150,11 @@ export const FEEDS: FeedConfig[] = [
     // kontrak — bukan karena ada yang rusak, melainkan karena anggarannya
     // diukur untuk feed yang berbeda.
     maxPriceAgeSeconds: 100_800,
+    // Terukur 2026-09-08 atas 45.000 blok (~6,2 hari): 6 ronde, dan KELIMA
+    // jaraknya 24,00-24,01 jam. Nol ronde pemicu-deviasi — feed heartbeat
+    // murni. Perhatikan 24,01 jam sedikit MELEWATI nominalnya, jadi ambang
+    // yang dipasang persis 24 jam akan menyala pada setiap ronde.
+    heartbeatSeconds: 86_400,
   },
   {
     pair: 'DAI/USD',
@@ -133,5 +163,7 @@ export const FEEDS: FeedConfig[] = [
     asset: '0x6B175474E89094C44Da98b954EedeAC495271d0F', // DAI
     // Jendela dan anggaran default keduanya cukup: 30 ronde per 9.000 blok,
     // sekelas ETH/USD. Heartbeat 1 jam, jauh di dalam anggaran global 3 jam.
+    // Jarak maks terukur 1,02 jam.
+    heartbeatSeconds: 3_600,
   },
 ];

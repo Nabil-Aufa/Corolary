@@ -61,13 +61,62 @@ const SCAN_CHUNK_BLOCKS = 3_000;
 const MAX_LOOKBACK_BLOCKS = 6_000;
 
 /**
- * Ambang "mulai khawatir": setengah dari `maxPriceAge` on-chain.
+ * Ambang "mulai khawatir", dihitung PER FEED dari heartbeat-nya sendiri.
  *
- * Di bawah ini, tidak adanya ronde baru sama sekali bukan masalah — feed
- * Chainlink memang hanya memancarkan saat harga menyimpang atau heartbeat
- * jatuh tempo. Di atasnya, diam berarti pasar akan membeku dalam beberapa jam.
+ * Dulu ini satu konstanta 43.200 detik dengan komentar "setengah dari
+ * `maxPriceAge` on-chain" — dan itu salah ke DUA arah sekaligus, karena
+ * `maxPriceAge` bukan satu angka:
+ *
+ *   ETH/BTC/DAI  anggaran 10.800 dtk (3 jam)  -> ambang 43.200 TIDAK PERNAH
+ *                menyala sebelum pasar beku. Peringatannya mustahil berguna
+ *                justru pada tiga feed yang benar-benar menggerbangi pasar.
+ *   USDC/USDT    anggaran 100.800 dtk (28 jam) -> menyala di 12 jam, padahal
+ *                heartbeat-nya 24 jam. Diam selama 12 jam adalah keadaan
+ *                NORMAL, jadi ia menyala palsu tiap hari. Terjadi 2026-09-08:
+ *                USDT ditandai pada 14,6 jam, aggregator diperiksa, dan
+ *                ternyata tidak ada apa-apa.
+ *
+ * Peringatan yang mustahil menyala dan peringatan yang menyala palsu tiap hari
+ * sama-sama tidak berguna, dan yang kedua lebih berbahaya: ia melatih orang
+ * untuk mengabaikan baris ini.
+ *
+ * Basisnya HEARTBEAT, bukan anggaran, karena pertanyaan yang dijawab peringatan
+ * ini adalah "apakah feed-nya berhenti bekerja" — dan heartbeat adalah janji
+ * Chainlink tentang jarak maksimum antar ronde. Anggaran menjawab pertanyaan
+ * lain ("apakah pasar akan beku"), dan itu sudah ditangani baris ringkasan
+ * `priceFreshness` lewat `slackSeconds`.
  */
-const STALE_CONCERN_SECONDS = 43_200;
+const STALE_CONCERN_HEARTBEATS = 1.5;
+
+/**
+ * Plafon: peringatan harus selalu mendahului pembekuan pasar.
+ *
+ * Tanpa ini, USDT (heartbeat 24 jam x 1,5 = 36 jam) akan diperingatkan SETELAH
+ * anggarannya 28 jam terlewat — terlambat untuk berguna.
+ */
+const STALE_CONCERN_BUDGET_FRACTION = 0.9;
+
+/**
+ * Ambang efektif untuk satu feed, dalam detik.
+ *
+ * Marginnya diperiksa terhadap jarak ronde yang BENAR-BENAR terukur
+ * 2026-09-08, bukan terhadap heartbeat nominal — USDT nyatanya berjalan di
+ * 24,01 jam, sedikit MELEWATI nominal 24 jam, jadi ambang yang dipasang persis
+ * di heartbeat akan menyala pada setiap ronde:
+ *
+ *   ETH/BTC/DAI  min(5.400, 9.720)   = 5.400 dtk;  jarak terukur maks 3.672 -> margin 29 mnt
+ *   USDC/USDT    min(129.600, 90.720) = 90.720 dtk; jarak terukur maks 86.436 -> margin 1,2 jam
+ *
+ * Margin itu harus menutup lag pipeline kita sendiri (attestation ~8 menit,
+ * lalu prove dan submit), karena `ageSeconds` diukur dari `updatedAt` ronde —
+ * waktu Ethereum — bukan dari saat kita mencatatnya.
+ */
+function staleConcernSeconds(feed: FeedConfig, budgetSeconds: number): number {
+  return Math.min(
+    feed.heartbeatSeconds * STALE_CONCERN_HEARTBEATS,
+    budgetSeconds * STALE_CONCERN_BUDGET_FRACTION,
+  );
+}
 
 let priceRegistry: ethers.Contract | null = null;
 
@@ -377,20 +426,34 @@ async function refreshFeed(
   const found = await findNewerRound(feed, head, current.roundId);
   if (!found) {
     // Ini keadaan NORMAL: ambang penyegaran (1 jam) sengaja jauh lebih ketat
-    // daripada maxPriceAge (24 jam), jadi sebagian besar putaran memang tidak
-    // menemukan ronde baru. Menaikkannya jadi warn akan membuat log penuh
-    // alarm palsu dan menenggelamkan yang sungguhan.
+    // daripada anggaran on-chain, jadi sebagian besar putaran memang tidak
+    // menemukan ronde baru. Menaikkannya jadi warn tanpa syarat akan membuat
+    // log penuh alarm palsu dan menenggelamkan yang sungguhan — karena itu
+    // ambang warn-nya per feed, lihat `staleConcernSeconds`.
+    // Anggaran dibaca dari KONTRAK, bukan dari `feed.maxPriceAgeSeconds`.
+    // Keduanya seharusnya sepakat, tapi kalau menyimpang, yang menentukan beku
+    // atau tidaknya pasar adalah chain — dan ambang peringatan yang diturunkan
+    // dari config akan meleset persis ketika config-lah yang salah.
+    const budgetSeconds = Number(await registry().getFunction('maxAgeFor')(feed.asset));
+    const concernAt = staleConcernSeconds(feed, budgetSeconds);
+
     const line = {
       pair: feed.pair,
       lookbackBlocks: feed.lookbackBlocks ?? MAX_LOOKBACK_BLOCKS,
       onChainRound: current.roundId.toString(),
       ageSeconds: ageSeconds === Infinity ? null : ageSeconds,
+      // Ambangnya ikut dicatat supaya peringatannya bisa dinilai tanpa membaca
+      // kode: "diam 25 jam, heartbeat 24 jam" berbeda jauh artinya dari
+      // "diam 25 jam" saja.
+      heartbeatSeconds: feed.heartbeatSeconds,
+      concernAtSeconds: Math.round(concernAt),
+      budgetSeconds,
     };
-    if (ageSeconds >= STALE_CONCERN_SECONDS) {
+    if (ageSeconds >= concernAt) {
       log.warn(
         line,
-        'feed tidak memancarkan ronde baru dan harganya mendekati basi — periksa ' +
-          'apakah aggregator-nya sudah dirotasi Chainlink',
+        'feed diam melewati heartbeat-nya sendiri — periksa apakah aggregator-nya ' +
+          'sudah dirotasi Chainlink',
       );
     } else {
       log.info(line, 'belum ada ronde baru; harga yang ada masih berlaku');
