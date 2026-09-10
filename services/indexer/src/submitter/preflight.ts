@@ -23,6 +23,49 @@ const PRECOMPILE = '0x0000000000000000000000000000000000000FD2';
 const verifier = new ethers.Contract(PRECOMPILE, VERIFY_ABI, creditcoin);
 
 /**
+ * Pra-pemeriksaan TIDAK BOLEH menggantung, karena ia berjalan di dalam iterasi
+ * submitter dan `loop()` menjadwalkan tick berikutnya hanya SETELAH iterasi
+ * selesai. Satu panggilan yang tidak pernah kembali karena itu tidak
+ * memperlambat submitter — ia menghentikannya, diam-diam, tanpa satu baris log
+ * pun. Pola yang sama pernah membunuh loop harga selama 1 jam 40 menit.
+ *
+ * 15 detik jauh di atas waktu jawab normal `eth_call` (satu blok CC3 ~15 detik
+ * adalah waktu EKSEKUSI transaksi, bukan waktu baca), dan jauh di bawah
+ * ITERATION_TIMEOUT_MS supaya pemulihannya terjadi di sini — bukan dengan
+ * membunuh seluruh iterasi.
+ */
+const PREFLIGHT_TIMEOUT_MS = 15_000;
+
+/**
+ * Di atas ukuran ini pra-pemeriksaan DILEWATI sama sekali.
+ *
+ * `eth_call` membawa payload yang sama persis dengan transaksinya, jadi untuk
+ * batch besar ia menggandakan permintaan berat ke gateway RPC — dan justru
+ * batch besarlah yang paling mungkin ditolak gateway dengan 413. Melakukan
+ * pra-pemeriksaan di sana berarti membayar dua kali untuk penolakan yang sama.
+ *
+ * Melewatinya tidak menghilangkan perlindungan: 413 pada pengiriman sungguhan
+ * kini divonis `splitBatch`, sehingga batch besar tetap dipecah dan tetap
+ * tercatat. Ambangnya diturunkan dari byte, bukan dari jumlah transaksi, karena
+ * byte-lah yang mengikat di kedua sisi (gas maupun HTTP).
+ */
+const PREFLIGHT_MAX_BYTES = 200_000;
+
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} melewati ${ms} ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * Memeriksa lapisan PROOF sebuah batch sebelum gas dibayar.
  *
  * Diukur langsung terhadap precompile hidup, bukan disimpulkan dari tanda
@@ -51,13 +94,26 @@ export async function preflightBatch(
   batchId: string,
   payload: BatchBundleJson,
 ): Promise<Classified | null> {
+  const totalBytes = payload.encodedTransactions.reduce((n, t) => n + (t.length - 2) / 2, 0);
+  if (totalBytes > PREFLIGHT_MAX_BYTES) {
+    log.debug(
+      { batchId, totalBytes, size: payload.heights.length },
+      'batch terlalu besar untuk pra-pemeriksaan — langsung dikirim, 413 ditangani sebagai splitBatch',
+    );
+    return null;
+  }
+
   try {
-    await verifier.getFunction('verify').staticCall(
-      payload.chainKey,
-      payload.heights,
-      payload.encodedTransactions,
-      payload.merkleProofs,
-      payload.sharedContinuityProof,
+    await withTimeout(
+      verifier.getFunction('verify').staticCall(
+        payload.chainKey,
+        payload.heights,
+        payload.encodedTransactions,
+        payload.merkleProofs,
+        payload.sharedContinuityProof,
+      ),
+      PREFLIGHT_TIMEOUT_MS,
+      'pra-pemeriksaan',
     );
     return null;
   } catch (err) {
