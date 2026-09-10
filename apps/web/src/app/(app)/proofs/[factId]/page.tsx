@@ -144,8 +144,11 @@ export default function FactDetailPage() {
           <ProofChain fact={data} />
 
           {/* ── Raw ──────────────────────────────────────────────────── */}
-          <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">Raw</h2>
-          <RawFields fact={data} />
+          {/* Tanpa judul "Raw" — tiap tabel membawa judulnya sendiri, dan
+              nama kelompoknya jauh lebih berarti daripada kata "Raw". */}
+          <div className="mt-12">
+            <RawFields fact={data} />
+          </div>
         </>
       )}
     </main>

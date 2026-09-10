@@ -2,49 +2,38 @@
 
 import { Check, Copy } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Chip } from '@/components/ui/chip';
 import { useCopy } from '@/hooks/useCopy';
 import { formatCount } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { FactWithProof } from '@/types';
 
-/**
- * Kolom tabel Raw, dipegang satu konstanta seperti FACT_COLUMNS di /proofs —
- * baris header dan baris isi harus mustahil berbeda.
- */
+/** Lebar kolom label, dipegang satu konstanta supaya header dan baris mustahil berbeda. */
 const RAW_COLUMNS = 'md:grid-cols-[16rem_minmax(0,1fr)_2rem]';
 
-interface RawRowProps {
+interface Row {
   label: string;
   value: string;
   /** Nilai penuh yang disalin. Tanpa ini barisnya bukan tombol. */
   copyValue?: string | undefined;
 }
 
-function RawRow({ label, value, copyValue }: RawRowProps) {
+function RawRow({ label, value, copyValue, isLast }: Row & { isLast: boolean }) {
   const { copied, copy } = useCopy();
   const copyable = copyValue !== undefined;
 
   const shell = cn(
-    'relative flex w-full flex-col gap-1 border-b border-border px-4 py-3 text-left last:border-b-0',
-    'md:grid md:items-center md:gap-4 md:py-3',
+    'relative flex w-full flex-col gap-1 px-4 py-3 text-left',
+    !isLast && 'border-b border-border',
+    'md:grid md:items-center md:gap-4',
     RAW_COLUMNS,
-    // Di bawah md ikonnya melayang di pojok, jadi nilainya butuh ruang supaya
-    // tidak berjalan di bawahnya. Di md ke atas ikon punya kolomnya sendiri.
     copyable && 'pr-10 transition-colors hover:bg-accent-soft/40 md:pr-4',
   );
 
   const body = (
     <>
-      {/* Kedua kolom sewarna. Yang membedakan mana label dan mana nilai adalah
-          posisinya di kolom, bukan tintanya — dan tabel ini sudah punya header
-          kolom yang menyatakannya. */}
       <span className="text-small text-ink-900">{label}</span>
       <span className="num break-all text-small text-ink-900">{value}</span>
       {copyable && (
-        // Absolut di layar sempit, sel grid biasa di lebar penuh. Menyembunyikannya
-        // di bawah md akan mencabut satu-satunya cara menyalin hash justru di
-        // perangkat yang paling sulit menyeleksi teks dengan tangan.
         <span className="absolute right-4 top-3 md:static md:justify-self-end">
           {copied ? (
             <Check size={14} strokeWidth={2} className="text-verified" />
@@ -66,65 +55,78 @@ function RawRow({ label, value, copyValue }: RawRowProps) {
 }
 
 /**
- * Pita pengelompokan.
+ * Satu tabel per kelompok, masing-masing berjudul sendiri.
  *
- * Bukan hiasan: "Log index (block-wide)" dan "Log index (in tx)" adalah dua
- * angka berbeda yang paling sering tertukar sepanjang proyek ini, dan berdiri
- * bersebelahan tanpa konteks keduanya terbaca seperti salah satunya salah
- * ketik. Pita ini yang menyatakan bahwa keduanya memang milik hal yang sama.
+ * Dulu ketiganya satu tabel dengan pita pengelompokan di dalamnya, di bawah
+ * judul "Raw". Judul itu tidak mengatakan apa pun — yang membawa arti adalah
+ * nama kelompoknya, jadi nama kelompok yang naik jadi judul.
  */
-function RawGroupRow({ title }: { title: string }) {
+function RawTable({ title, rows }: { title: string; rows: Row[] }) {
   return (
-    // Sel tabelnya tetap putih; yang berlatar abu hanya judulnya, dalam bentuk
-    // chip yang sama dengan metadata di Proof chain — tanpa garis tepi, karena
-    // di sini ia berdiri sendirian dan tidak ada tetangga yang perlu dipisah.
-    //
-    // Garis bawahnya tetap ada. Chip-nya sendiri sudah memisahkan judul dari
-    // baris di bawahnya, tapi menghilangkan satu garis membuat kisi tabelnya
-    // putus — dan yang paling terlihat justru putusnya, bukan pengelompokannya.
-    <div className="border-b border-border px-4 py-3">
-      <Chip bordered={false} className="font-semibold text-ink-900">
-        {title}
-      </Chip>
-    </div>
+    <section>
+      <h3 className="text-h3 font-semibold tracking-tight text-ink-900">{title}</h3>
+      <Card className="mt-3 overflow-hidden">
+        <div
+          className={cn(
+            'hidden h-11 items-center gap-4 border-b border-border px-4 text-small text-ink-500 md:grid',
+            RAW_COLUMNS,
+          )}
+        >
+          <span>Field</span>
+          <span>Value</span>
+          <span />
+        </div>
+
+        {rows.map((r, i) => (
+          <RawRow key={r.label} {...r} isLast={i === rows.length - 1} />
+        ))}
+      </Card>
+    </section>
   );
 }
 
 export function RawFields({ fact }: { fact: FactWithProof }) {
   return (
-    <Card className="overflow-hidden">
-      {/* Header kolom hanya di md ke atas — di bawah itu tiap baris menumpuk
-          label di atas nilainya, dan header dua kolom tidak lagi menjelaskan
-          apa pun. Pola yang sama dipakai tabel /proofs. */}
-      <div
-        className={cn(
-          'hidden h-11 items-center gap-4 border-b border-border px-4 text-small text-ink-500 md:grid',
-          RAW_COLUMNS,
-        )}
-      >
-        <span>Field</span>
-        <span>Value</span>
-        <span />
-      </div>
-
-      <RawGroupRow title="On-chain location" />
-      <RawRow label="Block height" value={formatCount(fact.blockHeight)} />
-      <RawRow label="Tx index" value={String(fact.txIndex)} />
-      <RawRow label="Log index (block-wide)" value={String(fact.logIndex)} />
-      <RawRow label="Log index (in tx)" value={String(fact.txLogIndex)} />
-      <RawRow label="Chain key" value={String(fact.chainKey)} />
-
-      <RawGroupRow title="Identity" />
-      <RawRow label="Fact ID" value={fact.factId} copyValue={fact.factId} />
-      <RawRow label="Asset" value={fact.asset} copyValue={fact.asset} />
-      <RawRow label="Protocol" value={fact.protocol} copyValue={fact.protocol} />
-
-      <RawGroupRow title="Batch" />
-      <RawRow
-        label="Batch ID"
-        value={fact.proof.batchId ?? '–'}
-        copyValue={fact.proof.batchId ?? undefined}
+    <div className="grid gap-8">
+      <RawTable
+        title="On-chain location"
+        rows={[
+          { label: 'Block height', value: formatCount(fact.blockHeight) },
+          { label: 'Tx index', value: String(fact.txIndex) },
+          // Dua angka ini paling sering tertukar di proyek ini. Berdiri
+          // bersebelahan dengan label yang menyebut cakupannya, keduanya
+          // tidak lagi bisa dibaca sebagai salah ketik satu sama lain.
+          { label: 'Log index (block-wide)', value: String(fact.logIndex) },
+          { label: 'Log index (in tx)', value: String(fact.txLogIndex) },
+          { label: 'Chain key', value: String(fact.chainKey) },
+        ]}
       />
-    </Card>
+
+      <RawTable
+        title="Identity"
+        rows={[
+          { label: 'Fact ID', value: fact.factId, copyValue: fact.factId },
+          { label: 'Asset', value: fact.asset, copyValue: fact.asset },
+          { label: 'Protocol', value: fact.protocol, copyValue: fact.protocol },
+        ]}
+      />
+
+      <RawTable
+        title="Batch"
+        rows={[
+          {
+            label: 'Batch ID',
+            value: fact.proof.batchId ?? '–',
+            copyValue: fact.proof.batchId ?? undefined,
+          },
+          { label: 'Batch size', value: formatCount(fact.proof.batchSize) },
+          // Kedua angka ini dulu hidup sebagai chip di dalam Proof chain.
+          // Chip-nya dilepas, dan halaman ini satu-satunya tempat keduanya
+          // pernah ditampilkan — jadi keduanya pindah ke sini, bukan hilang.
+          { label: 'Merkle siblings', value: formatCount(fact.proof.merkleProofSiblingsCount) },
+          { label: 'Continuity roots', value: formatCount(fact.proof.continuityProofRootsCount) },
+        ]}
+      />
+    </div>
   );
 }

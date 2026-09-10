@@ -1,38 +1,25 @@
-import type { CSSProperties } from 'react';
 import { Check } from 'lucide-react';
-import { Chip } from '@/components/ui/chip';
-import { formatCount, formatDuration } from '@/lib/format';
+import { formatDuration } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { FactWithProof } from '@/types';
-
-/**
- * Berapa langkah yang boleh berdiri dalam satu baris di desktop.
- *
- * Jumlah langkah TIDAK datang dari API — `FactWithProof` tidak memuat array
- * langkah; rantai ini disusun di sini dari field-field proof. Hari ini empat,
- * dan menambah satu (mis. pemisahan attestation dan finality) hanya berarti
- * menambah entri ke `steps`. Karena itu tata letaknya tidak boleh menyebut
- * angka empat di mana pun: kolomnya diturunkan dari `steps.length`, dan yang
- * dijaga cuma batas atas supaya kartu tidak menyempit sampai tak terbaca.
- */
-const MAX_COLUMNS = 4;
 
 interface Step {
   key: string;
   title: string;
-  /** Metadata pendek berbentuk nilai. Satu chip per potongan. */
-  chips: string[];
-  /** Metadata berbentuk kalimat. Tidak pernah dipaksa masuk chip. */
-  note: string | null;
+  note: string;
 }
 
 /**
  * Empat langkah dari transaksi Ethereum ke fakta permanen di Creditcoin.
  *
- * Ini komponen yang membuat juri MELIHAT kedalaman Attestcoin, bukan
- * membacanya di deck. Tautan keluar ke Etherscan dan Blockscout sengaja TIDAK
- * di sini — keduanya sudah berdiri sebagai pill di hero, dan menaruh tautan
- * yang sama di dua tempat membuat pembaca menduga keduanya menuju hal berbeda.
+ * Bentuknya SATU rel mendatar, bukan empat kartu berdampingan. Empat kartu
+ * terbaca sebagai empat hal yang kebetulan bersebelahan; yang perlu terbaca
+ * adalah satu transaksi bergerak melewati empat tahap, dan garis yang
+ * menyambung antar titik itulah yang mengatakannya.
+ *
+ * Tautan keluar ke Etherscan dan Blockscout sengaja TIDAK di sini — keduanya
+ * sudah berdiri sebagai pill di hero, dan tautan yang sama di dua tempat
+ * membuat pembaca menduga keduanya menuju hal berbeda.
  */
 export function ProofChain({ fact }: { fact: FactWithProof }) {
   const lagSeconds = Math.max(0, fact.recordedAt - fact.observedAt);
@@ -41,108 +28,89 @@ export function ProofChain({ fact }: { fact: FactWithProof }) {
     {
       key: 'observed',
       title: 'Ethereum transaction',
-      chips: [
-        `Block ${formatCount(fact.blockHeight)}`,
-        `tx index ${fact.txIndex}`,
-        `log ${fact.logIndex}`,
-      ],
-      note: null,
+      // Menyebut pemeriksaan `receiptStatus == 1`. Block Prover hanya
+      // membuktikan INKLUSI, bukan sukses — tanpa cek itu transaksi yang
+      // revert ikut lolos, dan itu lubang keamanan #1 di proyek ini.
+      note: 'Included in a mined mainnet block. The receipt confirms success.',
     },
     {
       key: 'attested',
       title: 'Attested on Creditcoin',
-      chips: [],
       note: `Attestor consensus reached. ${formatDuration(lagSeconds)} from observation to record.`,
     },
     {
       key: 'proved',
       title: 'Proof built',
-      chips: [
-        `chainKey ${fact.chainKey}`,
-        `${formatCount(fact.proof.merkleProofSiblingsCount)} Merkle siblings`,
-        `${formatCount(fact.proof.continuityProofRootsCount)} continuity roots`,
-      ],
       note: `Proved ${fact.proof.provedWithinHours.toFixed(2)}h after the transaction, inside the cheap window.`,
     },
     {
       key: 'recorded',
       title: 'Recorded in FactRegistry',
-      chips: [
-        `Creditcoin block ${formatCount(fact.proof.verifiedAtBlock)}`,
-        `batch of ${fact.proof.batchSize}`,
-      ],
-      note: null,
+      note: 'Permanent and replay-protected. The same log cannot be recorded twice.',
     },
   ];
 
-  const columns = Math.min(steps.length, MAX_COLUMNS);
-
   return (
-    <ol
-      className="grid lg:gap-4 lg:[grid-template-columns:repeat(var(--proof-cols),minmax(0,1fr))]"
-      style={{ '--proof-cols': columns } as CSSProperties}
-    >
-      {steps.map((step, i) => {
-        // Konektor hanya digambar kalau langkah berikutnya benar-benar duduk di
-        // KANAN langkah ini. Di ujung baris yang membungkus, tetangganya ada di
-        // baris bawah — garis ke kanan di sana akan menjulur ke ruang kosong.
-        const isRowEnd = (i + 1) % columns === 0;
-        const hasNext = i < steps.length - 1;
+    <div className="rounded-[var(--radius-lg)] border border-border bg-surface px-6 py-7">
+      <ol className="flex flex-col gap-7 lg:flex-row lg:gap-0">
+        {steps.map((step, i) => {
+          const isFirst = i === 0;
+          const isLast = i === steps.length - 1;
 
-        return (
-          <li
-            key={step.key}
-            className={cn(
-              'relative pb-7 pl-9 last:pb-0',
-              'lg:min-h-[168px] lg:rounded-[var(--radius-lg)] lg:border lg:border-border lg:bg-surface lg:p-5 lg:pb-5 lg:pl-5',
-            )}
-          >
-            {/* Rel vertikal: bahasa visual timeline, dipakai di bawah lg saja. */}
-            {hasNext && (
-              <span
-                aria-hidden="true"
-                className="absolute bottom-0 left-[11px] top-7 w-px bg-verified/30 lg:hidden"
-              />
-            )}
+          return (
+            <li
+              key={step.key}
+              className="relative flex-1 pl-10 lg:flex lg:flex-col lg:items-center lg:gap-3.5 lg:pl-0"
+            >
+              {/* Rel vertikal untuk layar sempit. Di lg ke atas relnya
+                  mendatar, jadi yang ini menghilang sepenuhnya. */}
+              {!isLast && (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-[-1.75rem] left-[14px] top-8 w-1.5 rounded-full bg-verified lg:hidden"
+                />
+              )}
 
-            {/* Konektor horizontal, melintasi gap grid tepat selebar gap itu. */}
-            {hasNext && !isRowEnd && (
-              <span
-                aria-hidden="true"
-                className="absolute left-full top-8 hidden h-px w-4 bg-verified/30 lg:block"
-              />
-            )}
+              <p className="text-body font-medium text-ink-900 lg:order-1 lg:text-center">
+                {step.title}
+              </p>
 
-            {/* `items-start`, bukan `items-center`: judul dua baris ("Attested on
-                Creditcoin") akan menggeser tick ke bawah kalau baris ini
-                memusat, dan konektor horizontal — yang tingginya tetap — jadi
-                tidak lagi menyambung ke tengah tick. */}
-            <div className="flex items-start gap-2.5">
-              <span
-                aria-hidden="true"
-                className="absolute left-0 top-0 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-verified-soft text-verified lg:static"
-              >
-                <Check size={13} strokeWidth={2} />
-              </span>
-              <p className="text-body font-medium text-ink-900">{step.title}</p>
-            </div>
+              {/* [garis][titik][garis] dalam satu baris, garis memakai `flex-1`.
+                  Titik karena itu SELALU tepat di tengah kolomnya berapa pun
+                  lebar kartunya — jaminan yang hilang begitu garis diberi
+                  posisi sendiri. */}
+              <div className="lg:order-2 lg:flex lg:w-full lg:items-center lg:gap-3.5">
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'hidden h-1.5 flex-1 rounded-r-full bg-verified lg:block',
+                    // `invisible`, bukan `hidden`: ia harus tetap memakan
+                    // ruang, kalau tidak titik di ujung rantai kehilangan
+                    // penyeimbang dan bergeser ke tepi kolom.
+                    isFirst && 'invisible',
+                  )}
+                />
 
-            {step.chips.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {step.chips.map((chip) => (
-                  <Chip key={chip}>{chip}</Chip>
-                ))}
+                <span className="absolute left-0 top-0 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-verified text-on-solid lg:static">
+                  <Check size={16} strokeWidth={3} aria-hidden="true" />
+                </span>
+
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'hidden h-1.5 flex-1 rounded-l-full bg-verified lg:block',
+                    isLast && 'invisible',
+                  )}
+                />
               </div>
-            )}
 
-            {step.note !== null && (
-              <p className={cn('text-small text-ink-500', step.chips.length > 0 ? 'mt-3' : 'mt-2')}>
+              <p className="mt-2 text-micro leading-[1.5] text-ink-500 lg:order-3 lg:mt-0 lg:w-52 lg:text-center">
                 {step.note}
               </p>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
