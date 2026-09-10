@@ -33,8 +33,13 @@ export function AddressDisplay({
   }
 
   return (
-    <span className={cn('inline-flex items-center gap-1.5', className)}>
-      <span className="num text-ink-900">{truncate ? shortenAddress(address) : address}</span>
+    <span className={cn('inline-flex max-w-full items-center gap-1.5', className)}>
+      {/* `break-all` hanya berpengaruh pada alamat penuh: 42 karakter tanpa
+          spasi tidak punya titik patah, jadi di layar 390px ia mendorong
+          seluruh halaman melebar ke samping alih-alih turun ke baris baru. */}
+      <span className="num min-w-0 break-all text-ink-900">
+        {truncate ? shortenAddress(address) : address}
+      </span>
       {copyable && (
         <button
           type="button"
