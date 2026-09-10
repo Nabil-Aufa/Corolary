@@ -6,6 +6,7 @@ import { requireContracts } from '../config.js';
 import { stageLogger } from '../logger.js';
 import { claimNextNonce, reconcileNonce } from './nonce.js';
 import { classifySubmitError } from './errors.js';
+import { preflightBatch } from './preflight.js';
 import { proofBuilder } from '../prover/client.js';
 import { splitToSingles, type BatchBundleJson, type SingleBundleJson } from '../prover/bundle.js';
 import { nextRetryDelayMs } from '../prover/run.js';
@@ -165,6 +166,44 @@ export async function submitOnce(): Promise<void> {
   await submitBatch(row);
 }
 
+/**
+ * Proof kedaluwarsa TIDAK boleh dikirim ulang — isinya tidak akan pernah cocok
+ * lagi. Batch dibubarkan dan anggotanya dikembalikan ke tahap proving, supaya
+ * prover membeli proof BARU dan menyusun batch baru.
+ *
+ * `payload = NULL` di statement yang sama: batch stale tidak akan pernah
+ * dikirim lagi, dan `persistReceipt` tidak pernah dipanggil untuk batch yang
+ * gagal — jadi tidak ada baris `facts` yang menunjuk ke batch ini lewat
+ * `batch_id`. Beda dengan status `done`: `/v1/facts/:factId` membaca
+ * `proof_batches.payload` untuk batch `done`, jadi payload `done` TIDAK boleh
+ * dikosongkan tanpa mengubah API itu dulu.
+ */
+async function markBatchStale(batchId: string, reason: string): Promise<void> {
+  await sql.begin(async (t) => {
+    await t`
+      UPDATE proof_batches
+      SET status = 'stale', last_error = ${reason}, updated_at = now(), payload = NULL
+      WHERE batch_id = ${batchId}
+    `;
+    await t`
+      UPDATE observed_events
+      SET status = 'proving', batch_id = NULL, last_error = ${reason},
+          attempts = attempts + 1, run_after = NULL
+      WHERE batch_id = ${batchId} AND status = 'submitting'
+    `;
+  });
+  log.warn({ batchId, reason }, 'proof kedaluwarsa, dijadwalkan proving ulang');
+}
+
+/** Batch gagal utuh; anggotanya dicoba satu per satu untuk mengisolasi penyebabnya. */
+async function markBatchSplit(batchId: string, reason: string): Promise<void> {
+  await sql`
+    UPDATE proof_batches
+    SET status = 'split', last_error = ${reason}, updated_at = now()
+    WHERE batch_id = ${batchId}
+  `;
+}
+
 async function submitBatch(row: BatchRow): Promise<void> {
   const { batch_id: batchId, payload } = row;
   const startedAt = Date.now();
@@ -184,6 +223,22 @@ async function submitBatch(row: BatchRow): Promise<void> {
       { batchId, totalBytes, txCount: payload.heights.length, perkiraanGas: Math.round(47.4 * totalBytes + 658_615) },
       'batch jauh lebih besar dari apa pun yang pernah terukur — tinjau T2 sebelum menaikkan MAX_BATCH_SIZE',
     );
+  }
+
+  // Pra-pemeriksaan lapisan proof lewat `eth_call` ke varian BACA-SAJA
+  // precompile. Batch yang pasti ditolak di lapisan ini tidak perlu membayar
+  // gas, dan tidak perlu memakai nonce — jadi ia dijalankan SEBELUM
+  // `claimNextNonce`, dan penanganannya melewatkan `reconcileNonce` karena
+  // tidak ada apa pun yang bisa tersiar.
+  const preflight = await preflightBatch(batchId, payload);
+  if (preflight?.verdict === 'staleProof') {
+    await markBatchStale(batchId, preflight.reason);
+    return;
+  }
+  if (preflight?.verdict === 'splitBatch') {
+    await markBatchSplit(batchId, preflight.reason);
+    await submitSingles(batchId, payload);
+    return;
   }
 
   const nonce = await claimNextNonce();
@@ -254,33 +309,9 @@ async function submitBatch(row: BatchRow): Promise<void> {
     const verdict = classifySubmitError(err, true);
     log.warn({ batchId, verdict: verdict.verdict, reason: verdict.reason }, 'submit batch gagal');
 
-    // Proof kedaluwarsa TIDAK boleh dikirim ulang — isinya tidak akan pernah
-    // cocok lagi. Batch dibubarkan dan anggotanya dikembalikan ke tahap
-    // proving, supaya prover membeli proof BARU dan menyusun batch baru.
     // Biaya proof-nya memang terbayar dua kali; tidak ada jalan lain.
     if (verdict.verdict === 'staleProof') {
-      await sql.begin(async (t) => {
-        // `payload = NULL` di statement yang sama: batch stale tidak akan
-        // pernah dikirim lagi (proof-nya kedaluwarsa permanen), dan
-        // `persistReceipt` tidak pernah dipanggil untuk batch yang gagal —
-        // jadi tidak ada baris `facts` yang menunjuk ke batch ini lewat
-        // `batch_id`. Beda dengan status `done`: `/v1/facts/:factId` di
-        // services/api membaca `proof_batches.payload` untuk batch `done`
-        // guna menghitung `continuityProofRootsCount`/`merkleProofSiblingsCount`
-        // — payload `done` TIDAK boleh dikosongkan tanpa mengubah API itu dulu.
-        await t`
-          UPDATE proof_batches
-          SET status = 'stale', last_error = ${verdict.reason}, updated_at = now(), payload = NULL
-          WHERE batch_id = ${batchId}
-        `;
-        await t`
-          UPDATE observed_events
-          SET status = 'proving', batch_id = NULL, last_error = ${verdict.reason},
-              attempts = attempts + 1, run_after = NULL
-          WHERE batch_id = ${batchId} AND status = 'submitting'
-        `;
-      });
-      log.warn({ batchId, reason: verdict.reason }, 'proof kedaluwarsa, dijadwalkan proving ulang');
+      await markBatchStale(batchId, verdict.reason);
       return;
     }
 
@@ -316,11 +347,7 @@ async function submitBatch(row: BatchRow): Promise<void> {
     }
 
     if (verdict.verdict === 'splitBatch') {
-      await sql`
-        UPDATE proof_batches
-        SET status = 'split', last_error = ${verdict.reason}, updated_at = now()
-        WHERE batch_id = ${batchId}
-      `;
+      await markBatchSplit(batchId, verdict.reason);
       await submitSingles(batchId, payload);
       return;
     }
