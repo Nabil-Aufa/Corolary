@@ -214,6 +214,39 @@ export function classifySubmitError(err: unknown, isBatch: boolean): Classified 
   if (text.includes('replacement transaction underpriced') || text.includes('underpriced')) {
     return { verdict: 'retryable', reason: 'gas price terlalu rendah' };
   }
+  // HTTP 413 dari gateway RPC: badan permintaan JSON-RPC terlalu besar.
+  //
+  // Terukur di produksi 2026-09-06, 08:40–15:08 UTC: 568 event gagal permanen
+  // dengan `server response 413 Request Entity Too Large` — satu sebab, satu
+  // jendela 6,5 jam, dan seluruh 568 kegagalan permanen yang pernah ada.
+  //
+  // Ini kegagalan DETERMINISTIK yang sebelumnya jatuh ke `retryable` lewat
+  // cabang terakhir: 413 tidak mengandung 'timeout', 'network', 'server error',
+  // maupun '429', jadi tidak ada satu pun pola di atas yang menangkapnya.
+  // Payload yang sama ditolak dengan ukuran yang sama, delapan kali, lalu
+  // menyerah — pelajaran yang sama persis dengan `Error("Merkle proof
+  // validation failed")`, hanya di sumbu yang berbeda.
+  //
+  // Kenapa ukurannya bisa sebesar itu tanpa ada yang tahu: docs/open-issues.md
+  // T2 memutuskan tidak menegakkan anggaran byte karena batch termahal cuma
+  // 17% dari batas gas blok, ruang kepala 5,9x. Alasan itu benar dan tetap
+  // tidak melindungi, karena ia hanya menimbang GAS. Batas yang menggigit ada
+  // di lapisan HTTP dan tidak punya hubungan apa pun dengan batas gas blok:
+  // 268.704 byte `encodedTx` menjadi ~524 KB begitu di-hex ke dalam JSON-RPC.
+  //
+  // Memecah batch membelah badan permintaannya, jadi vonisnya `splitBatch`.
+  // Untuk transaksi TUNGGAL tidak ada yang bisa dipecah lagi — payload sebesar
+  // itu memang tidak bisa dikirim lewat endpoint ini, dan itu butuh manusia,
+  // bukan percobaan kesembilan.
+  if (text.includes('413') || text.includes('too large') || text.includes('entity too large')) {
+    return {
+      verdict: isBatch ? 'splitBatch' : 'fatal',
+      reason: isBatch
+        ? 'badan permintaan RPC terlalu besar (413), batch dipecah'
+        : 'badan permintaan RPC terlalu besar (413) pada transaksi tunggal — tidak bisa dipecah lagi',
+    };
+  }
+
   if (
     text.includes('timeout') ||
     text.includes('econnreset') ||

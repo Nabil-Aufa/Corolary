@@ -128,3 +128,36 @@ test('proof tidak cocok pada transaksi TUNGGAL -> beli proof baru', () => {
   );
   assert.equal(v.verdict, 'staleProof');
 });
+
+test('HTTP 413 pada BATCH -> dipecah, bukan retry', () => {
+  // Terukur di produksi 2026-09-06, 08:40-15:08 UTC: 568 event gagal permanen
+  // dengan pesan ini — satu sebab, satu jendela 6,5 jam, dan SELURUH kegagalan
+  // permanen yang pernah ada di registry.
+  //
+  // Sebelumnya 413 tidak cocok dengan satu pun pola jaringan ('timeout',
+  // 'network', 'server error', '429'), jadi ia jatuh ke `retryable` di cabang
+  // terakhir. Payload yang sama ditolak dengan ukuran yang sama, delapan kali.
+  // Memecah batch membelah badan permintaannya; itu yang menolong.
+  const v = classifySubmitError(
+    { shortMessage: 'server response 413 Request Entity Too Large' },
+    true,
+  );
+  assert.equal(v.verdict, 'splitBatch');
+});
+
+test('HTTP 413 pada transaksi TUNGGAL -> fatal, karena tidak ada yang bisa dipecah', () => {
+  // Payload tunggal yang melewati batas endpoint tidak akan mengecil dengan
+  // dicoba lagi. Itu butuh manusia, bukan percobaan kesembilan.
+  const v = classifySubmitError(
+    { shortMessage: 'server response 413 Request Entity Too Large' },
+    false,
+  );
+  assert.equal(v.verdict, 'fatal');
+});
+
+test('413 tidak boleh tertangkap pola jaringan lebih dulu', () => {
+  // Urutan pemeriksaan itu sendiri yang diuji: kalau aturan 413 dipindah ke
+  // bawah blok jaringan, tes ini gagal dan kita tahu sebabnya.
+  const v = classifySubmitError({ shortMessage: 'server response 413 Request Entity Too Large' }, true);
+  assert.notEqual(v.reason, 'gangguan jaringan/RPC');
+});
