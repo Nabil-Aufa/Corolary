@@ -52,9 +52,33 @@ Attestcoin is not bolted onto this project — **it is the product**.
 | **Core data source** | Every credit fact originates from an Ethereum mainnet transaction proven through the Block Prover Precompile `0x…0FD2` |
 | **Price oracle** | Collateral prices are proven from Chainlink `AnswerUpdated` events on Ethereum — **zero centralized oracles anywhere in the system** |
 | **Eager proving** | Proofs are bought inside the <24h window (`2.59×10⁻⁵` CTC vs `3.13×10⁻⁴` lazy — **~12× cheaper**) and the resulting fact is stored permanently |
-| **Batch proving** | Up to 10 transactions share one continuity proof; measured **4,198,654 gas** for a batch of 10 against ~13.1M for ten singles (**~3× cheaper**) |
-| **Selective extraction** | SDK `QueryBuilder` for partial decoding instead of decoding whole receipts |
+| **Batch proving** | Up to 10 transactions share one continuity proof. Measured across **476 production batches**, not one sample: `gas ≈ 47.4 × bytes + 658,615` (R² = 0.833). A batch of 10 averages **552,364 gas per transaction** against **1,130,826** for singles — **51% cheaper per fact** |
+| **Position-preserving decode** | Log position is derived from the iteration index in `receipt.receiptLogs`, because `EvmV1Decoder.LogEntry` carries no `logIndex`. The SDK's `getLogsByEventSignature` helper is **deliberately avoided** — it returns a filtered array, which destroys the original position the replay key depends on |
 | **ChainInfo registry** | Precompile `0x…0fd3` to track attestation status before attempting a proof |
+
+### Every protocol surface we depend on
+
+Eleven distinct Attestcoin surfaces are load-bearing here — remove any one and something
+concrete breaks. Each row points at the line that uses it.
+
+| # | Surface | Where it lives | Used at | What breaks without it |
+|---|---|---|---|---|
+| 1 | `verifyAndEmit` (single) | Block Prover Precompile `0x…0FD2` | `AttestcoinReader.sol:112` | No fact can be proven at all |
+| 2 | `verifyAndEmit` (batch) | same precompile, batch overload | `AttestcoinReader.sol:173` | Per-fact gas roughly doubles — the cost model collapses |
+| 3 | `calculateTxIndex` | `INativeQueryVerifier` | `AttestcoinReader.sol:101, 159` | No `txIndex`, so no replay key |
+| 4 | `EvmV1Decoder.decodeReceiptFields` | `usc-contracts/write-ability/common` | `AttestcoinReader.sol:201` | `receiptStatus` unreadable — reverted Ethereum transactions would poison the registry |
+| 5 | `PrecompileChainInfoProvider` | ChainInfo Precompile `0x…0fd3` | `prover/client.ts:39`, `api/lib/chain.ts:42` | No attestation state; the pipeline would guess |
+| 6 | `getContinuityBounds` | ChainInfo | `attestation/waiter.ts:37`, `prices/run.ts:469` | Proofs requested before attestation, wasting CTC on failures |
+| 7 | `getLatestAttestedHeightAndHash` | ChainInfo | `api/routes/status.ts:51, 137` | Lag against the Ethereum head becomes unobservable |
+| 8 | `getSupportedChains` | ChainInfo | `api/routes/status.ts:46` | `chainKey 3` could not be confirmed as attested at runtime |
+| 9 | `getAttestationGenesisHeight` | ChainInfo | `api/routes/status.ts:53` | Backfill cannot tell "not attested" from "before attestation began" |
+| 10 | `ProofBuilder.getProof` / `getBatchProof` | `@gluwa/usc-sdk` | `prover/client.ts:26`, `prover/run.ts:77, 177` | No Merkle or continuity proofs to submit |
+| 11 | `verify` (batch, read-only) | same precompile, `view` overload | `submitter/preflight.ts:55` | Doomed batches would still be paid for in gas before being rejected |
+
+Two of these were corrected against the installed package rather than the docs: the
+`EvmV1Decoder` import path published in the documentation does not exist (the real one is
+under `write-ability/common/`), and `ProofBuilder`'s constructor takes positional
+arguments, not the options object the docs show.
 
 ### Why this is an architectural contribution, not a function call
 
@@ -163,28 +187,33 @@ mainnet address.
 
 ## Proof it works
 
-Read from the live registry on **2026-08-26**. Every number below is verifiable on-chain
-by anyone.
+Read from the live registry on **2026-09-10**. Every number below is verifiable on-chain
+by anyone — see [Verify it yourself](#verify-it-yourself) below for the exact commands.
 
 | | |
 |---|---|
-| Facts recorded from Ethereum mainnet | **5,123** |
-| Distinct wallets with proven history | **1,206** |
+| Facts recorded from Ethereum mainnet | **56,528** |
+| Distinct wallets with proven history | **9,611** |
+| Facts recorded in the last 24 hours | **6,681** |
 | Mainnet protocols indexed | **4** |
+| Watcher lag behind Ethereum head | **0 blocks** |
 
 ### A real wallet, scored
 
-`0x94963B928498bE7f06637C3D57ea1E74D7f73423` — **score 813 · tier 4 · 110% collateral
-ratio**, down from the 150% baseline.
+`0x94963B928498bE7f06637C3D57ea1E74D7f73423` — **score 816 · tier 4 · 110% collateral
+ratio**, down from the 150% baseline. 272 facts on-chain.
 
 | Component | Points | Max | Backed by |
 |---|---|---|---|
-| Repayment volume | 297 | 300 | 72 facts |
-| Repayment count | 171 | 200 | 72 facts |
-| History duration | 95 | 200 | first proven fact |
+| Repayment volume | 297 | 300 | 72 proven repayments |
+| Repayment count | 171 | 200 | 72 proven repayments |
+| History duration | 98 | 200 | first proven fact 2025-09-23 |
 | Liquidation penalty | 0 | −300 | no liquidations |
-| Protocol diversity | 50 | 100 | 2 of 4 protocols |
-| Active standing | 200 | 200 | 130 facts |
+| Protocol diversity | 50 | 100 | 2 of 4 protocols (Aave V3, Morpho Blue) |
+| Active standing | 200 | 200 | open positions still proven |
+
+Two more wallets, read the same day: `0x65c4C051…48A2` scores **836 · tier 4** on 604
+facts, and `0x76f30e3f…5b1A` scores **721 · tier 3** on **5,350** facts.
 
 Every component points back to specific facts, and every fact points back to a specific
 Ethereum mainnet transaction. Nothing here is a black box — which is precisely the
@@ -213,6 +242,39 @@ Deterministic and fully on-chain. No off-chain model, no proprietary weights.
 
 The ratio is **locked at borrow time**. A later score drop cannot retroactively make a
 healthy position liquidatable — it only applies to new borrows.
+
+### Verify it yourself
+
+No wallet, no API key, no clone. Every command below is a read against the live CC3
+registry and costs nothing.
+
+```bash
+export R=https://rpc.cc3-testnet.creditcoin.network
+export FACTS=0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5
+export GRAPH=0x896E283FB7213650f2C65c239168fEd89F57e952
+export MARKET=0xd97657E361928298A342D8e5049b7aD440b167d4
+export PRICES=0x1fC6c2CFB9e339012B70D45977737B9e411efdc9
+export W=0x94963B928498bE7f06637C3D57ea1E74D7f73423
+
+# Only Ethereum mainnet is accepted as a source. Sepolia is refused by policy.
+cast call $FACTS "allowedChainKeys(uint64)(bool)" 3 --rpc-url $R   # true  (mainnet)
+cast call $FACTS "allowedChainKeys(uint64)(bool)" 1 --rpc-url $R   # false (Sepolia)
+
+# How much proven mainnet history this wallet has, and what it scores.
+cast call $FACTS "factCountOf(address)(uint256)" $W --rpc-url $R   # 272
+cast call $GRAPH "scoreOf(address)(uint16,uint8)"  $W --rpc-url $R # 816, tier 4
+cast call $GRAPH "componentsOf(address)(int32[6])" $W --rpc-url $R # per-component points
+
+# The headline claim: 150% baseline down to 110% for this wallet.
+cast call $MARKET "effectiveRatioBps(address)(uint16)" $W --rpc-url $R  # 11000
+
+# Prices are proven Chainlink rounds, not an admin feed. `true` means fresh.
+cast call $PRICES "tryToUsd1e18(address,uint256)(uint256,bool)" \
+  0x66f5F2C577ec38CE5bb7BCb7054a531a72004d19 1000000 --rpc-url $R   # ~$0.9999, true
+```
+
+`allowedChainKeys(1) == false` is the load-bearing one. It is the difference between
+scoring a wallet on real Aave repayments and scoring it on testnet tokens anyone can mint.
 
 ---
 
