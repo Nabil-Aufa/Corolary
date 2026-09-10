@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Google_Sans } from 'next/font/google';
+import { Geist, Google_Sans } from 'next/font/google';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -16,6 +16,18 @@ const googleSans = Google_Sans({
   display: 'swap',
 });
 
+// Display HANYA untuk landing. Suisse Intl — font referensi — berbayar;
+// Geist adalah grotesk gratis yang paling dekat di ukuran raksasa: terminal
+// lurus dan aperture rapat, yang memberi kesan "engineered" itu. Di 14px ia
+// nyaris tak terbedakan dari Google Sans, jadi ia tidak pernah dipakai untuk
+// body — pemisahan dibayar hanya di tempat yang membuatnya terlihat.
+const geist = Geist({
+  subsets: ['latin'],
+  weight: ['500', '600'],
+  variable: '--font-display-family',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: 'Corolary: Proven credit, portable collateral',
   description:
@@ -27,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // suppressHydrationWarning: next-themes menulis class tema ke <html>
     // sebelum React hydrate, jadi markup server dan klien memang berbeda di
     // atribut itu — dan itu disengaja.
-    <html lang="en" className={googleSans.variable} suppressHydrationWarning>
+    <html lang="en" className={`${googleSans.variable} ${geist.variable}`} suppressHydrationWarning>
       <body className="min-h-dvh">
         {/* Header dan footer TIDAK di sini. Landing dan app punya kerangka
             yang berbeda, dan itu ditentukan oleh layout masing-masing route
