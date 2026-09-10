@@ -96,13 +96,10 @@ export function BackfillPanel({ address }: { address: Address }) {
               </p>
             )}
 
-            {/* Biayanya nyata dan dibayar oleh kita, bukan oleh pengunjung —
-                tapi menyembunyikannya sepenuhnya membuat tombol ini terasa
-                gratis untuk ditekan berulang kali. */}
-            <p className="mt-4 text-micro leading-relaxed text-ink-400">
-              Scanning reads Ethereum mainnet for this wallet across all four protocols, then proves
-              every event found through Attestcoin. A deep scan can take around 20 minutes.
-            </p>
+            {/* Cukup berapa lama. Cara kerjanya menarik bagi kita, tapi yang
+                dibutuhkan orang yang akan menekan tombol ini hanya apakah ia
+                perlu menunggu. */}
+            <p className="mt-4 text-micro text-ink-400">A deep scan takes around 20 minutes.</p>
           </>
         )}
       </CardBody>

@@ -35,15 +35,12 @@ export function NextTierGuidance({ score }: { score: CreditScore }) {
 
         {nextTier === null ? (
           <p className="mt-2 max-w-2xl text-body text-ink-500">
-            This wallet is already at the highest tier, and its collateral ratio is at the floor of{' '}
-            <span className="num text-ink-900">{formatRatio(score.collateralRatioBps)}</span>. More
-            points are still possible, but they no longer change what it costs to borrow.
+            Already at the highest tier. More points no longer change what it costs to borrow.
           </p>
         ) : (
           <p className="mt-2 max-w-2xl text-body text-ink-500">
-            <span className="num text-ink-900">{pointsNeeded}</span> more points reach tier{' '}
-            <span className="num text-ink-900">{nextTier}</span> {TIER_LABEL[nextTier]}, which drops
-            the required collateral from{' '}
+            <span className="num text-ink-900">{pointsNeeded}</span> more points reach{' '}
+            {TIER_LABEL[nextTier]}, lowering collateral from{' '}
             <span className="num">{formatRatio(score.collateralRatioBps)}</span> to{' '}
             <span className="num text-ink-900">
               {formatRatio(TIER_COLLATERAL_RATIO_BPS[nextTier])}
@@ -97,8 +94,7 @@ export function NextTierGuidance({ score }: { score: CreditScore }) {
           // membuat keduanya terbaca sama layak dikejar.
           <p className="mt-5 border-t border-border pt-4 text-small text-ink-500">
             {saturated.map((k) => LABEL[k]).join(' and ')}{' '}
-            {saturated.length === 1 ? 'is' : 'are'} deep into saturation. The remaining points
-            there cost far more input than they are worth. The lever is elsewhere.
+            {saturated.length === 1 ? 'is near its limit.' : 'are near their limit.'}
           </p>
         )}
 
@@ -107,8 +103,7 @@ export function NextTierGuidance({ score }: { score: CreditScore }) {
             di sini bukan skornya, melainkan masukan yang dibutuhkan untuk poin
             berikutnya — pertanyaan yang tidak dijawab kontrak sama sekali. */}
         <p className="mt-6 text-micro leading-relaxed text-ink-400">
-          Point targets are derived from the same constants CreditGraph uses on-chain. The score
-          itself always comes from the contract; nothing here is estimated on top of it.
+          Targets use the same constants as the on-chain contract.
         </p>
       </CardBody>
     </Card>

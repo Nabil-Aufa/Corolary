@@ -116,7 +116,7 @@ export function guidanceFor(score: CreditScore): Guidance {
         missing === 1 ? '' : 's'
       }`,
       detail:
-        'Exactly 25 points per protocol, with no saturation. It is the only component whose gain is known before the work is done: borrowing and repaying once on a protocol this wallet has not used yet is enough.',
+        '25 points per protocol. Borrow and repay once on a protocol this wallet has not used.',
     });
   }
 
@@ -132,7 +132,7 @@ export function guidanceFor(score: CreditScore): Guidance {
         daysNeeded,
       )} more days of proven history`,
       detail:
-        'Half-saturating at one year, so each additional day is worth less than the last. This history may already exist on mainnet and simply not be scanned yet, and a deeper scan costs nothing but time.',
+        'Gains slow after a year, and older history may not be scanned yet.',
     });
   }
 
@@ -149,7 +149,7 @@ export function guidanceFor(score: CreditScore): Guidance {
         needed === 1 ? '' : 's'
       }`,
       detail:
-        'Half-saturating at 12 repayments. Only repayments on Ethereum mainnet that have been proven through Attestcoin count.',
+        'Only proven mainnet repayments count.',
     });
   }
 
@@ -163,7 +163,7 @@ export function guidanceFor(score: CreditScore): Guidance {
       certainty: 'formula',
       title: `+${target - volume.points} points from ${formatUsdRough(needed)} more repaid`,
       detail:
-        'Half-saturating at $50,000, so the last points are far more expensive than the first. Volume is weighted, not a raw sum.',
+        'Gains slow as total repaid grows.',
     });
   }
 
@@ -175,7 +175,7 @@ export function guidanceFor(score: CreditScore): Guidance {
       certainty: standingCertainty(standing, score),
       title: `${standing.maxPoints - standing.points} points lost to inactivity or a liquidation`,
       detail:
-        'Half of this component is recency: full marks within 90 days of the last positive fact, decaying to zero at 720 days. The other half returns gradually after a liquidation.',
+        'Full marks within 90 days of the last positive fact, fading to zero by 720 days.',
     });
   }
 
@@ -187,7 +187,7 @@ export function guidanceFor(score: CreditScore): Guidance {
       certainty: 'none',
       title: `${penalty.points} points from past liquidations`,
       detail:
-        'This one does not come back. The penalty accumulates and is never reduced, so the rest of the score has to outgrow it.',
+        'Permanent. The rest of the score has to outgrow it.',
     });
   }
 
