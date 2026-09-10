@@ -13,7 +13,8 @@
     "prices:once": "tsx src/prices/once.ts",
     "t3": "tsx src/t3-invalid-member.ts",
     "test": "tsx --test",
-    "prices:trust": "tsx src/prices/trust.ts"
+    "prices:trust": "tsx src/prices/trust.ts",
+    "requeue-failed": "tsx src/requeue-failed.ts"
   },
   "dependencies": {
     "@corolary/shared": "workspace:*",

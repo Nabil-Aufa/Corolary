@@ -329,6 +329,45 @@ dan alert rotasi aggregator Chainlink.
 
 Cek uptime gratis lewat UptimeRobot/BetterStack ke `/v1/health` sudah cukup.
 
+### Build mana yang sedang berjalan
+
+`GET /v1/health` mengembalikan `commit`, SHA yang benar-benar dilayani. `version`
+ditulis tangan dan nyaris tidak pernah berubah, jadi ia tidak bisa menjawab
+pertanyaan ini. `commit: null` berarti **tidak diketahui** (mis. dijalankan lokal
+tanpa platform yang menyuntikkan SHA), bukan "belum pernah di-deploy".
+
+### Memulihkan event yang gagal permanen
+
+`GET /v1/indexer/status` memaparkan `failureReasons` — sebab kegagalan permanen
+yang sudah dikelompokkan, dengan rentang blok sumbernya. Rentang itu yang
+membedakan luka lama dari luka yang masih terbuka.
+
+`status = 'failed'` berarti event menyerah setelah delapan percobaan. Untuk sebab
+yang **sudah diperbaiki**, itu bukan vonis akhir — melainkan fakta mainnet nyata
+yang hilang dari registry sampai dikembalikan:
+
+```bash
+# Selalu lihat dulu; dry-run adalah default.
+pnpm --filter @corolary/indexer requeue-failed
+pnpm --filter @corolary/indexer requeue-failed -- --match 413
+
+# Baru kembalikan ke antrean.
+pnpm --filter @corolary/indexer requeue-failed -- --match 413 --apply
+```
+
+Selalu saring pada sebabnya (`--match`), jangan pada `failed` secara keseluruhan
+— sebab yang belum diperbaiki akan gagal lagi dan hanya membakar biaya proof.
+
+Event dikembalikan ke `proving`, **bukan** `submitting`: batch lamanya sudah
+punya proof, tapi continuity proof yang menganggur berhenti cocok dengan
+checkpoint Creditcoin yang terus maju, jadi proof berumur hari sudah pasti
+kedaluwarsa.
+
+Aman diulang. Kalau ada yang ternyata sudah tercatat, kontrak menolaknya lewat
+`queryId` dan klasifikasi memvonisnya `skip` — tidak ada jalan menghasilkan fakta
+ganda. Biayanya tarif lazy `3,13×10⁻⁴` CTC per transaksi karena bloknya sudah
+lewat 24 jam; skrip melaporkan perkiraannya sebelum mengubah apa pun.
+
 ---
 
 ## 9. Biaya
