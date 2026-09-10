@@ -54,20 +54,10 @@ export function ScoreHistoryChart({ address }: { address: Address }) {
   return (
     <Card>
       <CardBody>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-micro uppercase tracking-wide text-ink-400">Score over time</p>
-            {/* Sumbu X adalah kapan skor DICATAT di Creditcoin, bukan kapan
-                dompetnya beraktivitas di mainnet. Lompatan di sini terjadi saat
-                fakta baru terbukti dan skor dihitung ulang — bukan saat pemilik
-                dompet melakukan sesuatu. Menyamakan keduanya adalah kekeliruan
-                yang sudah berulang di proyek ini, dan grafik adalah tempat
-                paling mudah untuk mengulanginya tanpa sadar. */}
-            <p className="mt-1 max-w-md text-small text-ink-500">
-              Each step is a recomputation on Creditcoin after new facts were proven, not a change
-              in what the wallet did that day.
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Tanpa kalimat penjelas. Yang perlu diketahui dari grafik ini ada
+              di angkanya, dan angka itu sekarang tepat di bawah garisnya. */}
+          <p className="text-micro uppercase tracking-wide text-ink-400">Score over time</p>
           <Segments value={range} onChange={setRange} options={RANGES} />
         </div>
 
@@ -76,10 +66,8 @@ export function ScoreHistoryChart({ address }: { address: Address }) {
             <ErrorState error={history.error} onRetry={() => void history.refetch()} />
           ) : history.isPending ? (
             <Skeleton className="h-[260px]" />
-          ) : points.length < 2 ? (
-            <Sparse points={points} />
           ) : (
-            <Plot points={points} />
+            <Plot points={points} range={range} />
           )}
         </div>
       </CardBody>
@@ -87,59 +75,66 @@ export function ScoreHistoryChart({ address }: { address: Address }) {
   );
 }
 
+/** Titik tunggal: sama dengan `activeDot`, supaya titik yang diam dan yang disorot terbaca satu benda. */
+const SINGLE_DOT = {
+  r: 5,
+  fill: 'var(--color-accent)',
+  // `Area` mewariskan `fill-opacity` 0.6 miliknya ke setiap titik. Untuk garis
+  // itu tidak terlihat; untuk satu titik yang berdiri sendirian, titiknya jadi
+  // biru pucat yang nyaris hilang di atas garis tier.
+  fillOpacity: 1,
+  stroke: 'var(--color-surface)',
+  strokeWidth: 2,
+} as const;
+
 /**
- * Satu titik bukan garis, dan menggambarnya sebagai garis mendatar akan
- * menyiratkan riwayat yang tidak kita punya.
+ * Rentang sumbu X untuk data yang terlalu sedikit untuk menentukannya sendiri.
+ *
+ * `dataMin`/`dataMax` dari satu titik menghasilkan domain selebar nol, dan dari
+ * nol titik tidak menghasilkan apa-apa — dua-duanya membuat sumbunya runtuh.
+ * Satu titik diberi sehari di kiri-kanan supaya ia berdiri di tengah, bukan
+ * menempel di tepi dan terbaca sebagai potongan garis yang terpotong.
  */
-function Sparse({ points }: { points: ScoreHistoryPoint[] }) {
+function xDomainFor(
+  points: ScoreHistoryPoint[],
+  range: ScoreRange,
+): [number, number] | [string, string] {
+  if (points.length >= 2) return ['dataMin', 'dataMax'];
   const only = points[0];
-  return (
-    <p className="text-body text-ink-500">
-      {only === undefined ? (
-        <>No score has been recorded for this address in this window yet.</>
-      ) : (
-        <>
-          Only one recorded point so far: <span className="num text-ink-900">{only.score}</span> on{' '}
-          {formatDay(only.atTime)}. A line needs a second recomputation to mean anything.
-        </>
-      )}
-    </p>
-  );
+  if (only !== undefined) return [only.atTime - 86_400, only.atTime + 86_400];
+  const now = Math.floor(Date.now() / 1000);
+  return [now - (range === 'all' ? 30 : RANGE_DAYS[range]) * 86_400, now];
 }
 
-function Plot({ points }: { points: ScoreHistoryPoint[] }) {
-  const first = points[0] as ScoreHistoryPoint;
-  const last = points[points.length - 1] as ScoreHistoryPoint;
-  const peak = points.reduce((a, b) => (b.score > a.score ? b : a), first);
+/**
+ * Kerangka grafiknya SELALU digambar, berapa pun titiknya.
+ *
+ * Dulu kurang dari dua titik diganti satu kalimat, dan kartu berisi kalimat di
+ * tempat grafik terbaca seperti grafik yang gagal dimuat. Yang tetap dijaga
+ * adalah alasan lamanya: satu titik digambar sebagai TITIK, bukan garis datar,
+ * karena garis menyiratkan riwayat yang tidak kita punya.
+ */
+function Plot({ points, range }: { points: ScoreHistoryPoint[]; range: ScoreRange }) {
+  const first = points[0];
+  const last = points[points.length - 1];
+  const peak =
+    first === undefined ? undefined : points.reduce((a, b) => (b.score > a.score ? b : a), first);
+  const single = points.length === 1;
 
   return (
     <figure className="m-0">
-      {/* Nilai tidak boleh hanya bisa dibaca lewat tooltip. Ringkasan ini
-          membawa angka yang benar-benar penting — awal, akhir, puncak — ke
-          dalam teks biasa, terbaca pembaca layar maupun mata yang tidak
-          menyentuh grafiknya sama sekali. */}
-      <figcaption className="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-small text-ink-500">
-        <span>
-          First recorded <span className="num text-ink-900">{first.score}</span> ·{' '}
-          {formatDay(first.atTime)}
-        </span>
-        <span>
-          Now <span className="num text-ink-900">{last.score}</span> · tier {last.tier}{' '}
-          {TIER_LABEL[last.tier]}
-        </span>
-        {peak.score > last.score && (
-          <span>
-            Peak <span className="num text-ink-900">{peak.score}</span> · {formatDay(peak.atTime)}
-          </span>
-        )}
-      </figcaption>
-
       <div
         className="h-[260px]"
         role="img"
-        aria-label={`Credit score over time, from ${first.score} on ${formatDay(
-          first.atTime,
-        )} to ${last.score} on ${formatDay(last.atTime)}, across ${points.length} recorded points.`}
+        aria-label={
+          first === undefined || last === undefined
+            ? 'Credit score over time. No score recorded in this window.'
+            : single
+              ? `Credit score over time. One recorded point: ${first.score} on ${formatDay(first.atTime)}.`
+              : `Credit score over time, from ${first.score} on ${formatDay(first.atTime)} to ${
+                  last.score
+                } on ${formatDay(last.atTime)}, across ${points.length} recorded points.`
+        }
       >
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={points} margin={{ top: 4, right: 44, bottom: 4, left: 0 }}>
@@ -164,7 +159,8 @@ function Plot({ points }: { points: ScoreHistoryPoint[] }) {
               dataKey="atTime"
               type="number"
               scale="time"
-              domain={['dataMin', 'dataMax']}
+              domain={xDomainFor(points, range)}
+              {...(single && first !== undefined ? { ticks: [first.atTime] } : {})}
               tickFormatter={formatDay}
               tick={{ fill: 'var(--color-ink-400)', fontSize: 11 }}
               tickLine={false}
@@ -217,18 +213,44 @@ function Plot({ points }: { points: ScoreHistoryPoint[] }) {
               stroke="var(--color-accent)"
               strokeWidth={2}
               fill="url(#score-fill)"
-              dot={false}
-              activeDot={{
-                r: 4,
-                fill: 'var(--color-accent)',
-                stroke: 'var(--color-surface)',
-                strokeWidth: 2,
-              }}
+              dot={single ? SINGLE_DOT : false}
+              activeDot={SINGLE_DOT}
               isAnimationActive={false}
             />
           </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Di BAWAH grafik, dipisah jarak — bukan titik. Nilainya tetap teks
+          biasa supaya terbaca pembaca layar maupun mata yang tidak menyentuh
+          grafiknya sama sekali. */}
+      <figcaption className="mt-4 flex flex-wrap gap-x-8 gap-y-1 text-small text-ink-500">
+        {first === undefined || last === undefined || peak === undefined ? (
+          <span>No score recorded in this window.</span>
+        ) : (
+          <>
+            <span className="flex gap-2">
+              <span>First recorded</span>
+              <span className="num text-ink-900">{first.score}</span>
+              <span>{formatDay(first.atTime)}</span>
+            </span>
+            <span className="flex gap-2">
+              <span>Now</span>
+              <span className="num text-ink-900">{last.score}</span>
+              <span>
+                Tier {last.tier} {TIER_LABEL[last.tier]}
+              </span>
+            </span>
+            {peak.score > last.score && (
+              <span className="flex gap-2">
+                <span>Peak</span>
+                <span className="num text-ink-900">{peak.score}</span>
+                <span>{formatDay(peak.atTime)}</span>
+              </span>
+            )}
+          </>
+        )}
+      </figcaption>
     </figure>
   );
 }
