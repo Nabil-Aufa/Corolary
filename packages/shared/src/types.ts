@@ -228,6 +228,23 @@ export interface MarketFreshnessEntry {
   priceMaxAgeSeconds: number;
 }
 
+export interface IndexerFailureReason {
+  /** Teks `last_error`, dipangkas supaya pengelompokannya bermakna. */
+  reason: string;
+  /** Berapa event yang gagal permanen dengan sebab ini. */
+  count: number;
+  /**
+   * Blok sumber tertua dan termuda yang terkena sebab ini, unix seconds.
+   *
+   * Rentangnya yang membedakan luka lama dari luka yang masih terbuka: sebab
+   * yang berhenti di masa lalu sudah selesai, sebab yang menyentuh blok
+   * kemarin masih berlangsung. `queue.failed` sendiri tidak bisa membedakan
+   * keduanya karena ia kumulatif dan tidak pernah menyusut.
+   */
+  oldestObservedAt: UnixSeconds;
+  newestObservedAt: UnixSeconds;
+}
+
 export interface IndexerStatus {
   chainKey: number;
   latestEthereumBlock: number;
@@ -241,6 +258,20 @@ export interface IndexerStatus {
    * paling penting di sistem. Lihat docs/indexer.md.
    */
   oldestUnprovenAgeSeconds: number;
+  /**
+   * Sebab kegagalan permanen, dikelompokkan dan diurutkan dari yang terbanyak.
+   *
+   * `queue.failed` hanya memberi SATU angka, dan satu angka tidak bisa
+   * dibedakan antara "satu sebab yang terjadi 568 kali" dan "sembilan sebab
+   * berbeda yang menumpuk" — padahal keduanya menuntut tindakan yang sama
+   * sekali berbeda. Tanpa ini, mendiagnosis kegagalan menuntut akses langsung
+   * ke database produksi, yang berarti tidak ada yang mendiagnosisnya.
+   *
+   * Teksnya dipangkas dan dikelompokkan, jadi ia menjawab "sebab apa saja, dan
+   * seberapa sering" — bukan menggantikan log untuk melacak satu kejadian.
+   * Array kosong berarti tidak ada kegagalan permanen sama sekali.
+   */
+  failureReasons: IndexerFailureReason[];
   /** Jumlah baris `facts` kumulatif — seluruh riwayat, bukan 24 jam terakhir. */
   totalFacts: number;
   /** Jumlah subjek (dompet) berbeda yang punya minimal satu fakta. */

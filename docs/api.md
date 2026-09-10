@@ -336,6 +336,26 @@ Field kunci:
 
 ## 3. `GET /v1/indexer/status`
 
+`failureReasons` mengelompokkan `last_error` dari event yang gagal permanen,
+diurutkan dari yang terbanyak, maksimal 12 kelompok.
+
+`queue.failed` hanya satu angka, dan satu angka tidak bisa membedakan **satu
+sebab yang terjadi 568 kali** dari **sembilan sebab berbeda yang menumpuk** —
+padahal keduanya menuntut tindakan yang sama sekali berbeda. Sebelum field ini
+ada, menjawabnya menuntut akses langsung ke database produksi, sehingga praktis
+tidak pernah dijawab.
+
+`oldestObservedAt`/`newestObservedAt` adalah rentang blok SUMBER yang terkena
+sebab itu. Rentangnya yang membedakan luka lama dari luka yang masih terbuka:
+sebab yang berhenti berbulan lalu sudah selesai, sebab yang menyentuh blok
+kemarin masih berlangsung. `queue.failed` tidak bisa membedakannya karena ia
+kumulatif dan tidak pernah menyusut.
+
+Teksnya dipangkas ke 120 karakter sebelum dikelompokkan, karena `last_error`
+kerap memuat ekor yang unik per kejadian (hash, alamat) — tanpa pemangkasan
+setiap baris jadi kelompoknya sendiri dan hasilnya kembali jadi daftar mentah.
+Ini ringkasan operasional, bukan pengganti log untuk melacak satu kejadian.
+
 Kesehatan operasional indexer: cursor per protokol, lag terhadap attestation, dan
 ukuran antrean per status (`observed_events.status`). Dipakai untuk dashboard
 internal maupun badge "live" di frontend.
@@ -371,10 +391,18 @@ curl -s https://api.corolary.xyz/v1/indexer/status
       "proving": 1,
       "submitting": 0,
       "recorded24h": 214,
-      "failed": 0,
+      "failed": 568,
       "skipped24h": 5
     },
     "oldestUnprovenAgeSeconds": 612,
+    "failureReasons": [
+      {
+        "reason": "prover menolak: Failed to generate batch proof via API: Error: Failed to fetch batch proof",
+        "count": 568,
+        "oldestObservedAt": 1787670383,
+        "newestObservedAt": 1787884583
+      }
+    ],
     "totalFacts": 32481,
     "distinctSubjects": 1327,
     "onChainPriceAgeSeconds": 4120,

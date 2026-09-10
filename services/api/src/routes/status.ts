@@ -6,7 +6,8 @@ import { creditcoin, chainInfoProvider, priceRegistry } from '../lib/chain.js';
 import { protocolName } from '../lib/protocols.js';
 import { reservePriceFreshness } from '../lib/price-freshness.js';
 import type {
-  Address, ChainStatus, HealthStatus, IndexerStatus, MarketFreshnessEntry,
+  Address, ChainStatus, HealthStatus, IndexerFailureReason, IndexerStatus,
+  MarketFreshnessEntry,
 } from '@corolary/shared';
 
 export const status = new Hono();
@@ -149,6 +150,8 @@ status.get('/indexer/status', async (c) => {
   const totalFacts = Number(totals[0]?.total_facts ?? 0);
   const distinctSubjects = Number(totals[0]?.distinct_subjects ?? 0);
 
+  const failureReasons = await groupedFailureReasons();
+
   const onChainPriceAgeSeconds = await maxOnChainPriceAgeSeconds();
   const marketFreshness = await marketFreshnessEntries();
 
@@ -175,6 +178,7 @@ status.get('/indexer/status', async (c) => {
     oldestUnprovenAgeSeconds: oldestAt
       ? Math.max(0, Math.floor(Date.now() / 1000) - Number(oldestAt))
       : 0,
+    failureReasons,
     totalFacts,
     distinctSubjects,
     onChainPriceAgeSeconds,
@@ -185,6 +189,42 @@ status.get('/indexer/status', async (c) => {
   };
   return ok(c, data);
 });
+
+/**
+ * Sebab kegagalan permanen, dikelompokkan.
+ *
+ * `queue.failed` adalah satu angka, dan satu angka tidak bisa membedakan satu
+ * sebab yang terjadi ratusan kali dari belasan sebab yang menumpuk. Sebelum ini
+ * ada, satu-satunya cara menjawabnya adalah membuka database produksi —
+ * sehingga praktis tidak pernah dijawab.
+ *
+ * Dipangkas ke 120 karakter karena `last_error` kerap memuat ekor yang unik per
+ * kejadian (hash, alamat). Tanpa pemangkasan setiap baris jadi kelompoknya
+ * sendiri dan hasilnya kembali jadi daftar mentah, bukan ringkasan.
+ *
+ * Dibatasi 12 kelompok teratas: ini ringkasan operasional, bukan pengganti log.
+ */
+async function groupedFailureReasons(): Promise<IndexerFailureReason[]> {
+  const rows = await sql<
+    { reason: string; n: string; oldest: string | null; newest: string | null }[]
+  >`
+    SELECT left(coalesce(last_error, '(tanpa pesan)'), 120) AS reason,
+           count(*)::text AS n,
+           min(observed_at)::text AS oldest,
+           max(observed_at)::text AS newest
+    FROM observed_events
+    WHERE chain_key = ${config.ETHEREUM_CHAIN_KEY} AND status = 'failed'
+    GROUP BY 1
+    ORDER BY count(*) DESC
+    LIMIT 12
+  `;
+  return rows.map((r) => ({
+    reason: r.reason,
+    count: Number(r.n),
+    oldestObservedAt: Number(r.oldest ?? 0),
+    newestObservedAt: Number(r.newest ?? 0),
+  }));
+}
 
 /**
  * Aset kanonik yang dipantau harga-nya, dan alamatnya di Ethereum mainnet —
