@@ -46,11 +46,27 @@
 
   --color-on-solid: var(--color-on-solid);
 
+  --color-panel: var(--color-panel);
+  --color-panel-raised: var(--color-panel-raised);
+  --color-panel-border: var(--color-panel-border);
+  --color-panel-ink-900: var(--color-panel-ink-900);
+  --color-panel-ink-700: var(--color-panel-ink-700);
+  --color-panel-ink-500: var(--color-panel-ink-500);
+
+  --color-tint-a: var(--color-tint-a);
+  --color-tint-b: var(--color-tint-b);
+
   --font-sans: var(--font-sans-family), system-ui, sans-serif;
+  /* Display HANYA untuk landing. Dashboard tetap satu keluarga — dua grotesk
+     netral di ukuran body tidak bisa dibedakan siapa pun, jadi pemisahannya
+     dibayar hanya di tempat yang ukurannya membuatnya terlihat. */
+  --font-display: var(--font-display-family), var(--font-sans-family), system-ui, sans-serif;
 
   --radius-sm: var(--radius-sm);
   --radius-base: var(--radius-base);
   --radius-lg: var(--radius-lg);
+  --radius-card: var(--mkt-radius-card);
+  --radius-panel: var(--mkt-radius-panel);
 
   /* Skala tipe docs/frontend.md §2.2 — bukan default Tailwind. */
   --text-display: 3.5rem;
@@ -67,6 +83,24 @@
   --text-small--line-height: 1.5;
   --text-micro: 0.6875rem;
   --text-micro--line-height: 1.4;
+
+  /* Skala landing. Terpisah dari skala app di atas, dan sengaja EKSTREM:
+     kontras antara 90px dan 14px adalah mekanisme utamanya, bukan hiasan.
+     Menyisipkan ukuran menengah di antara keduanya justru melemahkannya. */
+  --text-mkt-display: clamp(2.5rem, 7.4vw, 5.625rem);
+  --text-mkt-display--line-height: 1;
+  --text-mkt-display--letter-spacing: -0.01em;
+  --text-mkt-h2: clamp(1.875rem, 4.4vw, 3.25rem);
+  --text-mkt-h2--line-height: 1.04;
+  --text-mkt-h2--letter-spacing: -0.01em;
+  --text-mkt-statement: clamp(1.25rem, 2.3vw, 1.875rem);
+  --text-mkt-statement--line-height: 1.28;
+  --text-mkt-statement--letter-spacing: -0.005em;
+  /* Angka mosaik statistik: tabular, dan cukup besar untuk dibaca dari
+     seberang ruangan saat demo diproyeksikan. */
+  --text-mkt-stat: clamp(2.25rem, 5vw, 3.75rem);
+  --text-mkt-stat--line-height: 1;
+  --text-mkt-stat--letter-spacing: -0.02em;
 }
 
 @layer base {

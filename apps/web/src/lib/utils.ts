@@ -13,7 +13,22 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * mengintai di mana pun warna teks bertemu ukuran kustom, bukan hanya di
  * tombol. Skala ini didefinisikan di globals.css (@theme --text-*).
  */
-const TYPE_SCALE = ['display', 'h1', 'h2', 'h3', 'body', 'small', 'micro'];
+const TYPE_SCALE = [
+  'display',
+  'h1',
+  'h2',
+  'h3',
+  'body',
+  'small',
+  'micro',
+  // Skala landing. Wajib terdaftar di sini juga — `text-mkt-display` yang
+  // tidak dikenali akan ditebak sebagai warna dan membuang `text-panel-ink-900`
+  // yang ditulis sebelumnya, persis mode kegagalan yang dijelaskan di atas.
+  'mkt-display',
+  'mkt-h2',
+  'mkt-statement',
+  'mkt-stat',
+];
 
 const twMerge = extendTailwindMerge({
   extend: {

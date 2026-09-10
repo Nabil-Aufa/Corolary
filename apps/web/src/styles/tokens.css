@@ -86,6 +86,35 @@
   --color-brand: #1d4fd8;
   --color-brand-hover: #1840b3;
 
+
+  /* ── Landing (marketing) ─────────────────────────────────────────────
+   *
+   * Landing memakai bahasa visual yang berbeda dari dashboard: tipografi
+   * raksasa, sudut besar, dan "panel curtain" — bagian yang meluncur MENUTUPI
+   * bagian sebelumnya, bukan mengalir di bawahnya. Skala app dipertahankan
+   * apa adanya; memaksa satu skala melayani keduanya merusak dashboard yang
+   * padat data.
+   *
+   * `--color-panel` adalah kebalikan halaman, bukan "hitam". Di terang ia
+   * gelap dengan teks terang; di gelap ia justru permukaan yang DINAIKKAN,
+   * karena panel #0a0d13 di atas latar #0a0d13 tidak akan terlihat sama
+   * sekali — curtain-nya hilang dan seluruh efeknya sia-sia. */
+  --color-panel: #0b0e14;
+  --color-panel-raised: #151a24;
+  --color-panel-border: #262d3c;
+  --color-panel-ink-900: #f4f6f9;
+  --color-panel-ink-700: #c6ccd9;
+  --color-panel-ink-500: #8b93a7;
+
+  /* Tint mosaik statistik. Sengaja nyaris tak berwarna — begitu ia cukup
+     jenuh untuk bersaing dengan aksen, aturan "biru = bisa diklik, teal =
+     terbukti" kehilangan artinya. */
+  --color-tint-a: #eaf3f0;
+  --color-tint-b: #eeeff8;
+
+  --mkt-radius-card: 20px;
+  --mkt-radius-panel: 80px;
+
   --radius-sm: 6px;
   --radius-base: 8px;
   --radius-lg: 12px;
@@ -128,4 +157,17 @@
   --color-on-solid: #0a0d13;
 
   --color-focus-ring: #5b85ff;
+
+  /* Curtain di gelap bekerja lewat ELEVASI, bukan inversi. Panel terang di
+     atas latar gelap terbaca seperti lampu sorot, dan bagian terpanjang di
+     halaman ini adalah panel. */
+  --color-panel: #131822;
+  --color-panel-raised: #1b2130;
+  --color-panel-border: #2b3345;
+  --color-panel-ink-900: #f4f6f9;
+  --color-panel-ink-700: #c6ccd9;
+  --color-panel-ink-500: #8b93a7;
+
+  --color-tint-a: #16241f;
+  --color-tint-b: #1a1c2b;
 }
