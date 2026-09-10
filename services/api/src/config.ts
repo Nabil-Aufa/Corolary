@@ -43,3 +43,20 @@ if (!parsed.success) {
 export const config = parsed.data;
 export const VERSION = '0.1.0';
 export const STARTED_AT = Date.now();
+
+/**
+ * SHA commit yang sedang berjalan, dibaca dari platform hosting.
+ *
+ * Railway menyuntikkan `RAILWAY_GIT_COMMIT_SHA` sendiri, jadi tidak ada yang
+ * perlu dikonfigurasi di sana. `GIT_COMMIT_SHA` disediakan sebagai jalan keluar
+ * untuk host lain — dan diperiksa LEBIH DULU supaya nilai yang dipasang manual
+ * bisa dipakai untuk menguji jalur ini tanpa menyentuh Railway.
+ *
+ * Sengaja TIDAK masuk skema zod: SHA yang hilang tidak boleh membuat proses
+ * gagal boot. Kehilangan observabilitas deploy jauh lebih ringan daripada API
+ * yang menolak menyala karena satu variabel diagnostik.
+ */
+export const COMMIT_SHA: string | null =
+  process.env['GIT_COMMIT_SHA']?.trim() ||
+  process.env['RAILWAY_GIT_COMMIT_SHA']?.trim() ||
+  null;

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { sql } from '../lib/db.js';
 import { ok } from '../lib/envelope.js';
-import { config, VERSION, STARTED_AT } from '../config.js';
+import { config, VERSION, STARTED_AT, COMMIT_SHA } from '../config.js';
 import { creditcoin, chainInfoProvider, priceRegistry } from '../lib/chain.js';
 import { protocolName } from '../lib/protocols.js';
 import { reservePriceFreshness } from '../lib/price-freshness.js';
@@ -27,6 +27,7 @@ status.get('/health', async (c) => {
     version: VERSION,
     uptime: Math.floor((Date.now() - STARTED_AT) / 1000),
     timestamp: Math.floor(Date.now() / 1000),
+    commit: COMMIT_SHA,
   };
   return ok(c, data);
 });

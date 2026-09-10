@@ -172,7 +172,9 @@ dan body:
   dengan `/v1` sampai frontend bermigrasi. `/v1` tidak pernah diubah bentuknya
   secara breaking setelah dipakai `apps/web`.
 - `GET /v1/health` men-tampilkan `version` (semver `services/api`) untuk debugging,
-  bukan untuk content negotiation.
+  bukan untuk content negotiation. Untuk memastikan build mana yang berjalan,
+  pakai `commit`, bukan `version` — `version` ditulis tangan dan nyaris tidak
+  pernah berubah.
 
 ### 0.9 CORS
 
@@ -218,6 +220,18 @@ proses Node hidup.
 > **Catatan penamaan:** field status di dalam `data` dinamai `status` (bukan `ok`)
 > supaya tidak rancu dengan `ok` di amplop respons — dua hal yang berbeda lapis.
 
+`commit` adalah SHA 40-karakter dari kode yang BENAR-BENAR berjalan, disuntikkan
+oleh platform hosting (`RAILWAY_GIT_COMMIT_SHA`, atau `GIT_COMMIT_SHA` untuk host
+lain). Ia ada karena `version` tidak bisa menjawab pertanyaan yang muncul setiap
+kali sesudah deploy: apakah yang melayani ini build yang baru di-push. Terukur
+2026-09-10 — push ke main lolos CI sementara `uptime` tetap 40,5 jam, dan dari
+luar tidak ada cara membedakan "sudah ter-deploy" dari "masih build lama tapi
+sehat".
+
+`commit` bernilai `null` bila prosesnya tidak dijalankan platform yang
+menyuntikkan SHA (mis. `pnpm dev:api` lokal). **`null` berarti tidak diketahui**,
+bukan "belum pernah di-deploy".
+
 ### Parameter
 
 Tidak ada.
@@ -237,7 +251,8 @@ curl -s https://api.corolary.xyz/v1/health
     "status": "ok",
     "version": "1.4.0",
     "uptime": 385920.42,
-    "timestamp": 1787400000
+    "timestamp": 1787400000,
+    "commit": "610f2779f0f7a6b1b2c3d4e5f60718293a4b5c6d"
   }
 }
 ```

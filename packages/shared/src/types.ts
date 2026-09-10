@@ -275,6 +275,21 @@ export interface HealthStatus {
   version: string;
   uptime: number;
   timestamp: UnixSeconds;
+  /**
+   * SHA commit yang sedang BENAR-BENAR berjalan, 40 karakter hex.
+   *
+   * `version` adalah semver yang ditulis tangan dan nyaris tidak pernah
+   * berubah, jadi ia tidak bisa menjawab satu-satunya pertanyaan yang penting
+   * setelah deploy: apakah kode yang baru di-push itu yang sedang melayani.
+   * Terukur 2026-09-10 — push ke main lolos CI sementara `uptime` tetap 40,5
+   * jam, dan tidak ada cara dari luar untuk membedakan "sudah ter-deploy" dari
+   * "masih build lama tapi sehat".
+   *
+   * `null` bila proses tidak dijalankan oleh platform yang menyuntikkan SHA
+   * (mis. `pnpm dev` lokal). Null berarti TIDAK DIKETAHUI — jangan dibaca
+   * sebagai "belum pernah di-deploy".
+   */
+  commit: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────
