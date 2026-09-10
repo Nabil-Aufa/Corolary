@@ -9,14 +9,13 @@ import { BackfillPanel } from '@/components/score/BackfillPanel';
 import { ComponentBreakdown } from '@/components/score/ComponentBreakdown';
 import { NextTierGuidance } from '@/components/score/NextTierGuidance';
 import { ScoreHistoryChart } from '@/components/score/ScoreHistoryChart';
-import { ScoreDial } from '@/components/score/ScoreDial';
-import { TierLadder } from '@/components/score/TierLadder';
+import { TierBars } from '@/components/score/TierBars';
+import { TierGauge } from '@/components/score/TierGauge';
 import { AddressDisplay } from '@/components/shared/AddressDisplay';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ErrorState } from '@/components/shared/ErrorState';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardBody } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useScore } from '@/hooks/useApi';
 import { etherscanAddress } from '@/lib/explorer';
@@ -73,14 +72,13 @@ export default function ScorePage() {
         // menampilkan angka nol seolah itu penilaian adalah kebohongan kecil
         // yang merusak satu-satunya klaim produk ini.
         <div className="grid gap-6">
-          {/* Kalimat lama berbunyi "wallet ini tidak punya event terindeks",
-              yang terbaca seolah dompetnya memang kosong. Itu kekeliruan yang
-              sama yang berulang di proyek ini: menyamakan jendela pemindaian
-              dengan riwayat yang benar-benar ada. Panel di bawahnya sekarang
-              menawarkan jalan keluarnya, jadi kalimatnya bisa jujur. */}
+          {/* Tanpa kotak bergaris. Tepat di bawahnya ada panel pemindaian
+              berkartu, dan dua bingkai bertumpuk untuk satu pesan membuat
+              halaman kosong terasa lebih ramai daripada halaman berisi. */}
           <EmptyState
+            bordered={false}
             title="Nothing indexed for this address yet"
-            description="Corolary only scores Ethereum mainnet lending activity that has been proven through Attestcoin. This wallet has not been scanned, which is not the same as having no history."
+            description="Scores come only from proven Ethereum mainnet lending activity. Scan this wallet below to find its history."
             action={
               <Link href="/proofs">
                 <Button variant="secondary">Browse proven facts</Button>
@@ -91,44 +89,60 @@ export default function ScorePage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
-            <Card>
-              <CardBody className="flex flex-col items-center gap-4">
-                <ScoreDial score={data.score} tier={data.tier} size="lg" />
-                <Badge tone="accent">
-                  Tier {data.tier} · {TIER_LABEL[data.tier]}
-                </Badge>
-                <p className="text-small text-ink-500">
-                  <span className="num text-ink-900">{formatCount(data.factCount)}</span> proven
-                  facts
-                  {data.firstFactAt !== null && <> · since {formatRelativeTime(data.firstFactAt)}</>}
-                </p>
-              </CardBody>
-            </Card>
+          {/* Satu kartu, dua kolom, dipisah hairline yang sama dengan pemisah
+              baris tabel. Dua kartu terpisah menyajikan skor dan rasio
+              kolateral sebagai dua statistik sejajar — padahal yang satu
+              SEBAB dan yang satu AKIBAT, dan hubungan itu inti produknya. */}
+          <Card>
+            <div className="grid items-center lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+              <div className="flex flex-col items-center gap-5 p-6 lg:p-8">
+                <TierGauge score={data.score} tier={data.tier} />
 
-            <Card>
-              <CardBody className="flex h-full flex-col">
-                <p className="text-micro uppercase tracking-wide text-ink-400">
-                  Required collateral
+                {/* Tanpa badge. Dua baris di dalam pill memaksa pill itu
+                    tumbuh jadi kotak, dan yang tersisa cuma border yang
+                    mengurung teks tanpa menambah arti — sementara badge di
+                    produk ini selalu satu baris micro huruf kapital. */}
+                <div className="text-center">
+                  <p className="text-h3 font-semibold tracking-tight text-ink-900">
+                    Tier {data.tier}
+                  </p>
+                  <p className="mt-0.5 text-body text-ink-500">{TIER_LABEL[data.tier]}</p>
+                </div>
+
+                <p className="text-micro text-ink-400">
+                  <span className="num">{formatCount(data.factCount)}</span> proven{' '}
+                  {data.factCount === 1 ? 'fact' : 'facts'}
+                  {data.firstFactAt !== null && <>, since {formatRelativeTime(data.firstFactAt)}</>}
                 </p>
-                <p className="num mt-2 text-display font-semibold leading-none text-ink-900">
+              </div>
+
+              <div className="border-t border-border p-6 lg:border-l lg:border-t-0 lg:p-8">
+                <p className="text-small text-ink-400">Required collateral</p>
+                <p className="num mt-1 text-[4.5rem] font-semibold leading-none tracking-tight text-ink-900 sm:text-[6rem] lg:text-[8.125rem]">
                   {formatRatio(data.collateralRatioBps)}
                 </p>
-                <p className="mt-3 max-w-md text-body text-ink-500">
-                  Against a{' '}
-                  <span className="num">{formatRatio(BASELINE_COLLATERAL_RATIO_BPS)}</span> baseline
-                  for wallets with no proven history, which is{' '}
-                  <span className="num text-ink-900">
-                    {(BASELINE_COLLATERAL_RATIO_BPS - data.collateralRatioBps) / 100}
-                  </span>{' '}
-                  percentage points of capital you do not have to lock.
+                {/* Satu baris, bukan paragraf. Rasio di atasnya sudah menjawab
+                    "berapa"; kalimat ini cukup menjawab "dibanding apa", dan
+                    versi tiga barisnya mendorong tangga tier jauh dari angka
+                    yang ia jelaskan. */}
+                <p className="mt-4 text-body text-ink-500 lg:text-h3">
+                  {data.collateralRatioBps >= BASELINE_COLLATERAL_RATIO_BPS ? (
+                    <>The same collateral as a wallet with no proven history.</>
+                  ) : (
+                    <>
+                      <span className="num">
+                        {(BASELINE_COLLATERAL_RATIO_BPS - data.collateralRatioBps) / 100}
+                      </span>{' '}
+                      percentage points less capital locked than the{' '}
+                      <span className="num">{formatRatio(BASELINE_COLLATERAL_RATIO_BPS)}</span>{' '}
+                      baseline.
+                    </>
+                  )}
                 </p>
-                <div className="mt-auto pt-8">
-                  <TierLadder tier={data.tier} />
-                </div>
-              </CardBody>
-            </Card>
-          </div>
+                <TierBars score={data.score} tier={data.tier} className="mt-6" />
+              </div>
+            </div>
+          </Card>
 
           <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
             How this score is built

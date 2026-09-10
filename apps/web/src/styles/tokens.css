@@ -50,6 +50,25 @@
   --color-danger: #c0233d;
   --color-danger-soft: #fce8ec;
 
+  /* Tangga tier — lima langkah biru, satu per tier.
+   *
+   * BUKAN palet baru: seluruhnya hue aksen (~223), dan langkah keempat PERSIS
+   * `--color-accent`. Yang ditambahkan cuma anak tangga yang belum ada, karena
+   * aksen sendiri hanya punya tiga (soft, base, hover) sementara tier ada lima.
+   *
+   * Dipakai di DUA tempat — segmen gauge dan baris tangga tier — dan satu-satunya
+   * cara menjamin "warna tier sama di keduanya" adalah kalau keduanya membaca
+   * token yang sama, bukan dua daftar yang kebetulan cocok hari ini.
+   *
+   * Di tema gelap arahnya DIBALIK: yang tertinggi jadi paling terang, bukan
+   * paling gelap. Alasannya sama dengan kenapa `--color-accent` menerang di
+   * gelap — di atas #0a0d13, biru tua adalah biru yang hilang. */
+  --color-tier-0: #c3cff5;
+  --color-tier-1: #93aaee;
+  --color-tier-2: #5c7de6;
+  --color-tier-3: #1d4fd8;
+  --color-tier-4: #143a9e;
+
   /* Teks di atas lencana BERISI. Di terang, warna solidnya gelap sehingga
      teks harus putih; di gelap, warna solidnya justru terang sehingga teks
      harus mendekati hitam. Satu token yang berbalik per tema membuat kelima
@@ -99,6 +118,12 @@
 
   --color-danger: #f2607a;
   --color-danger-soft: #3a1620;
+
+  --color-tier-0: #2b3a63;
+  --color-tier-1: #3b5391;
+  --color-tier-2: #4a6ec4;
+  --color-tier-3: #5b85ff;
+  --color-tier-4: #8fadff;
 
   --color-on-solid: #0a0d13;
 
