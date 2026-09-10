@@ -1,6 +1,6 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 /**
  * Waktu sekarang dalam detik, sebagai sumber eksternal — bukan `Date.now()` di
@@ -15,38 +15,64 @@ import { useSyncExternalStore } from 'react';
  *
  * Satu interval untuk SELURUH aplikasi, berapa pun komponen yang memakainya,
  * dan mati sendiri begitu pemakai terakhir lepas.
+ *
+ * Kerapatan tick adalah milik PEMANGGIL, karena hanya pemanggil yang tahu satuan
+ * terkecil yang benar-benar ditampilkannya. Tick 15 detik di bawah label yang
+ * mencetak detik menghasilkan persis gejala yang hendak dihindari komentar di
+ * atas: angka yang melompat 15 detik lalu membeku, tak terbedakan dari hitung
+ * mundur yang berhenti. Store-nya berdetak pada interval TERCEPAT yang sedang
+ * diminta, jadi satu komponen berdetik tidak memaksa seluruh aplikasi ikut
+ * ter-render tiap detik setelah komponen itu tertutup.
  */
 let current = 0;
 let timer: number | null = null;
-const listeners = new Set<() => void>();
+let period = 0;
 
-const TICK_MS = 15_000;
+/** Nilai adalah interval yang diminta tiap pelanggan, bukan sekadar keanggotaan. */
+const listeners = new Map<() => void, number>();
+
+const DEFAULT_TICK_MS = 15_000;
 
 function tick(): void {
   current = Math.floor(Date.now() / 1000);
-  for (const listener of listeners) listener();
+  for (const listener of listeners.keys()) listener();
 }
 
-function subscribe(listener: () => void): () => void {
-  if (listeners.size === 0) {
-    tick();
-    timer = window.setInterval(tick, TICK_MS);
+function reschedule(): void {
+  const next = listeners.size === 0 ? 0 : Math.min(...listeners.values());
+  if (next === period) return;
+
+  if (timer !== null) {
+    window.clearInterval(timer);
+    timer = null;
   }
-  listeners.add(listener);
+  period = next;
+  if (next > 0) timer = window.setInterval(tick, next);
+}
+
+function subscribe(listener: () => void, intervalMs: number): () => void {
+  // Dibaca sekali di sini supaya pelanggan pertama tidak menunggu satu periode
+  // penuh sebelum melihat angka yang benar.
+  if (listeners.size === 0) tick();
+  listeners.set(listener, intervalMs);
+  reschedule();
 
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && timer !== null) {
-      window.clearInterval(timer);
-      timer = null;
-    }
+    reschedule();
   };
 }
 
-/** `0` di server dan sebelum langganan pertama — pemanggil harus menanganinya. */
-export function useNow(): number {
+/**
+ * `0` di server dan sebelum langganan pertama — pemanggil harus menanganinya.
+ *
+ * `intervalMs` adalah kerapatan tick yang dibutuhkan tampilan pemanggil:
+ * 1.000 untuk label yang mencetak detik, default 15.000 untuk yang mencetak
+ * menit ke atas.
+ */
+export function useNow(intervalMs: number = DEFAULT_TICK_MS): number {
   return useSyncExternalStore(
-    subscribe,
+    useCallback((listener: () => void) => subscribe(listener, intervalMs), [intervalMs]),
     () => current,
     () => 0,
   );

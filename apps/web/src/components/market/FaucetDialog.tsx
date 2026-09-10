@@ -47,7 +47,11 @@ export function FaucetDialog({
   // Hitung mundur cooldown butuh waktu yang benar-benar berjalan; `0` berarti
   // belum terukur, dan selama itu tidak ada tombol yang ditandai cooling supaya
   // cat pertama tidak salah menonaktifkan semuanya.
-  const now = useNow();
+  //
+  // Tiap detik, bukan default 15 detik: labelnya mencetak detik, jadi tick yang
+  // lebih lambat membuatnya melompat lalu membeku — terbaca seperti hitung
+  // mundur yang mati, tepat di layar tempat pengguna sedang menunggu.
+  const now = useNow(1000);
 
   // Saldo dan waktu klaim terakhir dibaca sekaligus: satu multicall untuk
   // seluruh tabel, bukan dua panggilan per token.
