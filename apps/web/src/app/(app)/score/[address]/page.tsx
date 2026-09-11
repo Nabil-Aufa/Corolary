@@ -4,22 +4,18 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { isAddress } from 'viem';
 import { ExternalLink } from 'lucide-react';
-import { BASELINE_COLLATERAL_RATIO_BPS, TIER_LABEL } from '@corolary/shared';
 import { BackfillPanel } from '@/components/score/BackfillPanel';
 import { ComponentBreakdown } from '@/components/score/ComponentBreakdown';
 import { NextTierGuidance } from '@/components/score/NextTierGuidance';
+import { ScoreHero } from '@/components/score/ScoreHero';
 import { ScoreHistoryChart } from '@/components/score/ScoreHistoryChart';
-import { TierBars } from '@/components/score/TierBars';
-import { TierGauge } from '@/components/score/TierGauge';
 import { AddressDisplay } from '@/components/shared/AddressDisplay';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ErrorState } from '@/components/shared/ErrorState';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useScore } from '@/hooks/useApi';
 import { etherscanAddress } from '@/lib/explorer';
-import { formatCount, formatRatio, formatRelativeTime } from '@/lib/format';
 import type { Address } from '@/types';
 
 export default function ScorePage() {
@@ -89,60 +85,7 @@ export default function ScorePage() {
         </div>
       ) : (
         <>
-          {/* Satu kartu, dua kolom, dipisah hairline yang sama dengan pemisah
-              baris tabel. Dua kartu terpisah menyajikan skor dan rasio
-              kolateral sebagai dua statistik sejajar — padahal yang satu
-              SEBAB dan yang satu AKIBAT, dan hubungan itu inti produknya. */}
-          <Card>
-            <div className="grid items-center lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-              <div className="flex flex-col items-center gap-5 p-6 lg:p-8">
-                <TierGauge score={data.score} tier={data.tier} />
-
-                {/* Tanpa badge. Dua baris di dalam pill memaksa pill itu
-                    tumbuh jadi kotak, dan yang tersisa cuma border yang
-                    mengurung teks tanpa menambah arti — sementara badge di
-                    produk ini selalu satu baris micro huruf kapital. */}
-                <div className="text-center">
-                  <p className="text-h3 font-semibold tracking-tight text-ink-900">
-                    Tier {data.tier}
-                  </p>
-                  <p className="mt-0.5 text-body text-ink-500">{TIER_LABEL[data.tier]}</p>
-                </div>
-
-                <p className="text-micro text-ink-400">
-                  <span className="num">{formatCount(data.factCount)}</span> proven{' '}
-                  {data.factCount === 1 ? 'fact' : 'facts'}
-                  {data.firstFactAt !== null && <>, since {formatRelativeTime(data.firstFactAt)}</>}
-                </p>
-              </div>
-
-              <div className="border-t border-border p-6 lg:border-l lg:border-t-0 lg:p-8">
-                <p className="text-small text-ink-400">Required collateral</p>
-                <p className="num mt-1 text-[4.5rem] font-semibold leading-none tracking-tight text-ink-900 sm:text-[6rem] lg:text-[8.125rem]">
-                  {formatRatio(data.collateralRatioBps)}
-                </p>
-                {/* Satu baris, bukan paragraf. Rasio di atasnya sudah menjawab
-                    "berapa"; kalimat ini cukup menjawab "dibanding apa", dan
-                    versi tiga barisnya mendorong tangga tier jauh dari angka
-                    yang ia jelaskan. */}
-                <p className="mt-4 text-body text-ink-500 lg:text-h3">
-                  {data.collateralRatioBps >= BASELINE_COLLATERAL_RATIO_BPS ? (
-                    <>The same collateral as a wallet with no proven history.</>
-                  ) : (
-                    <>
-                      <span className="num">
-                        {(BASELINE_COLLATERAL_RATIO_BPS - data.collateralRatioBps) / 100}
-                      </span>{' '}
-                      percentage points less capital locked than the{' '}
-                      <span className="num">{formatRatio(BASELINE_COLLATERAL_RATIO_BPS)}</span>{' '}
-                      baseline.
-                    </>
-                  )}
-                </p>
-                <TierBars score={data.score} tier={data.tier} className="mt-6" />
-              </div>
-            </div>
-          </Card>
+          <ScoreHero score={data} />
 
           <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
             How this score is built

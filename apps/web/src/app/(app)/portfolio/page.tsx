@@ -3,28 +3,21 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
-import { TIER_LABEL } from '@corolary/shared';
 import { HealthFactorBar } from '@/components/market/HealthFactorBar';
-import {
-  MarketActionDialog,
-  type ActionGroup,
-} from '@/components/market/MarketActionDialog';
+import { MarketActionDialog, type ActionGroup } from '@/components/market/MarketActionDialog';
 import { PositionTable } from '@/components/market/PositionTable';
 import { FactRow } from '@/components/proofs/FactRow';
 import { BackfillPanel } from '@/components/score/BackfillPanel';
 import { NextTierGuidance } from '@/components/score/NextTierGuidance';
-import { ScoreDial } from '@/components/score/ScoreDial';
-import { TierLadder } from '@/components/score/TierLadder';
+import { ScoreHero } from '@/components/score/ScoreHero';
 import { AddressDisplay } from '@/components/shared/AddressDisplay';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ErrorState } from '@/components/shared/ErrorState';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardBody } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFacts, useMarketReserves, usePositions, useScore } from '@/hooks/useApi';
-import { formatCount } from '@/lib/format';
 import type { Address } from '@/types';
 
 export default function PortfolioPage() {
@@ -59,59 +52,63 @@ export default function PortfolioPage() {
   }
 
   const recent = facts.data?.pages.flatMap((p) => p.data) ?? [];
+  const scored = score.data !== undefined && score.data.factCount > 0;
 
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-12 md:px-8">
       <PageHeader title="Portfolio" aside={<AddressDisplay address={address} />} />
 
-      <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
-        <Card>
-          <CardBody className="flex flex-col items-center gap-4">
-            {score.isPending ? (
-              <Skeleton className="h-[132px] w-[132px] rounded-full" />
-            ) : score.data ? (
-              <>
-                <ScoreDial score={score.data.score} tier={score.data.tier} size="sm" />
-                <Badge tone="accent">
-                  Tier {score.data.tier} · {TIER_LABEL[score.data.tier]}
-                </Badge>
-                <Link href={`/score/${address}`} className="text-small text-accent hover:underline">
-                  See full breakdown →
-                </Link>
-              </>
-            ) : null}
-          </CardBody>
-        </Card>
+      {/* Kepala yang sama persis dengan /score/[address] — komponen yang sama,
+          bukan salinan. Pertanyaannya identik ("skorku berapa, apa untungnya"),
+          jadi menjawabnya dengan dial kecil di kartu terpisah membuat halaman
+          milik sendiri terasa seperti ringkasan kelas dua dari explorer
+          publik, padahal justru ini yang dilihat pemiliknya tiap hari. */}
+      {score.isError ? (
+        <ErrorState error={score.error} onRetry={() => void score.refetch()} />
+      ) : score.isPending ? (
+        <Skeleton className="h-[360px] lg:h-[312px]" />
+      ) : (
+        <ScoreHero
+          score={score.data}
+          footer={
+            // Tanpa fakta terbukti tidak ada apa pun untuk dibedah, jadi
+            // tautannya akan mengantar ke halaman yang lebih kosong daripada
+            // yang ditinggalkan.
+            scored ? (
+              <Link href={`/score/${address}`} className="text-small text-accent hover:underline">
+                See full breakdown →
+              </Link>
+            ) : undefined
+          }
+        />
+      )}
 
-        <Card>
-          <CardBody className="flex h-full flex-col">
-            <p className="text-micro uppercase tracking-wide text-ink-400">Where you stand</p>
-            {score.isError ? (
-              <ErrorState error={score.error} onRetry={() => void score.refetch()} />
-            ) : score.data ? (
-              <>
-                <p className="mt-2 text-body text-ink-500">
-                  <span className="num text-ink-900">{formatCount(score.data.factCount)}</span>{' '}
-                  proven facts back this score.
-                </p>
-                <div className="mt-auto pt-8">
-                  <TierLadder tier={score.data.tier} />
-                </div>
-              </>
-            ) : (
-              <Skeleton className="mt-4 h-24" />
-            )}
-          </CardBody>
-        </Card>
-      </div>
+      {/* Dompet tanpa riwayat terbukti tetap dapat hero yang sama, bukan kotak
+          kosong. Angkanya tidak dikarang: skor 0, tier 0, dan kolateral 150%
+          adalah keadaan on-chain yang sebenarnya untuk dompet yang belum
+          terbukti apa pun — dan kolom kanan hero sudah mengucapkannya dengan
+          benar ("the same collateral as a wallet with no proven history").
+          Yang ditambahkan di bawahnya adalah jalan keluarnya, karena "belum
+          dipindai" tidak sama dengan "tidak punya riwayat". */}
+      {score.data !== undefined && !scored && (
+        <>
+          <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
+            Start this history
+          </h2>
+          <BackfillPanel address={address} />
+        </>
+      )}
 
       {/* Halaman ini yang dispesifikasikan sebagai "apa yang harus saya
-          lakukan selanjutnya". TierLadder menunjukkan POSISI; panel ini yang
+          lakukan selanjutnya". Hero menunjukkan POSISI; panel ini yang
           menjawab caranya. */}
-      {score.data !== undefined && score.data.factCount > 0 && (
-        <div className="mt-6">
+      {scored && (
+        <>
+          <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
+            What happens next
+          </h2>
           <NextTierGuidance score={score.data} />
-        </div>
+        </>
       )}
 
       <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">Positions</h2>
@@ -137,7 +134,9 @@ export default function PortfolioPage() {
         />
       )}
 
-      <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">Recent activity</h2>
+      <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
+        Recent activity
+      </h2>
       {facts.isError ? (
         <ErrorState error={facts.error} onRetry={() => void facts.refetch()} />
       ) : recent.length > 0 ? (
@@ -149,13 +148,26 @@ export default function PortfolioPage() {
       ) : facts.isPending ? (
         <Skeleton className="h-40" />
       ) : (
-        <div className="grid gap-6">
-          <EmptyState
-            title="Nothing indexed for this wallet yet"
-            description="Corolary only scores Ethereum mainnet lending activity that has been proven through Attestcoin. This wallet has not been scanned, which is not the same as having no history."
-          />
+        <EmptyState
+          title="No proven facts yet"
+          description="Facts appear here once this wallet's mainnet lending activity has been scanned and proven."
+        />
+      )}
+
+      {/* Skor yang sudah ada TIDAK berarti riwayatnya sudah lengkap.
+          `firstFactAt` adalah minimum lintas protokol, jadi satu protokol yang
+          dipindai lebih dangkal menahan seluruh angka: dompet demo pernah
+          dibaca "mentok 8 bulan" padahal ada dua transaksi Morpho 91 hari
+          lebih tua, dan memindainya menggeser skor 797 -> 813. Karena itu
+          panelnya muncul juga saat skornya sudah ada — cabang kosong di atas
+          sudah memuatnya sendiri. */}
+      {scored && (
+        <>
+          <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
+            Deepen this history
+          </h2>
           <BackfillPanel address={address} />
-        </div>
+        </>
       )}
 
       {action !== null && activeReserve !== undefined && (
