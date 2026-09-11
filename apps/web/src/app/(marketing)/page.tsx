@@ -3,12 +3,11 @@ import { Insights } from '@/components/landing/Insights';
 import { LandingFaq } from '@/components/landing/LandingFaq';
 import { Outro } from '@/components/landing/Outro';
 import { Preview } from '@/components/landing/Preview';
-import { ProofReveal } from '@/components/landing/ProofReveal';
 import { ProtocolGrid } from '@/components/landing/ProtocolGrid';
 import { ScoreShowcase } from '@/components/landing/ScoreShowcase';
+import { WhyDifferent } from '@/components/landing/WhyDifferent';
 import { Statement } from '@/components/landing/Statement';
 import { TopHead } from '@/components/landing/TopHead';
-import { WhyCorolary } from '@/components/landing/WhyCorolary';
 import { Panel } from '@/components/marketing/Panel';
 import type { Address } from '@/types';
 
@@ -58,9 +57,9 @@ export default function HomePage() {
       <FeatureAccordion />
       <ProtocolGrid />
 
-      {/* Curtain pertama: gelap menutupi halaman terang. */}
-      <Panel tone="dark">
-        <ProofReveal />
+      {/* Curtain pertama: permukaan putih menutupi warna halaman. */}
+      <Panel tone="light">
+        <WhyDifferent />
       </Panel>
 
       {/* Curtain balik: warna halaman menutupi panel gelap. Tanpa langkah ini
@@ -68,7 +67,6 @@ export default function HomePage() {
           apa pun untuk ditutupi. */}
       <Panel tone="page">
         <ScoreShowcase address={FEATURED} />
-        <WhyCorolary />
       </Panel>
 
       {/* Curtain terakhir — dua bagian dalam satu panel, lalu menyatu dengan

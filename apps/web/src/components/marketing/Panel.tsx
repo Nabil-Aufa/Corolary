@@ -9,8 +9,12 @@ interface PanelProps {
    * warna halaman. Bergantian di antara keduanya adalah seluruh mekanisme
    * curtain — satu panel gelap yang tidak pernah ditutup balik hanya terbaca
    * sebagai "situsnya berubah gelap di tengah".
+   *
+   * `light` adalah permukaan putih (`--color-surface`), bukan warna halaman.
+   * Ia hanya terbaca sebagai curtain kalau yang di atasnya GELAP: selisih
+   * putih dengan warna halaman terlalu tipis untuk membaca sudut membulatnya.
    */
-  tone?: 'dark' | 'page';
+  tone?: 'dark' | 'page' | 'light';
   /** Sudut membulat di atas — panel "menutupi" bagian sebelumnya. */
   roundTop?: boolean;
 }
@@ -39,7 +43,9 @@ export function Panel({ children, className, tone = 'dark', roundTop = true }: P
       data-tone={tone}
       className={cn(
         'relative z-10',
-        tone === 'dark' ? 'bg-panel text-panel-ink-700' : 'bg-bg text-ink-700',
+        tone === 'dark' && 'bg-panel text-panel-ink-700',
+        tone === 'page' && 'bg-bg text-ink-700',
+        tone === 'light' && 'bg-surface text-ink-700',
         roundTop && 'rounded-t-[clamp(28px,7vw,80px)]',
         className,
       )}

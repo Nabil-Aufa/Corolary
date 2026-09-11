@@ -128,6 +128,25 @@
   --mkt-radius-card: 20px;
   --mkt-radius-panel: 80px;
 
+  /* ── Ramp biru monokrom untuk section "Why this is different" ──
+   *
+   * Satu hue (~213 derajat); hanya lightness yang berubah. Dipakai HANYA oleh
+   * section itu, dan sengaja TIDAK memakai nama `--color-blue-*`: Tailwind v4
+   * sudah punya palet `blue` bawaan, dan nama itu akan menimpanya untuk seluruh
+   * aplikasi.
+   *
+   * Token hijau global (`--color-verified`, `--color-positive`) sengaja tidak
+   * disentuh. Keduanya dipakai dua belas berkas lain — badge, tombol, dialog
+   * wallet, halaman proof — jadi menimpanya demi satu section akan mengubah
+   * warna di tempat tempat yang tidak ikut diperiksa. */
+  --blue-50: #eef3fa;
+  --blue-100: #dce7f5;
+  --blue-200: #bfd3ec;
+  --blue-400: #5b8fd0;
+  --blue-600: #1e5aa8;
+  --blue-800: #12315c;
+  --blue-950: #06162b;
+
   --radius-sm: 6px;
   --radius-base: 8px;
   --radius-lg: 12px;
@@ -174,6 +193,16 @@
   /* Curtain di gelap bekerja lewat ELEVASI, bukan inversi. Panel terang di
      atas latar gelap terbaca seperti lampu sorot, dan bagian terpanjang di
      halaman ini adalah panel. */
+  /* Hue-nya tetap; yang dibalik perannya, supaya kartu tidak menyala di atas
+     panel gelap. */
+  --blue-50: #0d1a2b;
+  --blue-100: #12243a;
+  --blue-200: #1b3555;
+  --blue-400: #5b8fd0;
+  --blue-600: #7aa8de;
+  --blue-800: #bfd3ec;
+  --blue-950: #eef3fa;
+
   --color-panel: #131822;
   --color-panel-raised: #1b2130;
   --color-panel-border: #2b3345;
