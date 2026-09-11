@@ -1,4 +1,4 @@
-import { FeatureStack } from '@/components/landing/FeatureStack';
+import { FeatureAccordion } from '@/components/landing/FeatureAccordion';
 import { Insights } from '@/components/landing/Insights';
 import { LandingFaq } from '@/components/landing/LandingFaq';
 import { Outro } from '@/components/landing/Outro';
@@ -55,7 +55,7 @@ export default function HomePage() {
         </Statement>
       </div>
 
-      <FeatureStack />
+      <FeatureAccordion />
       <ProtocolReel />
 
       {/* Curtain pertama: gelap menutupi halaman terang. */}

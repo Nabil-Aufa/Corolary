@@ -264,6 +264,302 @@
     overflow: hidden;
   }
 
+
+  /* ── Akordeon yang dibuka oleh posisi scroll ──────────────────────────────
+   *
+   * Mekanismenya dijelaskan di `FeatureAccordion.tsx`. Yang perlu diketahui di
+   * berkas ini cuma satu hal, dan ia adalah aturan keras:
+   *
+   *   TIDAK ADA `transition` pada properti yang dianimasikan GSAP.
+   *
+   * Di desktop, `grid-template-rows`, `background-color`, `color` dan `opacity`
+   * seluruhnya ditulis ulang tiap frame oleh scrub. Menambahkan transition CSS
+   * di atasnya berarti dua penghalus yang bertumpuk: nilai yang sudah dilembutkan
+   * scrub dilembutkan lagi oleh browser, dan hasilnya animasi yang selalu
+   * tertinggal dari scroll dan tidak pernah benar-benar sampai. Karena itu
+   * transition di bawah HANYA hidup di dalam media query mobile, tempat GSAP
+   * tidak menyentuh apa pun.
+   *
+   * ── Ukuran diturunkan dari judul, bukan dipilih satu per satu ──
+   * Semua jarak di bawah adalah kelipatan `--fa-title`, karena begitulah
+   * desainnya memang tersusun: padding 1,5em, radius 0,49em, jarak antar kartu
+   * 0,43em, nomor 0,33em. Menuliskannya sebagai angka lepas berarti mengubah
+   * ukuran judul diam-diam merusak seluruh proporsinya — dan yang terlihat
+   * hanyalah "kartunya terasa agak sesak", bukan satu nilai yang salah. */
+
+  .feature {
+    /* Satu sumber untuk seluruh skala kartu. */
+    --fa-title: clamp(1.75rem, 3vw, 2.625rem);
+    --fa-pad: clamp(34px, 3.75vw, 52px); /* 1,25em */
+    --fa-pad-end: clamp(24px, 2.6vw, 36px); /* 0,86em, tepi bawah bagian terbuka */
+    --fa-radius: clamp(14px, 1.5vw, 21px); /* 0,49em */
+    --fa-gap: clamp(12px, 1.3vw, 18px); /* 0,43em */
+
+    /* Kartu dibagi lima: 3/5 kiri untuk teks, 2/5 kanan untuk art. Ditulis
+       sekali di sini karena DUA aturan harus memakai angka yang sama persis:
+       lebar art, dan padding kanan kolom teks. Kalau keduanya ditulis sendiri
+       sendiri, teks akan mulai menindih art tanpa ada satu pun nilai yang
+       kelihatan salah. */
+    --fa-art: 40%;
+
+    /* Warna dibaca dari sini oleh JavaScript. Menyimpannya sebagai custom
+       property, bukan sebagai hex di dalam komponen, adalah satu-satunya cara
+       tema gelap ikut benar — blok `.dark` di bawah menimpanya, dan tween
+       membaca hasilnya. */
+    --fa-fill-from: #e9eaee;
+    --fa-fill-to: var(--color-panel);
+    --fa-ink-from: var(--color-ink-900);
+    --fa-ink-to: var(--color-panel-ink-900);
+
+    padding-block: clamp(48px, 6vw, 96px);
+  }
+
+  /* Di tema gelap kartu tertutup adalah permukaan yang TERANGKAT, bukan yang
+     lebih gelap dari halaman: arah kontrasnya berbalik, sementara tekstnya
+     sudah terang sejak awal sehingga tween warnanya memang tidak bergerak. */
+  :where(.dark) .feature {
+    --fa-fill-from: var(--color-surface-raised);
+    --fa-fill-to: #04060a;
+    --fa-ink-from: var(--color-ink-900);
+    --fa-ink-to: var(--color-ink-900);
+  }
+
+  .feature-main {
+    position: relative;
+  }
+
+  .feature-fake {
+    height: 0; /* diisi dari layout setelah mount */
+  }
+
+  .feature-items {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+  }
+
+  /* `clip`, bukan `hidden`: keduanya memotong, tapi `hidden` menjadikan elemen
+     ini kontainer scroll. Baris yang bisa di-scroll sendiri akan menelan gulir
+     roda mouse saat kursor kebetulan berada di atasnya — dan karena halaman ini
+     memakai Lenis, gejalanya adalah scroll yang berhenti total, bukan sekadar
+     tersendat.
+     Jaraknya `margin-bottom`, bukan `gap` pada induknya: tinggi tiap fake harus
+     sama dengan tinggi kartu DITAMBAH jaraknya, dan margin adalah satu-satunya
+     bentuk jarak yang bisa dibaca kembali dari kartunya sendiri saat diukur. */
+  .feature-item {
+    position: relative;
+    margin-bottom: var(--fa-gap);
+    overflow: clip;
+    border-radius: var(--fa-radius);
+    color: var(--fa-ink-from);
+  }
+
+  .feature-item-fill {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-color: var(--fa-fill-from);
+    will-change: background-color;
+  }
+
+  /* Art menempel ke tepi kanan kartu dan dipotong olehnya — tanpa padding,
+     karena justru terpotongnya itu yang membuatnya terbaca sebagai bidang yang
+     meluas keluar kartu, bukan sebagai gambar yang ditempel di dalamnya. */
+  /* `top`, bukan `inset-block`. Tepi ATAS kartu tidak bergerak saat kartu
+     terbuka; tepi bawahnya yang turun. Menjangkarkan art ke atas karena itu
+     membuatnya benar benar diam, sementara `inset-block: 0` akan meregangkannya
+     mengikuti tiap frame animasi. Tingginya dipatok dari JavaScript ke tinggi
+     kartu terbuka; `100%` di sini hanya berlaku sebelum patokan itu dipasang
+     dan di mobile, tempat tidak ada scrub sama sekali. */
+  .feature-item-bg {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    right: 0;
+    z-index: 1;
+    width: var(--fa-art);
+    opacity: 0;
+    pointer-events: none;
+    /* Putih penuh, bukan token tinta: di kartu yang sudah hitam, art inilah
+       satu satunya bidang terang, dan `--color-panel-ink-900` membuatnya
+       berkerabat dengan teks alih alih berdiri sebagai bidang tersendiri. */
+    color: #fff;
+
+    /* Tepi kiri art dilarutkan ke nol.
+       Tanpa ini ada garis tegak di batas 3/5: gradien art berjalan vertikal,
+       jadi di tepi kirinya ia masih beropasitas penuh dan berhenti mendadak di
+       tengah bidang hitam. Yang terlihat bukan "art dimulai di sini" melainkan
+       "gambarnya terpotong". Melarutkannya juga yang membuat kolom teks dan art
+       tidak perlu batas tegas di antara keduanya. */
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 42%);
+    mask-image: linear-gradient(to right, transparent 0%, #000 42%);
+    will-change: opacity;
+  }
+
+  /* Judul di kiri, nomor di kanan, keduanya di satu baris. `center`, bukan
+     `baseline`: nomor jauh lebih kecil dari judul, dan menyejajarkan garis
+     dasarnya membuat ia tampak melorot ke bawah judul alih-alih sejajar. */
+  .feature-item-head {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(16px, 3vw, 48px);
+    padding: var(--fa-pad);
+    color: inherit;
+    text-align: left;
+  }
+
+  .feature-item-title {
+    font-size: var(--fa-title);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+
+  /* Tidak disebut oleh GSAP: ia mewarisi `color` dari kartu, jadi ia sudah ikut
+     tween yang sama persis, dan `opacity` yang tetap membuatnya terbaca sebagai
+     abu-abu di kartu terang maupun gelap tanpa perlu dua warna terpisah. */
+  .feature-item-num {
+    flex-shrink: 0;
+    font-size: clamp(16px, 1.7vw, 24px); /* 0,57em */
+    line-height: 1;
+    opacity: 0.45;
+  }
+
+  /* Trik 0fr → 1fr. Ia bisa dianimasikan tanpa seorang pun perlu tahu tinggi
+     isinya lebih dulu — tidak seperti `max-height`, yang selalu jadi tebakan
+     dan ketahuan salahnya hanya pada teks terpanjang. */
+  .feature-item-accordion {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-rows: 0fr;
+    will-change: grid-template-rows;
+  }
+
+  /* Pasangan wajib dari trik di atas: baris setinggi nol memotong tepat nol
+     piksel kalau isinya tidak dipotong sendiri.
+     Elemen ini WAJIB tanpa padding. `overflow: hidden` memotong ISI sebuah
+     kotak, bukan padding kotak itu sendiri — jadi padding di sini tetap
+     menempati ruang meski baris gridnya sudah 0fr, dan kartu tertutup tumbuh
+     setinggi padding itu tanpa ada yang terlihat salah. Terukur: kartu jadi
+     5,6em alih-alih 4,1em dan judulnya melenceng 31px dari titik tengah.
+     Karena itu padding hidup di `-inner`, satu lapis lebih dalam. */
+  .feature-item-content {
+    overflow: hidden;
+  }
+
+  /* Padding atasnya nol — jarak judul ke deskripsi sudah diberikan oleh
+     `padding-bottom` milik kepala, sehingga kartu tertutup tetap simetris. */
+  .feature-item-inner {
+    /* Padding kanan sebesar lebar art, jadi teks berhenti tepat di batas 3/5.
+       Persen di sini dihitung terhadap lebar kartu, bukan lebar kolom teks,
+       karena kartu adalah blok penampungnya. */
+    padding: 0 var(--fa-art) var(--fa-pad-end) var(--fa-pad);
+  }
+
+  .feature-item-body {
+    font-size: clamp(15px, 1.5vw, 21px); /* 0,49em */
+    line-height: 1.47;
+    opacity: 0.8;
+  }
+
+  .feature-item-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: clamp(14px, 1.5vw, 20px);
+    font-size: var(--text-body);
+    color: inherit;
+  }
+
+  .feature-item-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Dipakai hanya selama pengukuran, satu frame, dan tidak pernah terlihat.
+     `!important` bukan kemalasan: yang harus dikalahkan adalah gaya INLINE yang
+     sedang ditulis GSAP, dan tidak ada spesifisitas selektor yang bisa. */
+  .feature.-measuring .feature-item-accordion {
+    grid-template-rows: 1fr !important;
+  }
+
+  /* ── Mobile: tidak ada scrub sama sekali ──
+   * Di layar sekecil ini seluruh kartu hampir setinggi viewport, jadi "dibuka
+   * oleh scroll" tidak punya ruang untuk terbaca sebagai gerakan. Ia jadi
+   * akordeon klik biasa — dan di sinilah, dan hanya di sini, transition CSS
+   * aman dipakai. */
+  @media (max-width: 767px) {
+    .feature-fakes {
+      display: none;
+    }
+
+    .feature-items {
+      position: static;
+    }
+
+    .feature-item,
+    .feature-item-fill,
+    .feature-item-bg {
+      transition:
+        color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .feature-item-accordion {
+      transition: grid-template-rows 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .feature-item.-active {
+      color: var(--fa-ink-to);
+    }
+
+    .feature-item.-active .feature-item-fill {
+      background-color: var(--fa-fill-to);
+    }
+
+    .feature-item.-active .feature-item-bg {
+      opacity: 1;
+    }
+
+    .feature-item.-active .feature-item-accordion {
+      grid-template-rows: 1fr;
+    }
+  }
+
+  /* ── Reduced motion: langsung di keadaan akhir ──
+   * Bukan "animasi yang dipercepat". Seluruh isi teks ada di dalam akordeon,
+   * jadi memotong durasinya saja akan menyisakan lima kartu yang isinya tetap
+   * tersembunyi sampai seseorang menggulir dengan cara yang tepat. */
+  @media (prefers-reduced-motion: reduce) and (min-width: 768px) {
+    .feature-fakes {
+      display: none;
+    }
+
+    .feature-items {
+      position: static;
+    }
+
+    .feature-item {
+      color: var(--fa-ink-to);
+    }
+
+    .feature-item-fill {
+      background-color: var(--fa-fill-to);
+    }
+
+    .feature-item-bg {
+      opacity: 1;
+    }
+
+    .feature-item-accordion {
+      grid-template-rows: 1fr;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
