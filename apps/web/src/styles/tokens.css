@@ -112,6 +112,19 @@
   --color-tint-a: #eaf3f0;
   --color-tint-b: #eeeff8;
 
+  /* Kartu yang MEMUTUS deretan gelap di tumpukan pipeline.
+   *
+   * Bukan `--color-surface`: putih di antara empat kartu hampir-hitam terbaca
+   * sebagai kartu yang gagal dimuat, bukan sebagai pergantian yang disengaja.
+   * Abu netral cukup terang untuk membalik warna teks, cukup redup untuk tetap
+   * terbaca sebagai anggota tumpukan yang sama.
+   *
+   * Di tema gelap ia TIDAK ikut menerang. Di atas latar gelap, kartu terang
+   * justru jadi satu-satunya hal yang terlihat di halaman dan memutus
+   * tumpukannya terlalu keras; yang dibutuhkan hanya satu langkah elevasi. */
+  --color-card-break: #ededed;
+  --color-card-break-ink: #0b0e14;
+
   --mkt-radius-card: 20px;
   --mkt-radius-panel: 80px;
 
@@ -170,4 +183,7 @@
 
   --color-tint-a: #16241f;
   --color-tint-b: #1a1c2b;
+
+  --color-card-break: #222839;
+  --color-card-break-ink: #f4f6f9;
 }

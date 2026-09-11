@@ -26,6 +26,9 @@ const TYPE_SCALE = [
   // yang ditulis sebelumnya, persis mode kegagalan yang dijelaskan di atas.
   'mkt-display',
   'mkt-h2',
+  'mkt-h3',
+  'mkt-lead',
+  'mkt-outro',
   'mkt-statement',
   'mkt-stat',
 ];
