@@ -3,6 +3,8 @@
 import Lenis from 'lenis';
 import { useEffect } from 'react';
 
+import { registerLenis } from '@/lib/lenis-store';
+
 /** Berapa layar yang dilompati PageUp/PageDown. Sedikit kurang dari satu layar
  *  supaya selalu ada baris yang tumpang tindih sebagai jangkar baca. */
 const PAGE_FRACTION = 0.9;
@@ -51,10 +53,11 @@ export function SmoothScroll() {
     // rAF dikendalikan sendiri, bukan `autoRaf`: loop bawaan tetap hidup
     // setelah komponen dilepas di App Router, jadi scroll di halaman APP
     // ikut ter-hijack setelah navigasi klien dari landing.
-    let frame = requestAnimationFrame(function raf(time: number) {
-      lenis.raf(time);
-      frame = requestAnimationFrame(raf);
-    });
+    //
+    // Loop itu sekarang tinggal di `lenis-store`, bersama instancenya, supaya
+    // bagian lain yang perlu menggerakkan Lenis sendiri (ScrollTrigger) bisa
+    // MENGAMBIL ALIH loop ini alih-alih menambah loop kedua di sebelahnya.
+    const unregister = registerLenis(lenis);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -123,7 +126,7 @@ export function SmoothScroll() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('focusin', onFocusIn);
-      cancelAnimationFrame(frame);
+      unregister();
       lenis.destroy();
     };
   }, []);
