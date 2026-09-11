@@ -4,7 +4,7 @@ import { LandingFaq } from '@/components/landing/LandingFaq';
 import { Outro } from '@/components/landing/Outro';
 import { Preview } from '@/components/landing/Preview';
 import { ProofReveal } from '@/components/landing/ProofReveal';
-import { ProtocolReel } from '@/components/landing/ProtocolReel';
+import { ProtocolGrid } from '@/components/landing/ProtocolGrid';
 import { ScoreShowcase } from '@/components/landing/ScoreShowcase';
 import { Statement } from '@/components/landing/Statement';
 import { TopHead } from '@/components/landing/TopHead';
@@ -56,7 +56,7 @@ export default function HomePage() {
       </div>
 
       <FeatureAccordion />
-      <ProtocolReel />
+      <ProtocolGrid />
 
       {/* Curtain pertama: gelap menutupi halaman terang. */}
       <Panel tone="dark">

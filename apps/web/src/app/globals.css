@@ -265,6 +265,59 @@
   }
 
 
+  /* Logo protokol dipaksa ke dua kutub, bukan sekadar dibuang warnanya.
+   *
+   * `grayscale` saja menghasilkan abu-abu, bukan hitam putih, dan alasannya ada
+   * di bentuk logonya: keempatnya glif TERANG di atas cakram berwarna, bukan
+   * wordmark hitam di atas transparan. Cakram Aave dan Morpho mendarat di
+   * sekitar tengah skala abu, jadi ia tetap abu berapa pun kontras yang
+   * ditambahkan di sekitar titik tengah itu.
+   *
+   * Karena itu seluruh gambar diturunkan dulu (`brightness`) supaya cakramnya
+   * jatuh jelas di bawah titik tengah, baru kontrasnya dinaikkan tajam: cakram
+   * terdorong ke hitam sementara glif di dalamnya terpotong di putih. Yang
+   * tersisa dua nada, bukan satu bidang abu.
+   *
+   * Angkanya diukur, bukan dikira-kira. Fraksi piksel yang mendarat di abu
+   * tengah (60..195), dirata-rata atas keempat logo: `b.72 c3` menyisakan
+   * 56,4% — dengan Compound 100% abu — sementara `b.65 c6` menyisakan 0,6%.
+   * Menaikkan kontras saja tidak cukup: glif Spark dan Compound mendarat
+   * hampir tepat di titik tengah, tempat kontras nyaris tidak menggesernya,
+   * jadi `brightness` harus turun lebih dulu agar keduanya punya arah.
+   *
+   * Membalik warnanya di tema gelap bukan pemanis: hasil di atas nyaris hitam,
+   * dan di atas panel gelap ia akan hilang sama sekali. */
+  .logo-bw {
+    filter: grayscale(1) brightness(0.65) contrast(6);
+  }
+
+  /* Logo tidak boleh lebih besar daripada judul sectionnya, dan itu harus
+     berlaku di SETIAP lebar, bukan cuma di desktop tempat kita mengeceknya.
+     Judulnya `clamp(30px, 5.4vw, 90px)`: ia menyusut sampai 30px di layar
+     sempit, sementara ukuran `BrandMark` adalah angka px mati. Pada 400px,
+     logo 40px karena itu kembali lebih besar daripada judulnya yang 30px.
+     `!important` dipakai karena yang harus dikalahkan adalah gaya INLINE yang
+     ditulis `BrandMark`, dan tidak ada spesifisitas selektor yang bisa. */
+  @media (max-width: 640px) {
+    .protocol-mark {
+      width: 26px !important;
+      height: 26px !important;
+    }
+
+    /* `max-*` supaya glif yang punya jarak ke tepi cakram ikut mengecil
+       proporsional alih alih terpotong oleh cakram yang menyusut. */
+    .protocol-mark > img {
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+    }
+  }
+
+  :where(.dark) .logo-bw {
+    filter: grayscale(1) brightness(0.65) contrast(6) invert(1);
+  }
+
   /* ── Akordeon yang dibuka oleh posisi scroll ──────────────────────────────
    *
    * Mekanismenya dijelaskan di `FeatureAccordion.tsx`. Yang perlu diketahui di
