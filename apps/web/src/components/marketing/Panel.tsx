@@ -33,6 +33,10 @@ interface PanelProps {
 export function Panel({ children, className, tone = 'dark', roundTop = true }: PanelProps) {
   return (
     <section
+      // Dibaca oleh navbar lewat IntersectionObserver untuk membalik warnanya
+      // sendiri. Navbar TIDAK bisa menyimpulkan ini dari posisi scroll: tinggi
+      // tiap panel bergantung pada data yang baru datang setelah render.
+      data-tone={tone}
       className={cn(
         'relative z-10',
         tone === 'dark' ? 'bg-panel text-panel-ink-700' : 'bg-bg text-ink-700',

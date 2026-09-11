@@ -27,11 +27,11 @@ const CONTRACTS = [
 export function MarketingFooter() {
   return (
     <footer className="bg-panel text-panel-ink-700">
-      <div className="mx-auto max-w-[1280px] px-6 pb-16 md:px-8">
+      <div className="mkt-container pb-16">
         <div className="grid gap-10 border-t border-panel-border pt-12 md:grid-cols-12">
           <div className="md:col-span-5">
             <p className="text-micro font-medium uppercase tracking-[0.12em] text-panel-ink-500">
-              Kontrak di {creditcoinTestnet.name}
+              Contracts on {creditcoinTestnet.name}
             </p>
             <ul className="mt-5 space-y-2">
               {CONTRACTS.map((c) => (
@@ -54,9 +54,9 @@ export function MarketingFooter() {
           <div className="md:col-span-7">
             {/* Dinyatakan di muka, bukan disembunyikan (docs/open-issues.md B2). */}
             <p className="max-w-xl text-small text-panel-ink-500">
-              Token pasar adalah ERC-20 testnet. Riwayat kredit, harga, dan skor berasal dari
-              transaksi Ethereum mainnet nyata yang dibuktikan lewat Attestcoin Protocol — token
-              yang jadi stand-in, harganya tidak.
+              Market tokens are testnet ERC-20s. Credit history, prices and scores all come from
+              real Ethereum mainnet transactions proven through the Attestcoin Protocol — the
+              tokens are stand-ins, the prices are not.
             </p>
             <p className="num mt-5 text-small text-panel-ink-500">
               {creditcoinTestnet.name} · chainId {creditcoinTestnet.id}
