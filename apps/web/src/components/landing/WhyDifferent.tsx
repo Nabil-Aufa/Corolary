@@ -120,7 +120,7 @@ export function WhyDifferent() {
   return (
     <div ref={rootRef} className="mkt-container py-[clamp(80px,10vw,160px)]">
       <h2
-        className="why-heading font-display font-medium text-ink-900"
+        className="why-heading text-center font-display font-medium text-panel-ink-900"
         style={{ fontSize: '5.625vw', lineHeight: 1 }}
       >
         {/* Dipecah per KATA, bukan per huruf: memecah per huruf memaksa pembaca

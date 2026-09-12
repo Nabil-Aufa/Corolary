@@ -57,8 +57,11 @@ export default function HomePage() {
       <FeatureAccordion />
       <ProtocolGrid />
 
-      {/* Curtain pertama: permukaan putih menutupi warna halaman. */}
-      <Panel tone="light">
+      {/* Curtain pertama: panel gelap menutupi warna halaman — latar yang sama
+          dengan "The registry, right now" di bawah. Keduanya gelap, tapi ada
+          bagian terang di antaranya, jadi masing masing tetap terbaca sebagai
+          sesuatu yang datang menutup. */}
+      <Panel tone="dark">
         <WhyDifferent />
       </Panel>
 
