@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
+import { BootScreen } from '@/components/shared/BootScreen';
 
 /**
  * Kerangka aplikasi: navigasi penuh dan footer dengan pengungkapan token
@@ -11,5 +12,18 @@ import { AppShell } from '@/components/layout/AppShell';
  * tidak mengubah satu pun alamat halaman.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <>
+      {/* Layar boot yang sama dengan landing, dengan batas tunggu jauh lebih
+          pendek: di sini tidak ada hero WebGL, jadi satu-satunya gerbang
+          adalah font dan ia selesai dalam hitungan milidetik. Batas 8 detik
+          milik landing di halaman ini bukan jaring pengaman, ia cuma lama.
+
+          Ia TIDAK muncul lagi saat seseorang berpindah dari landing ke sini:
+          `hasBooted()` menandai satu pemuatan halaman, dan navigasi klien
+          tidak menyiapkan apa pun yang perlu ditutupi. */}
+      <BootScreen maxMs={3000} />
+      <AppShell>{children}</AppShell>
+    </>
+  );
 }
