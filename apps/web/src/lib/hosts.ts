@@ -46,3 +46,17 @@ export function isAppPath(pathname: string): boolean {
 export function appHref(path: `/${string}`): string {
   return APP_ORIGIN === null ? path : `${APP_ORIGIN}${path}`;
 }
+
+/**
+ * A landing path as an absolute URL on the landing host, or the bare path when
+ * the split is not configured.
+ *
+ * The app header's wordmark needs this. A bare `/` is correct only while both
+ * halves share a host: once the split is on, `/` on the app host is the one
+ * path the proxy redirects — straight to `/proofs` — so the wordmark would
+ * bounce back into the app instead of leaving it, and nothing on screen would
+ * look broken enough to investigate.
+ */
+export function siteHref(path: `/${string}`): string {
+  return SITE_ORIGIN === null ? path : `${SITE_ORIGIN}${path}`;
+}
