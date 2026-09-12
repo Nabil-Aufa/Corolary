@@ -1,11 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useId, useState, type FormEvent } from 'react';
 import { isAddress } from 'viem';
 import { ArrowRight } from 'lucide-react';
 import { GradientArt } from '@/components/marketing/GradientArt';
 import { Reveal } from '@/components/marketing/Reveal';
+import { appHref } from '@/lib/hosts';
 
 /**
  * Penutup halaman: satu kalimat besar rata tengah, lalu satu kolom alamat.
@@ -22,7 +22,6 @@ import { Reveal } from '@/components/marketing/Reveal';
  * berarti dua tempat yang bisa berbeda jawabannya.
  */
 export function Outro() {
-  const router = useRouter();
   const inputId = useId();
   const errorId = useId();
   const [value, setValue] = useState('');
@@ -36,13 +35,14 @@ export function Outro() {
       return;
     }
     setError(null);
-    router.push(`/score/${candidate}`);
+    // A full navigation, not router.push: the score page lives on the app host.
+    window.location.assign(appHref(`/score/${candidate}`));
   }
 
   return (
     <section
-      // Ikut dibaca navbar — ia gelap tapi bukan `Panel`, jadi tanpa penanda
-      // ini navbar akan kembali terang tepat di bagian terakhir halaman.
+      // Penanda nada yang sama dengan `Panel` — bagian ini gelap tapi bukan
+      // `Panel`. Saat ini tidak ada yang membacanya (lihat Panel.tsx).
       data-tone="dark"
       className="relative isolate overflow-hidden bg-panel pb-[clamp(64px,8vw,120px)] pt-[clamp(80px,10vw,160px)] text-panel-ink-700"
     >
