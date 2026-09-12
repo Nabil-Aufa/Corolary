@@ -16,22 +16,39 @@ import { appHref } from '@/lib/hosts';
  * ditampilkan kosong atau dengan alamat nol — baris kontrak yang menunjuk ke
  * `0x000…` terbaca seperti deploy yang gagal.
  */
+/**
+ * Dibaca dari DUA nama, dan yang tanpa awalan didahulukan.
+ *
+ * Footer ini komponen SERVER — tidak ada `'use client'` di sepanjang rantainya
+ * — jadi ia boleh membaca env yang tidak ber-awalan `NEXT_PUBLIC_`. Itu
+ * penting, karena di `.env` proyek ini hanya `EFFICIENCY_MARKET` yang punya
+ * kembaran ber-awalan; tiga kontrak lainnya cuma ada tanpa awalan. Membaca
+ * `NEXT_PUBLIC_` saja membuat footer menampilkan SATU kontrak dari empat yang
+ * benar-benar ter-deploy — dan karena baris yang alamatnya kosong memang
+ * sengaja dihilangkan, tidak ada satu pun gejala yang terlihat: kolomnya
+ * tampak lengkap, isinya cuma seperempat.
+ *
+ * Kalau suatu hari komponen ini jadi komponen klien, tiga baris ini kembali
+ * `undefined` tanpa peringatan apa pun. Awalan `NEXT_PUBLIC_` tetap dibaca
+ * sebagai cadangan supaya kasus itu tidak menghapus seluruh kolom.
+ */
 const CONTRACTS = [
   {
     label: 'FactRegistry',
-    address: process.env.NEXT_PUBLIC_FACT_REGISTRY_ADDRESS,
+    address: process.env.FACT_REGISTRY_ADDRESS ?? process.env.NEXT_PUBLIC_FACT_REGISTRY_ADDRESS,
   },
   {
     label: 'CreditGraph',
-    address: process.env.NEXT_PUBLIC_CREDIT_GRAPH_ADDRESS,
+    address: process.env.CREDIT_GRAPH_ADDRESS ?? process.env.NEXT_PUBLIC_CREDIT_GRAPH_ADDRESS,
   },
   {
     label: 'EfficiencyMarket',
-    address: process.env.NEXT_PUBLIC_EFFICIENCY_MARKET_ADDRESS,
+    address:
+      process.env.EFFICIENCY_MARKET_ADDRESS ?? process.env.NEXT_PUBLIC_EFFICIENCY_MARKET_ADDRESS,
   },
   {
     label: 'PriceRegistry',
-    address: process.env.NEXT_PUBLIC_PRICE_REGISTRY_ADDRESS,
+    address: process.env.PRICE_REGISTRY_ADDRESS ?? process.env.NEXT_PUBLIC_PRICE_REGISTRY_ADDRESS,
   },
 ].filter((c): c is { label: string; address: string } => {
   return typeof c.address === 'string' && /^0x[0-9a-fA-F]{40}$/.test(c.address);
