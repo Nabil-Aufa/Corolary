@@ -81,7 +81,7 @@ export default function ScorePage() {
               </Link>
             }
           />
-          <BackfillPanel address={raw as Address} />
+          <BackfillPanel address={raw as Address} indexedFacts={0} />
         </div>
       ) : (
         <>
@@ -111,7 +111,7 @@ export default function ScorePage() {
           <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
             Deepen this history
           </h2>
-          <BackfillPanel address={raw as Address} />
+          <BackfillPanel address={raw as Address} indexedFacts={data.factCount} />
         </>
       )}
     </main>

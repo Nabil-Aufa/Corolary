@@ -29,7 +29,28 @@ const DEPTHS = [
 
 type Depth = (typeof DEPTHS)[number]['value'];
 
-export function BackfillPanel({ address }: { address: Address }) {
+/**
+ * Perkiraan lama MEMBACA saja, dalam menit.
+ *
+ * Jangkarnya satu pengukuran: pemindaian 12 bulan x 4 protokol adalah ~2.100
+ * panggilan RPC dan ~20 menit (docs/indexer.md). Jumlah panggilan sebanding
+ * lebar rentang blok, jadi sisanya diskalakan dari sana, bukan ditebak.
+ */
+const READ_MINUTES: Record<Depth, number> = { '6': 10, '12': 20, '24': 40 };
+
+interface BackfillPanelProps {
+  address: Address;
+  /**
+   * Jumlah fakta yang SUDAH terindeks untuk dompet ini (`factCount` dari
+   * /v1/score). Wajib, dan bukan sekadar hiasan: tabel `jobs` bukan sumber
+   * kebenaran untuk "sudah terindeks atau belum". Riwayat bisa masuk lewat
+   * CLI indexer tanpa pernah melewati antrean job — itu yang terjadi pada
+   * dompet demo, yang punya 277 fakta terbukti dan NOL baris job.
+   */
+  indexedFacts: number;
+}
+
+export function BackfillPanel({ address, indexedFacts }: BackfillPanelProps) {
   const job = useBackfillStatus(address);
   const start = useStartBackfill(address);
   const [depth, setDepth] = useState<Depth>('6');
@@ -62,7 +83,7 @@ export function BackfillPanel({ address }: { address: Address }) {
           <Running job={job.data as BackfillJob} />
         ) : (
           <>
-            <Result job={job.data ?? null} />
+            <Result job={job.data ?? null} indexedFacts={indexedFacts} />
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <Segments
@@ -96,10 +117,23 @@ export function BackfillPanel({ address }: { address: Address }) {
               </p>
             )}
 
-            {/* Cukup berapa lama. Cara kerjanya menarik bagi kita, tapi yang
-                dibutuhkan orang yang akan menekan tombol ini hanya apakah ia
-                perlu menunggu. */}
-            <p className="mt-4 text-micro text-ink-400">A deep scan takes around 20 minutes.</p>
+            {/* Cukup berapa lama, untuk kedalaman yang BENAR-BENAR dipilih.
+                Sebelumnya satu kalimat statis menyebut "a deep scan" sekitar 20
+                menit, padahal 20 menit itu angka 12 bulan (docs/indexer.md:
+                ~2.100 panggilan RPC), sementara pilihan terdalam di sini 24
+                bulan. Panggilan RPC sebanding lebar rentang blok, jadi menitnya
+                ikut skala bulannya.
+
+                Kalimat kedua ada karena angka pertama saja menyesatkan: itu
+                lama MEMBACA. Membuktikan hasilnya ke CC3 terpisah dan
+                bergantung pada seberapa ramai dompetnya — satu dompet aktif
+                pernah memunculkan 1.277 transaksi hanya dari 10% pertama
+                rentang 24 bulan. */}
+            <p className="mt-4 text-micro text-ink-400">
+              Reading <span className="num">{depth}</span> months takes around{' '}
+              <span className="num">{READ_MINUTES[depth]}</span> minutes. Proving what it finds
+              takes longer again on a busy wallet.
+            </p>
           </>
         )}
       </CardBody>
@@ -143,18 +177,35 @@ function Running({ job }: { job: BackfillJob }) {
   );
 }
 
-function Result({ job }: { job: BackfillJob | null }) {
+function Result({ job, indexedFacts }: { job: BackfillJob | null; indexedFacts: number }) {
+  // Tidak ada baris job BUKAN berarti tidak ada yang terindeks. Riwayat bisa
+  // masuk lewat CLI indexer tanpa melewati antrean job sama sekali, dan dompet
+  // demo persis begitu: 277 fakta terbukti, nol job. Kalimat lama mengatakan
+  // "nothing has been indexed for it yet" di halaman yang tepat di atasnya
+  // menampilkan skor 818 dari fakta-fakta itu.
   if (job === null) {
-    return (
+    return indexedFacts > 0 ? (
       <p className="mt-2 text-body text-ink-500">
-        This wallet has never been scanned. Nothing has been indexed for it yet, which is not the
-        same as having no history on mainnet.
+        <span className="num text-ink-900">{formatCount(indexedFacts)}</span> facts are already
+        indexed for this wallet, read outside this panel. Scanning here can still reach further
+        back than whatever window they came from.
+      </p>
+    ) : (
+      <p className="mt-2 text-body text-ink-500">
+        Nothing has been indexed for this wallet yet, which is not the same as having no history on
+        mainnet. Nobody has looked.
       </p>
     );
   }
 
   switch (job.status) {
-    case 'complete':
+    case 'complete': {
+      // Nol butuh kalimatnya sendiri. Percabangan lama hanya memeriksa `null`,
+      // jadi dompet tanpa riwayat membaca "0 matching events were found, some
+      // of which may already have been indexed before this scan" — anak
+      // kalimat yang tidak berarti apa-apa pada nol, dan tidak pernah
+      // mengatakan terus terang bahwa memang tidak ada apa-apa di sana.
+      const nothing = job.logsFound === 0;
       return (
         <p className="mt-2 flex items-start gap-2 text-body text-ink-500">
           <Check size={17} strokeWidth={2} className="mt-0.5 shrink-0 text-verified" />
@@ -162,6 +213,11 @@ function Result({ job }: { job: BackfillJob | null }) {
             Scanned <span className="num text-ink-900">{job.months}</span> months.{' '}
             {job.logsFound === null ? (
               'The scan finished.'
+            ) : nothing ? (
+              <>
+                No lending activity on Aave, Morpho, Spark or Compound in that window. A deeper
+                scan can look further back, but this wallet may simply have no history to prove.
+              </>
             ) : (
               <>
                 <span className="num text-ink-900">{formatCount(job.logsFound)}</span> matching
@@ -171,6 +227,7 @@ function Result({ job }: { job: BackfillJob | null }) {
           </span>
         </p>
       );
+    }
 
     case 'covered':
       return (

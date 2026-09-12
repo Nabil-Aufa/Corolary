@@ -95,7 +95,7 @@ export default function PortfolioPage() {
           <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
             Start this history
           </h2>
-          <BackfillPanel address={address} />
+          <BackfillPanel address={address} indexedFacts={score.data.factCount} />
         </>
       )}
 
@@ -166,7 +166,7 @@ export default function PortfolioPage() {
           <h2 className="mt-12 pb-4 text-h2 font-semibold tracking-tight text-ink-900">
             Deepen this history
           </h2>
-          <BackfillPanel address={address} />
+          <BackfillPanel address={address} indexedFacts={score.data?.factCount ?? 0} />
         </>
       )}
 
