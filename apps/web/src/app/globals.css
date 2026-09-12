@@ -133,6 +133,30 @@
     border-color: var(--color-border);
   }
 
+  /* Batang scroll disembunyikan di landing SAJA.
+   *
+   * `:has(.navbar)` adalah pengaitnya, dan itu disengaja: `.navbar` hanya ada
+   * di `app/(marketing)/layout.tsx`. Menyetelnya di `html` polos akan ikut
+   * mengenai app, yang justru butuh batang scroll — di sana orang menggulir
+   * tabel panjang untuk mencari satu baris, dan batang scroll adalah
+   * satu-satunya petunjuk seberapa jauh isinya.
+   *
+   * Murni CSS, bukan kelas yang dipasang lewat useEffect: yang kedua akan
+   * memunculkan batang scroll sekejap di muat pertama lalu menghilangkannya,
+   * dan pergeseran 17px yang menyertainya terlihat sebagai halaman yang
+   * meloncat.
+   *
+   * Menggulir sendiri TIDAK ikut hilang — roda, sentuh, dan keyboard tetap
+   * bekerja seperti biasa; yang hilang cuma gambarnya. */
+  html:has(.navbar) {
+    scrollbar-width: none; /* Firefox */
+  }
+
+  html:has(.navbar)::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
   body {
     background-color: var(--color-bg);
     color: var(--color-ink-700);
