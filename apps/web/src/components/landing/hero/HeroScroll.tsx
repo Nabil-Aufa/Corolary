@@ -129,13 +129,39 @@ export function HeroScroll() {
         }px ${r.x}px round ${r.radius}px)`;
       };
 
+      /**
+       * The navbar reads `data-nav` off whatever is under it, and for every
+       * other section that is a constant. Here it is not: the frame opens from
+       * a card on a light page to a black fullscreen, so the bar is over light
+       * then over dark without the section itself moving.
+       *
+       * The test is the frame's top edge against the bar's bottom line. Written
+       * only when it flips, so the header's MutationObserver wakes a handful of
+       * times across the whole pin rather than every frame.
+       */
+      let navTone = '';
+      const applyNavTone = () => {
+        const f = frame.current;
+        if (f === null) return;
+        const barHeight = document.querySelector<HTMLElement>('.navbar-strip')?.offsetHeight ?? 0;
+        const top = sectionEl.getBoundingClientRect().top + frameRectAt(f, hero.zoom).y;
+        const next = top < barHeight ? 'dark' : 'light';
+        if (next === navTone) return;
+        navTone = next;
+        sectionEl.dataset.nav = next;
+      };
+
       measure();
       applyClip();
+      applyNavTone();
 
       const t = CONFIG.timeline;
       const timeline = gsap.timeline({
         defaults: { ease: 'none' },
-        ...(mode === 'css' ? { onUpdate: applyClip } : {}),
+        onUpdate: mode === 'css' ? () => {
+          applyClip();
+          applyNavTone();
+        } : applyNavTone,
         scrollTrigger: {
           trigger: sectionEl,
           start: 'top top',
@@ -150,6 +176,7 @@ export function HeroScroll() {
           onRefresh: (self) => {
             measure();
             applyClip();
+            applyNavTone();
             scrollRange.current = { start: self.start, end: self.end };
             controller.current?.refresh();
           },
@@ -249,6 +276,8 @@ export function HeroScroll() {
       <section
         ref={section}
         aria-labelledby="hero-title"
+        // Rewritten as the frame opens; light is where it starts.
+        data-nav="light"
         className={cn('relative isolate', mode !== 'static' && 'h-screen overflow-hidden')}
       >
         <HeroCopy ref={copy} />

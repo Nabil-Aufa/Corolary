@@ -22,7 +22,7 @@
     height: var(--nav-h);
   }
 
-  /* ── Background: slides in only while scrolling up ─────────────────────── */
+  /* ── Background: always there, tinted by what is behind it ─────────────── */
   .navbar .navbar-fill {
     position: fixed;
     top: 0;
@@ -30,22 +30,26 @@
     right: 0;
     height: var(--nav-h);
     z-index: 94;
-    /* Opaque page color, not the reference's translucent white + blur. Any
-       transparency lets whatever scrolls behind tint the bar — the dark panels
-       most of all — and `saturate(300%)` amplifies it, so the bar never quite
-       matches the page it sits on. */
-    background: var(--color-bg);
-    transform: translateY(-100%);
-    visibility: hidden;
-    transition:
-      transform 0.3s,
-      visibility 0.3s;
+    /* Translucent with a blur, which the opaque page colour used to rule out:
+       any transparency let the dark panels tint a bar that could not answer
+       back. It can now — the tone follows the section underneath — so the
+       blur is affordable again. */
+    -webkit-backdrop-filter: blur(calc(14 * var(--u)));
+    backdrop-filter: blur(calc(14 * var(--u)));
+    background-color: color-mix(in srgb, var(--color-bg) 95%, transparent);
+    transition: background-color 0.25s ease;
   }
 
-  .navbar.is-visible .navbar-fill,
-  .navbar.is-menu-open .navbar-fill {
-    transform: translateY(0);
-    visibility: visible;
+  .navbar.is-dark .navbar-fill {
+    background-color: color-mix(in srgb, var(--color-panel) 90%, transparent);
+  }
+
+  /* At the very top the page shows through, but the text still takes its tone
+     from whatever is behind — the hero's frame is already dark up there. */
+  .navbar.is-top .navbar-fill {
+    background-color: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   /* ── Bar ───────────────────────────────────────────────────────────────── */
@@ -56,18 +60,6 @@
     right: 0;
     height: var(--nav-h);
     z-index: 98;
-    transition: transform 0.3s;
-  }
-
-  .navbar.is-fixed .navbar-strip {
-    transform: translateY(-100%);
-  }
-
-  /* After `.is-fixed` on purpose: scrolling back up leaves both classes set,
-     and this is the rule that must win. */
-  .navbar.is-visible .navbar-strip,
-  .navbar.is-menu-open .navbar-strip {
-    transform: translateY(0);
   }
 
   .navbar .navbar-container {
@@ -88,6 +80,18 @@
      block (~165 wide) balances the Launch App button (~167×58) on the other
      side of the bar. Still on `--u`, so that balance holds at every desktop
      width instead of only at 1600px. */
+  .navbar .navbar-logo,
+  .navbar .nav-link,
+  .navbar .navbar-burger {
+    transition: color 0.25s ease;
+  }
+
+  .navbar.is-dark .navbar-logo,
+  .navbar.is-dark .nav-link,
+  .navbar.is-dark .navbar-burger {
+    color: var(--color-panel-ink-900);
+  }
+
   .navbar .navbar-logo {
     display: flex;
     align-items: center;

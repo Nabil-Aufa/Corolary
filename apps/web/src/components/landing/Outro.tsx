@@ -18,6 +18,7 @@ export function Outro() {
       // Penanda nada yang sama dengan `Panel` — bagian ini gelap tapi bukan
       // `Panel`. Saat ini tidak ada yang membacanya (lihat Panel.tsx).
       data-tone="dark"
+      data-nav="dark"
       className="relative isolate overflow-hidden bg-panel pb-[clamp(64px,8vw,120px)] pt-[clamp(80px,10vw,160px)] text-panel-ink-700"
     >
       {/* Art memenuhi seluruh lebar, bukan hanya kolom isi. Dibatasi ke kolom,

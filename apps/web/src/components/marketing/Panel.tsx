@@ -69,10 +69,11 @@ interface PanelProps {
 export function Panel({ children, className, tone = 'dark', roundTop = true }: PanelProps) {
   return (
     <section
-      // Penanda nada bagian ini untuk siapa pun yang perlu tahu apakah ia gelap.
-      // Saat ini tidak ada yang membacanya: navbar landing tidak lagi membalik
-      // warna, ia bersembunyi saat digulir ke bawah (MarketingHeader.tsx).
+      // Nada bagian ini, di bawah dua nama. `data-tone` deskriptif; `data-nav`
+      // adalah yang dibaca navbar untuk memilih warnanya sendiri
+      // (MarketingHeader.tsx), dan hanya mengenal gelap atau terang.
       data-tone={tone}
+      data-nav={tone === 'dark' ? 'dark' : 'light'}
       className={cn(
         // Mengembalikan 80px yang dimakan oleh panel BERIKUTNYA saat ia
         // menumpuk bagian bawah panel ini.

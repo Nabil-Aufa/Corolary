@@ -340,7 +340,14 @@ export function FeatureAccordion() {
   }, [resolvedTheme]);
 
   return (
-    <section id="pipeline" ref={rootRef} className="feature mkt-container">
+    <section
+      id="pipeline"
+      // Read by the navbar, which takes its tone from whichever section
+      // sits behind it (MarketingHeader.tsx).
+      data-nav="light"
+      ref={rootRef}
+      className="feature mkt-container"
+    >
       <div className="feature-main">
         {/* Spacer. Kosong dengan sengaja — inilah yang memberi section-nya
             tinggi dan inilah yang dipicu ScrollTrigger. */}

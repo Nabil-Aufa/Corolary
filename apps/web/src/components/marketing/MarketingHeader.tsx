@@ -28,61 +28,85 @@ const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
  * Landing navbar. Styles live in `styles/marketing-navbar.css`; sizes there are
  * fluid against a 1600px design width.
  *
- * Scroll behaviour: transparent at the very top, hidden while scrolling down,
- * back with a blurred background as soon as the visitor scrolls up. Hiding on
- * the way down is what makes a light navbar workable on this page at all — half
- * of it is dark panels, and a bar that stayed put would sit unreadable on top
- * of them.
+ * The bar never hides. It used to duck out of the way while scrolling down,
+ * which was the old answer to a light bar sitting on dark panels; the answer
+ * now is that the bar takes the tone of whatever is behind it.
+ *
+ * Behind it means behind it, not near it: a one pixel sample line across the
+ * middle of the bar, and whichever `[data-nav]` section crosses that line owns
+ * the tone. A section's own bounds would hand over at its edge, which is up to
+ * a bar's height away from where the eye sees the change.
+ *
+ * The hero is the one section whose tone is not fixed — its black frame grows
+ * out of a light page — so it rewrites its own `data-nav` as the frame opens,
+ * and a MutationObserver picks that up. An IntersectionObserver alone cannot:
+ * nothing is entering or leaving the line while the hero is pinned.
  */
 export function MarketingHeader() {
   const strip = useRef<HTMLDivElement>(null);
   const menuId = useId();
-  const [isFixed, setIsFixed] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+  const [atTop, setAtTop] = useState(true);
+  const [tone, setTone] = useState<'light' | 'dark'>('light');
   const [active, setActive] = useState<SectionId | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Only the very top is special now: there the bar keeps the page showing
+  // through it, so the hero's first screen is not cut off by a band of colour.
   useEffect(() => {
-    let lastY = window.scrollY;
     let frame = 0;
-
     const update = () => {
       frame = 0;
-      const y = window.scrollY;
-      const barHeight = strip.current?.offsetHeight ?? 0;
-
-      if (y <= 0) {
-        setIsFixed(false);
-        setIsVisible(false);
-      } else if (y > lastY) {
-        if (y > barHeight) {
-          setIsFixed(true);
-          setIsVisible(false);
-        }
-      } else if (y < lastY) {
-        setIsVisible(true);
-      }
-      lastY = y;
+      setAtTop(window.scrollY <= 0);
     };
-
-    // Lenis drives the page through window.scrollTo, so native scroll events
-    // still fire. rAF coalesces them to one update per frame.
     const onScroll = () => {
       if (frame === 0) frame = requestAnimationFrame(update);
     };
-
     window.addEventListener('scroll', onScroll, { passive: true });
-
-    // A reload restores the scroll position mid-page. Treat that like scrolling
-    // up, or the bar would float transparent over whatever section is there.
-    const initial = requestAnimationFrame(() => {
-      if (window.scrollY > 0) setIsVisible(true);
-    });
-
+    update();
     return () => {
       window.removeEventListener('scroll', onScroll);
-      cancelAnimationFrame(initial);
       if (frame !== 0) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  // Tone of whatever the bar is sitting on.
+  useEffect(() => {
+    const sections = [...document.querySelectorAll<HTMLElement>('[data-nav]')];
+    if (sections.length === 0) return;
+
+    const barHeight = strip.current?.offsetHeight ?? 0;
+    const mid = barHeight / 2;
+    let behind: HTMLElement | null = null;
+
+    const read = () => setTone(behind?.dataset.nav === 'dark' ? 'dark' : 'light');
+
+    const crossing = new Set<HTMLElement>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const el = entry.target as HTMLElement;
+          if (entry.isIntersecting) crossing.add(el);
+          else crossing.delete(el);
+        }
+        // Last in document order wins: sections overlap by a curtain radius,
+        // and the one that comes later is the one drawn on top.
+        behind = sections.filter((el) => crossing.has(el)).at(-1) ?? null;
+        read();
+      },
+      // A 1px band across the middle of the bar. Collapsing the viewport to
+      // that line is what makes "behind the bar" mean the pixels under it.
+      { rootMargin: `-${mid}px 0px -${window.innerHeight - mid - 1}px 0px` },
+    );
+    for (const el of sections) observer.observe(el);
+
+    // The hero rewrites its own tone while pinned, with no intersection change
+    // to announce it.
+    const mutations = new MutationObserver(read);
+    for (const el of sections) mutations.observe(el, { attributeFilter: ['data-nav'] });
+
+    return () => {
+      observer.disconnect();
+      mutations.disconnect();
     };
   }, []);
 
@@ -158,8 +182,8 @@ export function MarketingHeader() {
     <header
       className={cn(
         'navbar',
-        isFixed && 'is-fixed',
-        isVisible && 'is-visible',
+        `is-${tone}`,
+        atTop && !menuOpen && 'is-top',
         menuOpen && 'is-menu-open',
       )}
     >
