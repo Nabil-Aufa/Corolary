@@ -122,7 +122,28 @@ export function HeroScroll() {
       return;
     }
 
-    // Dan satu arah ketiga: dokumen yang tersembunyi. CoinCanvas menolak
+    // Arah ketiga: hero yang tidak ada di layar. Me-refresh dari tengah
+    // halaman — `#registry`, misalnya — mengembalikan posisi gulir sebelum
+    // efek ini berjalan, jadi ScrollTrigger sudah memutuskan hero berada di
+    // luar jangkauan dan CoinCanvas mulai dalam keadaan tidak aktif. Ia tidak
+    // menggambar, jadi `onReady` tidak terlambat — ia tidak akan pernah
+    // datang.
+    //
+    // Gejalanya tidak terbaca sebagai macet, dan itu yang membuatnya lolos:
+    // gerbang `fonts` tetap selesai, jadi logonya terisi PERSIS setengah lalu
+    // berhenti, dan layarnya baru pergi delapan detik kemudian saat batas
+    // waktu menyapunya. Terlihat seperti animasi yang lambat, bukan seperti
+    // sesuatu yang menunggu hal yang tidak akan terjadi.
+    //
+    // Menyelesaikannya benar, bukan sekadar menyerah: yang ditutupi layar boot
+    // adalah bagian halaman yang akan dilihat orang ini, dan di posisi itu
+    // tidak ada satu pun piksel WebGL di antaranya.
+    if (!visible.current) {
+      resolveBootGate('hero');
+      return;
+    }
+
+    // Dan arah keempat: dokumen yang tersembunyi. CoinCanvas menolak
     // menggambar selagi `document.hidden` benar, jadi di tab latar `onReady`
     // BUKAN sesuatu yang datang terlambat, ia tidak akan datang sama sekali
     // sampai tabnya dilihat. Menunggunya berarti layar boot bertahan sampai
@@ -244,6 +265,13 @@ export function HeroScroll() {
         onToggle: (self) => {
           visible.current = self.isActive;
           controller.current?.setActive(self.isActive);
+          // Sebagian browser memulihkan posisi gulir SETELAH hidrasi, jadi
+          // pemeriksaan sekali saat mount bisa mendapati hero masih di layar
+          // dan baru di sini ia keluar. Tanpa baris ini, urutan itu
+          // menghidupkan kembali persis kebuntuan yang dijelaskan di gerbang
+          // `hero` di atas. Aman dipanggil berkali-kali; gerbang yang sudah
+          // selesai tidak berubah lagi.
+          if (!self.isActive) resolveBootGate('hero');
         },
       });
       visible.current = watch.isActive;
