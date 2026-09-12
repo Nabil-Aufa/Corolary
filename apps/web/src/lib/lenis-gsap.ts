@@ -37,6 +37,18 @@ import { claimRaf, onLenis } from './lenis-store';
 
 let refs = 0;
 let teardown: (() => void) | null = null;
+let lastTickFrame = -1;
+
+/**
+ * Frame `gsap.ticker` saat Lenis terakhir maju.
+ *
+ * Dipakai HUD hero (`?debug=1`) untuk MEMBUKTIKAN urutan tick, bukan
+ * mengasumsikannya: kalau angka ini tidak sama dengan `gsap.ticker.frame` di
+ * dalam callback lain, callback itu sedang membaca posisi frame sebelumnya.
+ */
+export function lenisTickFrame(): number {
+  return lastTickFrame;
+}
 
 function bind(lenis: Lenis): () => void {
   const releaseRaf = claimRaf();
@@ -45,14 +57,24 @@ function bind(lenis: Lenis): () => void {
   lenis.on('scroll', update);
 
   // Ticker GSAP memberi waktu dalam detik; Lenis menunggu milidetik.
-  const tick = (time: number) => lenis.raf(time * 1000);
-  gsap.ticker.add(tick);
+  const tick = (time: number) => {
+    lenis.raf(time * 1000);
+    lastTickFrame = gsap.ticker.frame;
+  };
+  // Argumen ketiga = prioritaskan. Menyambungkan Lenis ke ScrollTrigger saja
+  // belum cukup untuk callback ticker LAIN yang membaca posisi scroll di frame
+  // yang sama — hero menggambar seluruh scene-nya dari sana. Tanpa prioritas,
+  // urutannya ditentukan oleh komponen mana yang mount lebih dulu, dan satu
+  // remount membaliknya jadi tertinggal satu frame: tepi frame hero terlihat
+  // bergetar, dan tidak ada error yang menjelaskan kenapa.
+  gsap.ticker.add(tick, false, true);
   gsap.ticker.lagSmoothing(0);
 
   return () => {
     lenis.off('scroll', update);
     gsap.ticker.remove(tick);
     gsap.ticker.lagSmoothing(500, 33); // kembali ke bawaan GSAP
+    lastTickFrame = -1;
     releaseRaf();
   };
 }
