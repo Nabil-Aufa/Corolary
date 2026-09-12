@@ -33,7 +33,7 @@ const REASONS: Reason[] = [
   },
   {
     label: 'Coverage',
-    body: 'History is read from Aave V3, Morpho Blue, Compound and SparkLend. A reputation built on a single protocol is shallow and easy to game; one that has to hold across four is far more expensive to fake.',
+    body: 'History is read from Aave V3, Morpho Blue, Compound and SparkLend. A record that has to hold across four protocols is far more expensive to fake.',
   },
   {
     label: 'Risk',
@@ -41,11 +41,11 @@ const REASONS: Reason[] = [
   },
   {
     label: 'Cost',
-    body: 'A proof costs ten times less inside the first 24 hours, so events are proven while they are still fresh and then stored permanently. Nothing is ever proven on demand while a reader waits.',
+    body: 'A proof costs ten times less inside the first 24 hours, so events are proven while fresh and then stored permanently.',
   },
   {
     label: 'Sourcing',
-    body: 'The market runs on Creditcoin testnet, but the credit history behind it is read from Ethereum mainnet. The tokens are stand-ins; the borrowing record and the prices proving it are not.',
+    body: 'The market runs on Creditcoin testnet, but the credit history behind it is read from Ethereum mainnet. The tokens are stand-ins; the record is not.',
   },
 ];
 

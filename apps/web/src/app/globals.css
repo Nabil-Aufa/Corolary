@@ -265,92 +265,109 @@
   }
 
 
-  /* ── "Why this is different": kartu berserak ─────────────────────────────
+  /* ── "Why this is different": lima kartu yang membuka ───────────────────
    *
-   * Ukurannya dalam `vw`, bukan px tetap: seluruh susunan ini bergantung pada
-   * kartu dan jarak geser yang menskala bersama, dan satu nilai px di antara
-   * nilai vw akan membuat tumpukannya berubah bentuk tiap kali lebar berubah.
+   * Dua keadaan, dan yang menentukan bentuknya SCROLL, bukan hover: satu
+   * tumpukan miring saat bagian ini baru masuk layar, lalu kisi rapi 3 + 2
+   * saat ia benar benar terbaca. Keduanya harus bisa dibalik saat pembaca
+   * menggulir balik, jadi yang dianimasikan HANYA `transform`. Tata letaknya
+   * tetap kisi yang sama sepanjang waktu; tumpukan itu cuma geseran di atas
+   * kisi yang sudah jadi, sehingga tinggi bagian ini tidak pernah berubah dan
+   * tidak ada yang di bawahnya ikut melompat.
    *
-   * Satu pengecualian yang disengaja: lebar BORDER tetap 4px. Border itulah
-   * yang memisahkan kartu saat mereka saling menumpuk, dan pemisah yang ikut
-   * menyusut akan hilang persis di layar tempat tumpukannya paling rapat. */
+   * Karena itu TIDAK ada lagi `translate`/`rotate` statis per kartu di sini.
+   * Sebaran tumpukan dihitung di `WhyDifferent.tsx` terhadap posisi kisi tiap
+   * kartu yang sebenarnya; menuliskannya juga di CSS berarti dua sumber
+   * kebenaran yang akan menyimpang begitu jumlah kartu atau kolomnya berubah.
+   */
 
   .why-cards {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5vw;
+    /* Warna kartu TIDAK mengikuti tema, dan itu disengaja. Panel di belakang
+       bagian ini gelap di tema terang maupun gelap (`--color-panel` memang
+       kebalikan halaman), jadi kartu yang ikut membalik akan jadi gelap di
+       atas gelap. Nilai di sini karena itu mutlak, bukan token tema. */
+    --why-card-grey: #e6e8ed;
+    --why-card-blue: #dfe7fa;
+    --why-ink: #0b0e14;
+    --why-ink-soft: #55607a;
+
+    /* Enam kolom, bukan tiga. Dengan tiga kolom dua kartu di baris bawah cuma
+       bisa rata kiri atau rata tengah penuh, dan keduanya terbaca sebagai
+       kisi yang kurang satu — bukan sebagai baris kedua. Enam kolom membuat
+       baris itu bisa masuk setengah kartu ke dalam. */
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    align-items: start;
+    gap: 1.75vw;
   }
 
   .why-card {
     position: relative;
-    width: 25vw;
-    padding: 3.125vw;
-    border: 4px solid var(--color-surface);
+    grid-column: span 2;
+    padding: 2.25vw;
     border-radius: 0.5vw;
-    background: var(--blue-50);
-    /* Tanpa bayangan sama sekali. Yang memisahkan kartu adalah bordernya. */
-    box-shadow: none;
+    background: var(--why-card-grey);
+    /* Hanya elemen yang benar benar dianimasikan yang diberi ini. */
+    will-change: transform;
   }
 
-  /* Geseran statis, dan sengaja memakai properti `translate`/`rotate`
-     TERPISAH, bukan `transform` gabungan. Kalau nanti kartunya ikut
-     dianimasikan, GSAP menulis ke `transform` — dan `transform` gabungan akan
-     menimpa seluruh sebaran ini sekaligus, membuat tumpukannya runtuh jadi
-     satu baris rata tanpa ada yang terlihat error.
-
-     Nilai y negatif di baris bawah bukan salah ketik: itu yang menarik baris
-     kedua NAIK sehingga kedua baris saling mengunci, bukan sekadar bertumpuk
-     ke bawah. */
-  .why-card:nth-child(1) {
-    translate: 7.03vw 7.35vw;
-    rotate: -9deg;
-    z-index: 1;
+  /* Dua warna, dan yang menentukan pasangannya bukan selera: kartu biru
+     selalu bertetangga dengan kartu abu di tumpukan (1 abu, 2 biru, 3 abu,
+     lalu 4 dan 5 biru di baris bawah). Tanpa border pemisah, dua kartu
+     sewarna yang bertindihan akan menyatu jadi satu bidang tanpa tepi —
+     karena itu geseran tumpukan di `WhyDifferent.tsx` menjauhkan kartu 4 dan
+     5, satu satunya pasangan sewarna yang benar benar bersinggungan. */
+  .why-card:nth-child(2),
+  .why-card:nth-child(4),
+  .why-card:nth-child(5) {
+    background: var(--why-card-blue);
   }
 
-  .why-card:nth-child(2) {
-    translate: 0 -1.28vw;
-    rotate: 0deg;
-    z-index: 2;
-  }
-
+  /* Kartu biru lebih pendek daripada kartu abu. Teksnya memang lebih ringkas,
+     tapi selisih panjang kalimat tidak bisa dijadikan jaminan — satu kata
+     tambahan bisa menambah satu baris penuh. Tinggi minimum inilah yang
+     menjaminnya. */
+  .why-card:nth-child(1),
   .why-card:nth-child(3) {
-    translate: -6vw 7.5vw;
-    rotate: 9deg;
-    z-index: 3;
+    min-height: 21vw;
   }
 
+  /* Baris kedua, masuk setengah kartu dari kedua sisi. */
   .why-card:nth-child(4) {
-    translate: 4vw -9.75vw;
-    rotate: -20deg;
-    z-index: 4;
+    grid-column: 2 / span 2;
   }
 
   .why-card:nth-child(5) {
-    translate: 0.72vw -12.3vw;
-    rotate: 20deg;
-    z-index: 5;
+    grid-column: 4 / span 2;
   }
+
+  /* Urutan tumpang tindih saat menumpuk. Tidak berpengaruh apa apa setelah
+     kisinya terbuka, karena di sana tidak ada kartu yang bersinggungan. */
+  .why-card:nth-child(1) { z-index: 1; }
+  .why-card:nth-child(2) { z-index: 2; }
+  .why-card:nth-child(3) { z-index: 3; }
+  .why-card:nth-child(4) { z-index: 4; }
+  .why-card:nth-child(5) { z-index: 5; }
 
   .why-card-index {
     display: block;
     font-size: 1.125vw;
     line-height: 1;
-    color: var(--blue-400);
+    color: var(--why-ink-soft);
   }
 
   .why-card-text {
     margin-top: 1.5vw;
     font-size: 1.125vw;
     line-height: 1.4;
-    color: var(--blue-950);
+    color: var(--why-ink);
   }
 
   .why-card-divider {
     width: 3.75vw;
     height: 1px;
     margin-top: 1.5vw;
-    background: var(--blue-950);
+    background: var(--why-ink);
     opacity: 0.2;
   }
 
@@ -359,7 +376,7 @@
     margin-top: 1.5vw;
     font-size: 1.125vw;
     line-height: 1.4;
-    color: var(--blue-800);
+    color: var(--why-ink-soft);
   }
 
   /* Judul dipecah per KATA, tiap kata punya jendela sendiri. `clip`, bukan
@@ -376,29 +393,29 @@
     will-change: transform;
   }
 
-  /* ── Di bawah 768px: satu kolom, tanpa sebaran ──
-   * Kartu 25vw pada 375px hanya 94px, dan teks 1.125vw jadi 4px. Sebaran yang
-   * saling mengunci juga butuh ruang mendatar yang memang tidak ada di sini,
-   * jadi yang dibuang bukan cuma rotasinya melainkan seluruh geserannya. */
+  /* ── Di bawah 768px: satu kolom, tanpa tumpukan ──
+   * Kartu sepertiga lebar pada 375px hanya ~110px, dan teks 1.125vw jadi 4px.
+   * Tumpukan yang saling mengunci juga butuh ruang mendatar yang memang tidak
+   * ada di sini, jadi animasinya pun tidak dipasang (lihat `matchMedia` di
+   * `WhyDifferent.tsx`) — bukan cuma disembunyikan lewat CSS. */
   @media (max-width: 767px) {
     .why-cards {
-      flex-direction: column;
-      gap: 4vw;
+      grid-template-columns: 1fr;
+      gap: 16px;
     }
 
-    .why-card {
-      width: 100%;
-      padding: 24px;
-      border-radius: 8px;
-    }
-
+    .why-card,
     .why-card:nth-child(1),
-    .why-card:nth-child(2),
     .why-card:nth-child(3),
     .why-card:nth-child(4),
     .why-card:nth-child(5) {
-      translate: none;
-      rotate: none;
+      grid-column: 1 / -1;
+      padding: 24px;
+      border-radius: 8px;
+      /* Di satu kolom, kartu abu yang dipaksa lebih tinggi cuma jadi ruang
+         kosong di bawah teks — selisih tingginya tidak bisa dibandingkan
+         dengan apa pun karena tidak ada kartu di sebelahnya. */
+      min-height: 0;
     }
 
     .why-card-index,
