@@ -286,8 +286,13 @@
        bagian ini gelap di tema terang maupun gelap (`--color-panel` memang
        kebalikan halaman), jadi kartu yang ikut membalik akan jadi gelap di
        atas gelap. Nilai di sini karena itu mutlak, bukan token tema. */
-    --why-card-grey: #e6e8ed;
-    --why-card-blue: #dfe7fa;
+    /* Hijau dan birunya sepasang dengan kartu di "The registry, right now":
+       nilainya persis `--color-verified-soft` dan `--color-accent-soft` pada
+       tema terang. Disalin sebagai nilai mutlak, bukan dirujuk lewat token,
+       karena panel di belakang bagian ini gelap di kedua tema — token yang
+       ikut membalik akan jadi kartu gelap di atas gelap. */
+    --why-card-green: #e3f5f1;
+    --why-card-blue: #e8edff;
     --why-ink: #0b0e14;
     --why-ink-soft: #55607a;
 
@@ -306,14 +311,14 @@
     grid-column: span 2;
     padding: 2.25vw;
     border-radius: 0.5vw;
-    background: var(--why-card-grey);
+    background: var(--why-card-green);
     /* Hanya elemen yang benar benar dianimasikan yang diberi ini. */
     will-change: transform;
   }
 
   /* Dua warna, dan yang menentukan pasangannya bukan selera: kartu biru
-     selalu bertetangga dengan kartu abu di tumpukan (1 abu, 2 biru, 3 abu,
-     lalu 4 dan 5 biru di baris bawah). Tanpa border pemisah, dua kartu
+     selalu bertetangga dengan kartu hijau di tumpukan (1 hijau, 2 biru,
+     3 hijau, lalu 4 dan 5 biru di baris bawah). Tanpa border pemisah, dua kartu
      sewarna yang bertindihan akan menyatu jadi satu bidang tanpa tepi —
      karena itu geseran tumpukan di `WhyDifferent.tsx` menjauhkan kartu 4 dan
      5, satu satunya pasangan sewarna yang benar benar bersinggungan. */
@@ -323,7 +328,7 @@
     background: var(--why-card-blue);
   }
 
-  /* Kartu biru lebih pendek daripada kartu abu. Teksnya memang lebih ringkas,
+  /* Kartu biru lebih pendek daripada kartu hijau. Teksnya memang lebih ringkas,
      tapi selisih panjang kalimat tidak bisa dijadikan jaminan — satu kata
      tambahan bisa menambah satu baris penuh. Tinggi minimum inilah yang
      menjaminnya. */
@@ -412,7 +417,7 @@
       grid-column: 1 / -1;
       padding: 24px;
       border-radius: 8px;
-      /* Di satu kolom, kartu abu yang dipaksa lebih tinggi cuma jadi ruang
+      /* Di satu kolom, kartu hijau yang dipaksa lebih tinggi cuma jadi ruang
          kosong di bawah teks — selisih tingginya tidak bisa dibandingkan
          dengan apa pun karena tidak ada kartu di sebelahnya. */
       min-height: 0;

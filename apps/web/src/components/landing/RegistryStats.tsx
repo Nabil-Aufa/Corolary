@@ -118,7 +118,7 @@ function StatCard({ metric, tint }: { metric: Metric; tint: 'mint' | 'lavender' 
   return (
     <div
       className={cn(
-        'flex h-full min-h-[clamp(200px,20vw,320px)] flex-col rounded-card p-[clamp(24px,2.4vw,40px)]',
+        'flex h-full min-h-[clamp(160px,15vw,240px)] flex-col rounded-card p-[clamp(22px,2vw,36px)]',
         // Kedua warna ini sudah ada di tokens dan punya pasangan gelapnya, jadi
         // kartunya ikut membalik bersama halaman. Menuliskan hex pucat di sini
         // akan jadi dua bidang terang di atas halaman gelap.
@@ -127,10 +127,10 @@ function StatCard({ metric, tint }: { metric: Metric; tint: 'mint' | 'lavender' 
     >
       <Icon aria-hidden="true" className="size-7 shrink-0 stroke-[1.5] text-ink-900" />
 
-      <div className="mt-auto pt-10">
+      <div className="mt-auto pt-8">
         {metric.value === null ? (
           <>
-            <Skeleton className="h-[clamp(30px,2.8vw,56px)] w-40" />
+            <Skeleton className="h-[clamp(34px,3.1vw,64px)] w-40" />
             <Skeleton className="mt-3 h-3 w-32" />
           </>
         ) : (
@@ -142,8 +142,11 @@ function StatCard({ metric, tint }: { metric: Metric; tint: 'mint' | 'lavender' 
                 padding 120px ke 240px di sana, jadi kartunya MENYUSUT persis
                 saat fontnya masih membesar. Pada 3,4vw angkanya 261px di dalam
                 kartu selebar 239px — meluber tanpa ada yang error, dan hanya
-                di dua rentang lebar itu. */}
-            <p className="num font-display text-[clamp(30px,2.8vw,56px)] font-medium leading-[1.05] text-ink-900">
+                di dua rentang lebar itu.
+                Membesarkan angka karena itu menuntut ruang mendatarnya
+                ditambah dulu: padding kartu yang dikurangi, bukan cuma
+                fontnya yang dinaikkan. */}
+            <p className="num font-display text-[clamp(34px,3.1vw,64px)] font-medium leading-[1.05] text-ink-900">
               {metric.value}
             </p>
             <p className="mt-3 text-micro font-medium uppercase tracking-[0.12em] text-ink-500">
