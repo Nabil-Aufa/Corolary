@@ -19,10 +19,17 @@ export interface HeroTuning {
   innerGlow: number;
   innerGlowAlpha: number;
   bendAmount: number;
-  /** Starfield idle drift, world units per second. */
+  /** Starfield idle: toward the camera and sideways, both in world units per second. */
   driftSpeed: number;
+  slideSpeed: number;
+  starCount: number;
+  starCountMobile: number;
   starSpan: number;
   starFade: number;
+  starSizeMin: number;
+  starSizeMax: number;
+  starTwinkle: number;
+  starFogDensity: number;
 }
 
 export function defaultTuning(): HeroTuning {
@@ -39,8 +46,22 @@ export function defaultTuning(): HeroTuning {
     innerGlowAlpha: CONFIG.frame.innerGlowAlpha,
     bendAmount: CONFIG.frame.bendAmount,
     driftSpeed: CONFIG.stars.driftSpeed,
-    starSpan: CONFIG.stars.span,
-    starFade: CONFIG.stars.fade,
+    slideSpeed: CONFIG.stars.slideSpeed,
+    starCount: CONFIG.stars.countDesktop,
+    starCountMobile: CONFIG.stars.countMobile,
+    // One period of the depth wrap is the whole camera path, so a star folded
+    // round the back lands on a distance the distribution already had.
+    starSpan: CONFIG.camera.startZ + CONFIG.stars.zAhead - (CONFIG.camera.endZ - CONFIG.stars.zBeyond),
+    // 15% of the span, as briefed. A slider of its own because the two are
+    // worth pulling apart while tuning; drift them too far and the seams
+    // reappear, which is the whole thing the fade exists to prevent.
+    starFade:
+      (CONFIG.camera.startZ + CONFIG.stars.zAhead - (CONFIG.camera.endZ - CONFIG.stars.zBeyond)) *
+      CONFIG.stars.fadeFraction,
+    starSizeMin: CONFIG.stars.sizeRange[0],
+    starSizeMax: CONFIG.stars.sizeRange[1],
+    starTwinkle: CONFIG.stars.twinkleAmount,
+    starFogDensity: CONFIG.stars.fogDensity,
   };
 }
 

@@ -52,8 +52,9 @@ export interface HeroDebugSample {
   bend: number;
   /** Peak displacement of the frame's bent edge, CSS px. */
   bendPx: number;
-  /** World units the starfield has drifted toward the camera. */
+  /** World units the starfield has drifted toward the camera, and sideways. */
   drift: number;
+  slide: number;
   /** Scene-pass draws plus the mask pass. */
   drawCalls: number;
   rect: { x: number; y: number; w: number; h: number; radius: number };
@@ -139,7 +140,7 @@ export function mountDebugHud(): DebugHud {
         `draws      ${fixed(sample.drawCalls, 0)}`,
         `lenisFirst ${sample.lenisFirst ? '     yes' : '      NO'}`,
         `uBend      ${fixed(sample.bend, 4)}  frame ${sample.bendPx.toFixed(1)}px`,
-        `drift      ${fixed(sample.drift, 2)}`,
+        `drift      ${fixed(sample.drift, 2)}  slide ${sample.slide.toFixed(2)}u`,
         `rect       ${r.x.toFixed(1)}, ${r.y.toFixed(1)}  ${r.w.toFixed(1)}×${r.h.toFixed(1)}  r${r.radius.toFixed(1)}`,
         `nearest    ${nearest}`,
       ].join('\n');

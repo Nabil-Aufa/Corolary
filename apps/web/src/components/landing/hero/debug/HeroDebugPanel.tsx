@@ -68,12 +68,19 @@ const GROUPS: readonly { title: string; fields: readonly Field[] }[] = [
   {
     title: 'Starfield',
     fields: [
-      { key: 'driftSpeed', label: 'driftSpeed (units/s)', min: 0, max: 4, step: 0.01 },
-      { key: 'starSpan', label: 'span', min: 6, max: 80, step: 1 },
-      { key: 'starFade', label: 'fade', min: 0, max: 20, step: 0.5 },
+      { key: 'starCount', label: 'count', min: 200, max: 6000, step: 50 },
+      { key: 'driftSpeed', label: 'driftSpeed (units/s)', min: 0, max: 1, step: 0.01 },
+      { key: 'slideSpeed', label: 'slideSpeed (units/s)', min: 0, max: 0.5, step: 0.002 },
+      { key: 'starSpan', label: 'span', min: 10, max: 140, step: 1 },
+      { key: 'starFade', label: 'fade', min: 0, max: 30, step: 0.5 },
+      { key: 'starSizeMin', label: 'sizeMin (px)', min: 0.4, max: 4, step: 0.05 },
+      { key: 'starSizeMax', label: 'sizeMax (px)', min: 0.4, max: 6, step: 0.05 },
+      { key: 'starTwinkle', label: 'twinkleAmount', min: 0, max: 0.4, step: 0.005 },
+      { key: 'starFogDensity', label: 'star fogDensity', min: 0, max: 0.12, step: 0.001 },
     ],
   },
 ];
+
 
 function isTuning(value: unknown): value is HeroTuning {
   if (typeof value !== 'object' || value === null) return false;
@@ -88,7 +95,8 @@ function configSnippet(t: HeroTuning): string {
     `camera: { startZ: ${n(t.startZ)}, endZ: ${n(t.endZ)}, endY: ${n(t.endY)} }`,
     `// z spacing ×${n(t.zSpacing)} — scale coins.zGap by this, it is not a CONFIG field`,
     `depth: { focusDist: ${n(t.focusDist)}, focusRange: ${n(t.focusRange)}, fogDensity: ${n(t.fogDensity)} }`,
-    `stars: { driftSpeed: ${n(t.driftSpeed)}, span: ${n(t.starSpan)}, fade: ${n(t.starFade)} }`,
+    `stars: { countDesktop: ${n(t.starCount)}, driftSpeed: ${n(t.driftSpeed)}, slideSpeed: ${n(t.slideSpeed)}, sizeRange: [${n(t.starSizeMin)}, ${n(t.starSizeMax)}], twinkleAmount: ${n(t.starTwinkle)}, fogDensity: ${n(t.starFogDensity)} }`,
+    `// span ${n(t.starSpan)} is derived from camera.startZ/endZ + stars.zAhead/zBeyond, not stored`,
     `frame: { bendAmount: ${n(t.bendAmount)}, feather: ${n(t.feather)}, innerGlow: ${n(t.innerGlow)}, innerGlowAlpha: ${n(t.innerGlowAlpha)} }`,
   ].join('\n');
 }

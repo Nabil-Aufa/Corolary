@@ -28,6 +28,8 @@ export interface RenderInput {
   bend: number;
   /** Accumulated world units the starfield has drifted toward the camera; only ever grows. */
   drift: number;
+  /** Accumulated sideways translation of the starfield, world units; only ever grows. */
+  slide: number;
   /** 0..1 paragraph reveal, per character, left to right and top to bottom. */
   wipe: number;
   /** The frame's own background: the scene's clear colour and its fog. */
@@ -266,99 +268,129 @@ void main() {
  * closes it faster or slower on top of that — so scrolling up slows the
  * approach rather than fighting it, and the drift is always forward.
  */
+/**
+ * The starfield, in one vertex shader.
+ *
+ * Three motions run at once and none of them replaces another:
+ *
+ * 1. Parallax. The stars sit still in world space, so `uCamZ` and `uCamY`
+ *    moving under them IS the scroll. This is the loudest of the three.
+ * 2. Drift. `uDrift` only ever grows, so the field closes on the camera even
+ *    with the page held still — and keeps closing while it is scrolled, adding
+ *    to the parallax rather than taking turns with it.
+ * 3. Slide. The whole field translates sideways, near stars crossing the frame
+ *    faster than far ones. Only the stars move this way; the camera, the coins
+ *    and the text planes never do. Deliberately a translation and not a
+ *    rotation — see the note on it below, it is the difference between the
+ *    camera appearing to fly straight ahead and appearing to fly sideways.
+ *
+ * The field then wraps in z and in y, so the flight can run forever without the
+ * sky thinning out, and fades at every seam so nothing blinks into being.
+ */
 const STAR_VERTEX = /* glsl */ `
-attribute vec3 position;
-attribute float aRandom;
+attribute vec3 aPosition;
+attribute float aSeed;
 attribute float aSize;
+attribute vec3 aTint;
 attribute float aBright;
 
 uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
-uniform float uDpr;
-uniform float uReferenceDepth;
-uniform float uMaxPoint;
 uniform float uCamZ;
 uniform float uCamY;
-uniform float uDrift;         // accumulated world units, monotonically forward
-uniform float uDMin;          // nearest a star comes before wrapping round
-uniform float uSpan;          // depth of the slab
-uniform float uFade;          // seam fade, world units
-uniform float uFieldH;        // height of the slab, carried along with the camera
+uniform float uDrift;         // world units, monotonically forward
+uniform float uSlide;         // world units sideways, monotonically one way
+uniform float uDMin;
+uniform float uSpan;
+uniform float uFade;
+uniform float uFieldH;
+uniform float uHalfW;
 uniform float uFadeY;
+uniform float uDpr;
+uniform float uScale;         // distance at which aSize is drawn as written
+uniform float uMaxPoint;
+uniform float uTime;
+uniform float uTwinkle;
+uniform float uFogDensity;
+uniform float uFocusDist;
 
-varying float vRandom;
-varying float vBright;
-varying float vDepth;
-varying float vFade;
+varying vec3 vTint;
+varying float vAlpha;
+
 
 void main() {
-  float d = uCamZ - (position.z + uDrift);
+  // 1. Drift and the depth wrap, in one expression. This runs FIRST: the yaw
+  //    below needs the star's own distance, and nothing here may depend on the
+  //    yaw or the two motions start contaminating each other.
+  float d = uCamZ - (aPosition.z + uDrift);
   d = uDMin + mod(d - uDMin, uSpan);
   float dMax = uDMin + uSpan;
+  float zPos = uCamZ - d;
 
-  // The slab travels with the camera, so the descent never drops out of it.
+  // 2. The sideways idle: the whole field TRANSLATES, it does not turn.
+  //
+  //    This is the one that has to be a translation. Screen x is
+  //    x / (tan(fov/2) * d * aspect), so a constant world offset lands as an
+  //    offset that shrinks with depth and vanishes at infinity — which is
+  //    exactly what keeps the point the camera is flying toward dead centre.
+  //
+  //    A rotation does not. Rotating the field about the camera by t puts the
+  //    vanishing point at tan(t): measured, 10 degrees of yaw moved it 204 px
+  //    off centre, so flying forward looked like flying sideways. Shifting by
+  //    uYaw * d instead of a constant has the same flaw for the same reason —
+  //    it also survives to infinity. The two properties are exclusive: sideways
+  //    motion that reads identically at every depth REQUIRES moving the
+  //    vanishing point. So the sideways motion is parallaxed instead, near
+  //    stars sliding faster than far ones, and the approach stays straight.
+  //
+  //    Wrapped over the field width so the slide can run forever. The seam sits
+  //    at uHalfW, outside the frame at every depth the span reaches; the fade is
+  //    insurance for a span pushed far past its default in the debug panel,
+  //    where it degrades to a dim edge rather than a pop.
+  float xPos = mod(aPosition.x + uSlide + uHalfW, uHalfW * 2.0) - uHalfW;
+
+  // 3. The vertical wrap travels with the camera, so the descent never drops
+  //    out of the field and the bottom of the frame is never empty.
   float halfH = uFieldH * 0.5;
-  float yPos = mod(position.y - uCamY + halfH, uFieldH) - halfH + uCamY;
+  float yPos = mod(aPosition.y - uCamY + halfH, uFieldH) - halfH + uCamY;
 
-  vec4 viewPosition = modelViewMatrix * vec4(position.x, yPos, uCamZ - d, 1.0);
-  gl_Position = projectionMatrix * viewPosition;
-  vDepth = d;
+  vec4 mvPosition = modelViewMatrix * vec4(xPos, yPos, zPos, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
+  gl_PointSize = clamp(aSize * uDpr * uScale / max(-mvPosition.z, 0.001), 1.0, uMaxPoint);
 
-  // Faded at every seam, or a star would snap into being at the far edge and
-  // blink out at the near one. The upper bounds are written as 1.0 - smoothstep
-  // rather than with the edges swapped: GLSL ES leaves smoothstep undefined
-  // when edge0 >= edge1.
-  float near = smoothstep(uDMin, uDMin + uFade, d);
-  float far = 1.0 - smoothstep(dMax - uFade, dMax, d);
+  // Seam fades. The upper bounds are written as 1.0 - smoothstep rather than
+  // with the edges swapped: GLSL ES leaves smoothstep undefined when
+  // edge0 >= edge1.
+  float nearSeam = smoothstep(uDMin, uDMin + uFade, d);
+  float farSeam = 1.0 - smoothstep(dMax - uFade, dMax, d);
   float vertical = 1.0 - smoothstep(halfH - uFadeY, halfH, abs(yPos - uCamY));
-  vFade = near * far * vertical;
+  float lateral = 1.0 - smoothstep(uHalfW - uFadeY, uHalfW, abs(xPos));
 
-  // Perspective size: near stars are larger and, for the same camera motion,
-  // sweep across the frame faster — that difference is the parallax.
-  gl_PointSize = clamp(aSize * uDpr * uReferenceDepth / max(d, 0.001), 1.0, uMaxPoint);
-  vRandom = aRandom;
-  vBright = aBright;
+  // Slow, shallow, and out of phase per star. A period in seconds rather than a
+  // frequency, so the number in CONFIG is the thing you can actually count.
+  float period = mix(6.0, 12.0, fract(aSeed * 7.31));
+  float twinkle = 1.0 - uTwinkle * (0.5 + 0.5 * sin(uTime * 6.2831853 / period + aSeed * 6.2831853));
+
+  float fog = exp(-max(d - uFocusDist, 0.0) * uFogDensity);
+
+  vTint = aTint;
+  vAlpha = aBright * nearSeam * farSeam * vertical * lateral * twinkle * fog;
 }
 `;
 
 const STAR_FRAGMENT = /* glsl */ `
 precision highp float;
 
-uniform float uTime;
-uniform float uBlueShare;
-
-varying float vRandom;
-varying float vBright;
-varying float vDepth;
-varying float vFade;
+varying vec3 vTint;
+varying float vAlpha;
 
 void main() {
-  vec2 c = gl_PointCoord - 0.5;
-  float r = length(c);
-
-  // smoothstep(0.12, 0.0, r) written the other way round: GLSL ES leaves
-  // smoothstep undefined when edge0 >= edge1.
-  float core = 1.0 - smoothstep(0.0, 0.12, r);
-  float glow = exp(-r * r * 18.0) * 0.6;
-
-  // Four-point glint on bright stars. Faded before the sprite border, or the
-  // arms would end in a visible square.
-  float spark = max(
-    exp(-abs(c.x) * 40.0) * exp(-abs(c.y) * 4.0),
-    exp(-abs(c.y) * 40.0) * exp(-abs(c.x) * 4.0)
-  ) * 0.8;
-  spark *= vBright * (1.0 - smoothstep(0.38, 0.5, max(abs(c.x), abs(c.y))));
-
-  float wave = 0.5 + 0.5 * sin(uTime * mix(0.6 + vRandom * 1.8, 0.3 + vRandom * 0.5, vBright) + vRandom * 6.28);
-  float twinkle = mix(mix(0.7, 1.0, wave), mix(0.5, 1.0, wave), vBright);
-
-  float blue = step(1.0 - uBlueShare, fract(vRandom * 91.7));
-  vec3 glowColor = mix(vec3(1.0), vec3(0.72, 0.8, 0.98), blue);
-  float depthFade = mix(1.0, 0.6, smoothstep(12.0, 40.0, vDepth));
-
-  vec3 color = (vec3(core) + glowColor * (glow + spark)) * twinkle * depthFade * vFade;
-  // Additive (ONE, ONE): colour only, alpha untouched.
-  gl_FragColor = vec4(color, 0.0);
+  // A disc with one thin antialiased edge, and nothing else. No core, no halo,
+  // no glint: those are what turn a star into a glowing ball.
+  float alpha = vAlpha * smoothstep(0.5, 0.35, length(gl_PointCoord - 0.5));
+  if (alpha < 0.004) discard;
+  // Premultiplied, like everything else in this pass.
+  gl_FragColor = vec4(vTint * alpha, alpha);
 }
 `;
 
@@ -501,49 +533,102 @@ export function createCoinScene(ogl: Ogl, options: SceneOptions): CoinScene {
   const scene = new ogl.Transform();
 
   // ── Stars ──────────────────────────────────────────────────────────────
+  /**
+   * Base positions, once. Seventy per cent uniform, thirty per cent drawn
+   * around a handful of cluster centres with a gaussian offset — a real sky has
+   * crowded patches and bare ones, and an even scatter reads as a grid however
+   * many points are in it. Everything comes off one seeded stream, so the sky
+   * is the same on every reload and every machine.
+   *
+   * x is the only axis that is neither wrapped nor drifted, so it alone has to
+   * cover the widest viewport outright. y and z only have to be uniform over
+   * one period of their wrap; where a star lands is the shader's problem.
+   */
   const createStarGeometry = (tuning: HeroTuning) => {
-    const { countDesktop, countMobile, fieldH, widthFactor, seed, sizeRange, brightSizeRange, brightShare } =
-      CONFIG.stars;
-    const count = mobile ? countMobile : countDesktop;
-    const halfH = fieldH * 0.5;
-    const halfW = halfH * widthFactor;
+    const S = CONFIG.stars;
+    const count = Math.max(1, Math.round(mobile ? tuning.starCountMobile : tuning.starCount));
+    const halfH = S.fieldH * 0.5;
+    const halfW = halfH * S.widthFactor;
+    const span = Math.max(tuning.starSpan, 1);
 
     const positions = new Float32Array(count * 3);
-    const randoms = new Float32Array(count);
+    const seeds = new Float32Array(count);
     const sizes = new Float32Array(count);
+    const tints = new Float32Array(count * 3);
     const brights = new Float32Array(count);
-    const random = mulberry32(seed);
+
+    const random = mulberry32(S.seed);
+    const pick = (range: readonly number[], t: number) => (range[0] ?? 0) + ((range[1] ?? 0) - (range[0] ?? 0)) * t;
+    /** Box–Muller, so the cluster falloff is a real gaussian rather than a triangle of stacked uniforms. */
+    const gaussian = () => {
+      const u = Math.max(random(), 1e-6);
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
+    };
+
+    const clusterCount = Math.round(pick(S.clusterCount, random()));
+    const centres = Array.from({ length: clusterCount }, () => ({
+      x: (random() * 2 - 1) * halfW,
+      y: (random() * 2 - 1) * halfH,
+      z: random() * span,
+    }));
+
+    const wrap = (value: number, size: number) => ((value % size) + size) % size;
+    const blue = hexToRgb(S.blue);
+    const violet = hexToRgb(S.violet);
+
     for (let i = 0; i < count; i++) {
-      // x is never wrapped and never drifts, so it is the only axis that needs
-      // to cover the widest viewport outright. y and z only have to be uniform
-      // over one period of their wrap; where they land is the shader's problem.
-      positions[i * 3] = (random() * 2 - 1) * halfW;
-      positions[i * 3 + 1] = (random() * 2 - 1) * halfH;
-      positions[i * 3 + 2] = random() * tuning.starSpan;
-      randoms[i] = random();
-      const bright = random() < brightShare;
-      const [min, max] = bright ? brightSizeRange : sizeRange;
-      sizes[i] = min + (max - min) * random();
-      brights[i] = bright ? 1 : 0;
+      const centre = random() < S.clusterShare ? centres[Math.floor(random() * clusterCount)] : undefined;
+      if (centre === undefined) {
+        positions[i * 3] = (random() * 2 - 1) * halfW;
+        positions[i * 3 + 1] = (random() * 2 - 1) * halfH;
+        positions[i * 3 + 2] = random() * span;
+      } else {
+        // Wrapped rather than clamped: clamping would pile the tail of every
+        // cluster against the field's edges as a visible rim.
+        positions[i * 3] = wrap(centre.x + gaussian() * S.clusterSigma + halfW, halfW * 2) - halfW;
+        positions[i * 3 + 1] = wrap(centre.y + gaussian() * S.clusterSigma + halfH, halfH * 2) - halfH;
+        positions[i * 3 + 2] = wrap(centre.z + gaussian() * S.clusterSigma, span);
+      }
+
+      seeds[i] = random();
+      sizes[i] = pick([tuning.starSizeMin, tuning.starSizeMax], random());
+
+      const hue = random();
+      const tint = hue < S.blueShare ? blue : hue < S.blueShare + S.violetShare ? violet : [1, 1, 1];
+      tints[i * 3] = tint[0] ?? 1;
+      tints[i * 3 + 1] = tint[1] ?? 1;
+      tints[i * 3 + 2] = tint[2] ?? 1;
+
+      const tier = random();
+      const range = tier < S.dimShare ? S.dimAlpha : tier < S.dimShare + S.midShare ? S.midAlpha : S.brightAlpha;
+      brights[i] = pick(range, random());
+
     }
+
     return new ogl.Geometry(gl, {
-      position: { size: 3, data: positions },
-      aRandom: { size: 1, data: randoms },
+      aPosition: { size: 3, data: positions },
+      aSeed: { size: 1, data: seeds },
       aSize: { size: 1, data: sizes },
+      aTint: { size: 3, data: tints },
       aBright: { size: 1, data: brights },
     });
   };
-  // The field is placed relative to the camera now, so the dolly's own numbers
-  // no longer change it; only the span it is generated over does.
-  const starKey = (tuning: HeroTuning) => `${tuning.starSpan}|${mobile}`;
+  // The field is camera-relative, so the dolly's own numbers no longer change
+  // it. Only what the base positions were generated over does.
+  const starKey = (tuning: HeroTuning) =>
+    `${tuning.starCount}|${tuning.starCountMobile}|${tuning.starSpan}|${tuning.starSizeMin}|${tuning.starSizeMax}|${mobile}`;
 
-  const starTime = { value: 0 };
   const starField = {
     uCamZ: uniform(0),
     uCamY: uniform(0),
     uDrift: uniform(0),
-    uSpan: uniform(CONFIG.stars.span),
-    uFade: uniform(CONFIG.stars.fade),
+    uSlide: uniform(0),
+    uTime: uniform(0),
+    uSpan: uniform(CONFIG.stars.zAhead),
+    uFade: uniform(1),
+    uTwinkle: uniform(CONFIG.stars.twinkleAmount),
+    uFogDensity: uniform(CONFIG.stars.fogDensity),
+    uFocusDist: uniform(CONFIG.depth.focusDist),
   };
   const starProgram = new ogl.Program(gl, {
     vertex: STAR_VERTEX,
@@ -554,23 +639,25 @@ export function createCoinScene(ogl: Ogl, options: SceneOptions): CoinScene {
     cullFace: false,
     uniforms: {
       ...starField,
-      uTime: starTime,
       uDpr: { value: dpr },
-      uReferenceDepth: { value: CONFIG.stars.referenceDepth },
+      uScale: { value: CONFIG.stars.referenceDepth },
       uMaxPoint: { value: CONFIG.stars.maxPointPx * dpr },
       uDMin: { value: CONFIG.stars.dMin },
       uFieldH: { value: CONFIG.stars.fieldH },
+      uHalfW: { value: (CONFIG.stars.fieldH * 0.5) * CONFIG.stars.widthFactor },
       uFadeY: { value: CONFIG.stars.fadeY },
-      uBlueShare: { value: CONFIG.stars.blueShare },
     },
   });
-  starProgram.setBlendFunc(gl.ONE, gl.ONE);
+  // Ordinary alpha over a premultiplied pass, not additive: additive is what
+  // makes a dim star on a dark sky glow instead of sit there.
+  starProgram.setBlendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   let starsBuiltFor = starKey(DEFAULT_TUNING);
   const starMesh = new ogl.Mesh(gl, {
     geometry: createStarGeometry(DEFAULT_TUNING),
     program: starProgram,
     mode: gl.POINTS,
     frustumCulled: false,
+    // Drawn before the coins; they paint over it.
     renderOrder: -1,
   });
   starMesh.setParent(scene);
@@ -837,12 +924,16 @@ export function createCoinScene(ogl: Ogl, options: SceneOptions): CoinScene {
       focusRange.value = Math.max(tuning.focusRange, 0.001);
       fogDensity.value = tuning.fogDensity;
 
-      starTime.value = input.time;
+      starField.uTime.value = input.time;
       starField.uCamZ.value = input.cameraZ;
       starField.uCamY.value = input.cameraY;
       starField.uDrift.value = input.drift;
+      starField.uSlide.value = input.slide;
       starField.uSpan.value = Math.max(tuning.starSpan, 1);
       starField.uFade.value = tuning.starFade;
+      starField.uTwinkle.value = tuning.starTwinkle;
+      starField.uFogDensity.value = tuning.starFogDensity;
+      starField.uFocusDist.value = tuning.focusDist;
 
       const [r, g, b] = input.clearColor;
       fogColor.value[0] = r;

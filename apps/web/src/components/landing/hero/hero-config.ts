@@ -294,48 +294,113 @@ export const CONFIG = {
     nearDiscard: 0.5,
   },
 
+  /**
+   * The starfield. Points in world space, one draw call, and every one of its
+   * three motions lives in the vertex shader — nothing here is recomputed on
+   * the CPU per frame.
+   *
+   * Reference is morpho.org: small sharp dots, not glowing spheres. No four
+   * point glints, no oversized hero stars, no additive blending. What sells the
+   * depth is density and parallax, and both of those are free.
+   */
   stars: {
+    countDesktop: 2500,
+    countMobile: 1000,
     /**
-     * The field is a slab in front of the camera, wrapped at both ends rather
-     * than laid along the dolly: every star's distance is folded back into
-     * [dMin, dMin + span], so the flight can run forever — on the drift alone,
-     * with nothing scrolling — without the sky thinning out. Because the wrap
-     * makes distance uniform, most of the count sits deep and off screen, which
-     * is why it is high; the slab is one draw call regardless.
+     * Base positions cover the whole camera path — startZ + zAhead down to
+     * endZ − zBeyond — which is also one period of the depth wrap, so folding a
+     * star round the back lands it on a distance the distribution already had.
      */
-    countDesktop: 3000,
-    countMobile: 1200,
+    zAhead: 5,
+    zBeyond: 30,
     /** Nearest a star comes before it wraps round to the back. */
     dMin: 1.5,
-    /** Depth of the slab. Past this the fog has taken the coins anyway. */
-    span: 26,
-    /** Fade at both depth seams, world units: about 15% of the span. */
-    fade: 4,
+    /** Fade at both depth seams, as a fraction of the span: kills the pop. */
+    fadeFraction: 0.15,
     /**
      * Height of the slab, which travels with the camera so the descent never
-     * drops out of it. Comfortably taller than the view at `span`, so the seam
-     * fade stays off screen instead of dimming the top and bottom rows.
+     * drops out of it, and its width as a multiple of that.
+     *
+     * Sized so that halfH − fadeY still covers the view at the FAR end of the
+     * span: 2 tan(fov/2) × 70 ≈ 58. Anything shorter and the far half of the
+     * field stops reaching the top and bottom of the frame, which reads as a
+     * band of sky that thins out towards the edges — measurable long before it
+     * is nameable.
      */
-    fieldH: 34,
-    fadeY: 5,
-    /** Width of the slab as a multiple of its height; covers viewports up to that aspect. */
-    widthFactor: 2.2,
+    fieldH: 68,
+    fadeY: 6,
+    widthFactor: 2.4,
     /**
-     * World units per second the field closes on the camera with nothing
-     * scrolling. Scroll adds to or subtracts from this rather than replacing
-     * it, so the drift is always forward.
+     * Three tenths of the count is drawn around cluster centres with a gaussian
+     * offset, the rest uniformly. A real sky has dense patches and empty ones;
+     * a uniform scatter reads as a grid no matter how many points are in it.
+     */
+    clusterShare: 0.3,
+    clusterCount: [8, 12],
+    clusterSigma: 9,
+    seed: 20260911,
+    /** Point size in CSS px before DPR and perspective attenuation, and its ceiling. */
+    sizeRange: [1, 2.2],
+    maxPointPx: 3,
+    /**
+     * The brightest tier reads as a highlight: a size multiplier and one soft
+     * falloff inside its own sprite. Deliberately not a bloom and not a glint —
+     * it stops well before the sprite border, so the star still reads as a
+     * point with a lit centre rather than as a ball of light.
+     */
+    /**
+     * Distance at which a star is drawn at its nominal size. The wrap makes
+     * distance uniform over the whole span, so half the field sits beyond 35
+     * units; at a reference of 12 those stars all attenuate below one device
+     * pixel and the sky reads as empty.
+     */
+    referenceDepth: 20,
+    /** Shares of the count that are pale blue and pale violet; the rest is white. */
+    blueShare: 0.11,
+    violetShare: 0.07,
+    blue: '#aec2ff',
+    violet: '#c9b8ff',
+    /**
+     * Brightness in three tiers rather than one range: an even spread of alpha
+     * reads as one grey haze, while tiers read as stars at different distances.
+     * Shares are dim, mid, bright; the remainder of each pair is its range.
+     */
+    dimShare: 0.6,
+    midShare: 0.3,
+    dimAlpha: [0.35, 0.55],
+    midAlpha: [0.6, 0.8],
+    brightAlpha: [0.9, 1],
+    /** Peak alpha swing, and the seconds a full cycle takes. Anything more reads as flicker. */
+    twinkleAmount: 0.08,
+    twinklePeriod: [6, 12],
+    /**
+     * Stars get their own fog density, gentler than the coins': the coins are
+     * meant to fall away, the sky behind them is not.
+     */
+    fogDensity: 0.01,
+    /**
+     * Idle motion. Both keep running while the page is scrolled — they stack on
+     * top of the parallax rather than taking turns with it — and both only ever
+     * run one way, so scrolling up slows the approach instead of reversing it.
+     *
+     * World units per second toward the camera, and world units per second
+     * sideways. The sideways one is a TRANSLATION, not a rotation, and its unit
+     * changed with it: a rotation puts the vanishing point off centre and the
+     * approach then reads as diagonal.
+     *
+     * At 2.625 u/s the whole field cycles through the span every 26 seconds, so
+     * the idle is no longer a drift so much as a slow flight. The seam fade is
+     * 10.3 units wide, which at this speed is 3.9 s to cross — still far more
+     * than enough to stay under any visible step.
+     *
+     * Still NOT calibrated against morpho.org, and the 0.88 trim from that
+     * brief was never applied. driftSpeed is the briefed 0.35 raised on request
+     * by 25%, then 50%, then doubled. slideSpeed cannot be traced the same way
+     * because its unit changed; it is set to about twice the on-screen rate the
+     * old yaw gave at mid depth.
      */
     driftSpeed: 0.35,
-    seed: 20260911,
-    /** Sprite size in px before DPR and distance attenuation. */
-    sizeRange: [2, 4],
-    brightShare: 0.1,
-    brightSizeRange: [6, 10],
-    /** Depth at which a star is drawn at its nominal size; nearer is larger, farther smaller. */
-    referenceDepth: 12,
-    /** CSS px, multiplied by DPR. */
-    maxPointPx: 10,
-    blueShare: 0.25,
+    slideSpeed: 0.036,
   },
 
   /**

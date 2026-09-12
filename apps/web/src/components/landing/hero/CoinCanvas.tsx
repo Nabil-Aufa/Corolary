@@ -178,9 +178,11 @@ export function CoinCanvas({ state, frame, visible, onController, onReady, onUna
       let lastScroll = window.scrollY;
       // Accumulated from the ticker's own dt, clamped like every other
       // integration here, so a hidden tab comes back where it left off rather
-      // than jumping by however long it was away. It never resets: a reset
-      // would teleport the whole field.
+      // than jumping by however long it was away. Neither ever resets: a reset
+      // would teleport the whole field, and neither ever runs backwards, so
+      // scrolling up slows the approach instead of reversing it.
       let drift = 0;
+      let slide = 0;
       let active = visible.current;
       let presented = false;
       let announced = false;
@@ -220,7 +222,9 @@ export function CoinCanvas({ state, frame, visible, onController, onReady, onUna
         const bend = softLimit(springScroll * CONFIG.bend.gain, CONFIG.bend.max);
         // Only ever forward, and only while this loop is running — which is
         // exactly when the section is on screen and the tab is visible.
-        drift += dt * (reducedMotion() ? 0 : tune.driftSpeed);
+        const idle = reducedMotion() ? 0 : 1;
+        drift += dt * tune.driftSpeed * idle;
+        slide += dt * tune.slideSpeed * idle;
 
         live.render({
           time,
@@ -229,6 +233,7 @@ export function CoinCanvas({ state, frame, visible, onController, onReady, onUna
           frame: rect,
           bend,
           drift,
+          slide,
           wipe: hero.wipe,
           clearColor: measured.color,
           pageColor: measured.pageColor,
@@ -257,6 +262,7 @@ export function CoinCanvas({ state, frame, visible, onController, onReady, onUna
             bend,
             bendPx: bend * tune.bendAmount * rect.h,
             drift,
+            slide,
             drawCalls: live.debugDrawCalls(),
             rect,
             camera: live.debugCamera(),
