@@ -194,7 +194,7 @@ Jeda itu TIDAK dibagi rata, dan batas waktu di judul tiap scene sudah
 memperhitungkannya. Jatah terbesar tetap di scene 3, karena di sanalah gambar
 bekerja sendirian: dial dan breakdown butuh dibaca, bukan diceritakan. Scene 5
 memakan lebih dari sepertiga video, dan itu memang harganya — pengungkapan token
-testnet sendirian 112 kata dan tidak boleh dipercepat, sementara kontras 150
+testnet sendirian 72 kata dan tidak boleh dipercepat, sementara kontras 150
 lawan 110 sekarang ikut diucapkan di sana.
 
 Ruangnya sudah habis. **Menambah satu kalimat saja membuat video lewat dari tiga
@@ -272,17 +272,42 @@ cursor indexer yang hidup, bukan digambar.
 selesai, lalu scroll ke ComponentBreakdown. **Klik** satu komponen supaya
 barisnya terbuka dan daftar `factId`-nya terlihat — barisnya akordeon, bukan
 tooltip, jadi hover saja tidak memperlihatkan apa pun. Hanya satu baris bisa
-terbuka pada satu waktu; pilih **Repayment volume**, yang punya fakta paling
-banyak. Beri jeda di sini, gambarnya yang bekerja.
+terbuka pada satu waktu.
+
+**Buka baris Protocol diversity**, dan itu bukan pilihan bebas. Dua alasan:
+
+- Ia punya fakta terbanyak. Terukur lewat API 2026-09-12: Protocol diversity
+  **8**, Repayment volume dan Repayment count masing-masing 5, Active standing
+  5. Versi lama dokumen ini menunjuk Repayment volume sebagai yang terbanyak,
+  dan itu keliru.
+- Ia satu-satunya yang membuat narasinya bisa diperiksa. Baris itu menampilkan
+  **50 / 100**, bukan "2 dari 4" — dan kalimat "protocol diversity, two of
+  four" baru punya sandaran di layar setelah barisnya terbuka dan penjelasnya
+  terbaca: *"Linear, 25 points for each of the four indexed protocols."*
+
+**Jangan membuka History duration atau Liquidation penalty di kamera.**
+Keduanya `factCount` nol dan tidak merender daftar bukti sama sekali,
+sementara narasi di bawah mengklaim setiap komponen menunjuk bukti spesifik.
+Empat komponen lainnya memang menunjuk; dua ini tidak, dan membukanya
+memperlihatkan persis lubang yang sedang diucapkan.
+
+Beri jeda di sini, gambarnya yang bekerja.
 
 **[SUARA]**
 > "A real mainnet wallet, not one of ours. Score 818, tier 4. No off-chain model: every component
 > is computed on-chain, and every one points at specific evidence. Repayment
-> volume, 298 of 300. Protocol diversity, two of four. Liquidation penalty, zero.
+> volume, 298 of 300. Protocol diversity, two of four. Liquidation penalty, none.
 > No black box, which is exactly where earlier credit scores failed."
 
 Catatan: kalau angka di layar berbeda, sebut angka di layar. Bentuk yang tahan
 drift: "score above 800, tier 4".
+
+"Liquidation penalty, **none**" — bukan "zero". Baris itu tidak mencetak angka;
+ia mencetak teks **"No liquidations"**, karena komponen ini bergerak ke bawah
+(rentang −300..0) sehingga "0 dari 300" akan terbaca seperti kehilangan 300
+poin, kebalikan penuh dari artinya. Mengucapkan "zero" sambil layar menulis
+"No liquidations" adalah satu-satunya baris di naskah ini yang tidak cocok
+dengan layarnya.
 
 ### Scene 4, Rantai bukti (00:59 sampai 01:31)
 
