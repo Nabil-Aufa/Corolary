@@ -242,30 +242,47 @@ async function submitBatch(row: BatchRow): Promise<void> {
     return;
   }
 
+  const batchArgs = [
+    {
+      chainKey: payload.chainKey,
+      heights: payload.heights,
+      merkleProofs: payload.merkleProofs,
+      sharedContinuityProof: payload.sharedContinuityProof,
+    },
+    payload.encodedTransactions,
+    payload.observedAts,
+  ] as const;
+
+  /**
+   * Batch yang terlalu besar DIPECAH, bukan dipindahkan ke WebSocket.
+   *
+   * Untuk batch, batas body HTTP bukan kendala yang sebenarnya — batas gas
+   * bloknya yang mengikat. Pada regresi 476 batch produksi, `gas ≈ 47,4 ×
+   * byte`, jadi payload sebesar ini mustahil masuk blok CC3 (75.000.000)
+   * lewat transport apa pun. Terukur di produksi 2026-09-12: 2.767.584 byte,
+   * perkiraan 131.842.097 gas, 1,76x batas blok.
+   *
+   * Sempat SALAH di sini: batch dialihkan ke WebSocket seperti transaksi
+   * tunggal. Itu menghapus 413 yang dulu menjadi SATU-SATUNYA pemicu
+   * pemecahan, jadi batch mustahil itu dikirim ulang terus alih-alih dipecah.
+   * Pemeriksaan ini menggantikan pemicu tersebut dengan pengukuran, dan
+   * berjalan SEBELUM nonce diklaim supaya tidak ada nonce yang terbuang.
+   */
+  const batchCallDataBytes = hexBytes(
+    registry().interface.encodeFunctionData('recordFactBatch', batchArgs as unknown as unknown[]),
+  );
+  if (needsWebSocket(batchCallDataBytes)) {
+    const reason = `payload ${batchCallDataBytes} byte melampaui batas body HTTP dan anggaran gas blok`;
+    log.warn({ batchId, callDataBytes: batchCallDataBytes }, 'batch dipecah tanpa dikirim: terlalu besar');
+    await markBatchSplit(batchId, reason);
+    await submitSingles(batchId, payload);
+    return;
+  }
+
   const nonce = await claimNextNonce();
 
   try {
-    const args = [
-      {
-        chainKey: payload.chainKey,
-        heights: payload.heights,
-        merkleProofs: payload.merkleProofs,
-        sharedContinuityProof: payload.sharedContinuityProof,
-      },
-      payload.encodedTransactions,
-      payload.observedAts,
-    ] as const;
-    // Jalurnya dipilih dari ukuran calldata, bukan dari error yang terjadi
-    // nanti. Dihitung lokal lewat `encodeFunctionData`, jadi angkanya ukuran
-    // sebenarnya dan bukan taksiran.
-    const send = (c: ethers.Contract): Promise<ethers.ContractTransactionResponse> =>
-      c.getFunction('recordFactBatch')(...args, { nonce });
-    const callDataBytes = hexBytes(
-      registry().interface.encodeFunctionData('recordFactBatch', args as unknown as unknown[]),
-    );
-    const tx = needsWebSocket(callDataBytes)
-      ? await withWebSocketRegistry(send)
-      : await send(registry());
+    const tx = await registry().getFunction('recordFactBatch')(...batchArgs, { nonce });
 
     const receipt = await tx.wait();
     if (!receipt || receipt.status !== 1) {
@@ -457,19 +474,30 @@ async function submitSingle(
     // dikirim lewat HTTP, dijawab 413, lalu ditandai fatal karena tidak ada
     // lagi yang bisa dipecah. Sekarang ukurannya diperiksa lebih dulu dan yang
     // tidak muat berjalan lewat WebSocket.
-    const send = (c: ethers.Contract): Promise<ethers.ContractTransactionResponse> =>
-      c.getFunction('recordFact')(...args, { nonce });
+    // Mengirim DAN menunggu di dalam satu cakupan.
+    //
+    // Sempat SALAH di sini: hanya pengirimannya yang dijalankan lewat soket,
+    // lalu `tx.wait()` dipanggil sesudah soketnya ditutup. Transaksinya
+    // benar-benar terkirim, tapi yang menunggu resinya adalah provider yang
+    // sudah mati — dan gejalanya `could not coalesce error`, yang
+    // diklasifikasikan `retryable` sehingga batch yang sudah berhasil dikirim
+    // dicoba lagi. Terukur di produksi 2026-09-12.
+    const sendAndWait = async (
+      c: ethers.Contract,
+    ): Promise<{ hash: string; receipt: ethers.ContractTransactionReceipt }> => {
+      const sent = await c.getFunction('recordFact')(...args, { nonce });
+      const got = await sent.wait();
+      if (!got || got.status !== 1) {
+        throw new Error(`recordFact revert on-chain: ${sent.hash}`);
+      }
+      return { hash: sent.hash, receipt: got };
+    };
     const callDataBytes = hexBytes(
       registry().interface.encodeFunctionData('recordFact', args as unknown as unknown[]),
     );
-    const tx = needsWebSocket(callDataBytes)
-      ? await withWebSocketRegistry(send)
-      : await send(registry());
-
-    const receipt = await tx.wait();
-    if (!receipt || receipt.status !== 1) {
-      throw new Error(`recordFact revert on-chain: ${tx.hash}`);
-    }
+    const { hash, receipt } = needsWebSocket(callDataBytes)
+      ? await withWebSocketRegistry(sendAndWait)
+      : await sendAndWait(registry());
 
     await markTx(bundle, 'recorded', null);
     try {
@@ -477,7 +505,7 @@ async function submitSingle(
     } catch (err) {
       log.error({ sourceTx: bundle.txHash, err: String(err) }, 'gagal menyalin fakta ke mirror');
     }
-    log.info({ batchId, txHash: tx.hash, sourceTx: bundle.txHash }, 'fakta tercatat (tunggal)');
+    log.info({ batchId, txHash: hash, sourceTx: bundle.txHash }, 'fakta tercatat (tunggal)');
   } catch (err) {
     // JANGAN sekadar `releaseNonce`. Melepas nonce mengandaikan transaksinya
     // tidak pernah tersiar — dan pada RPC yang berkedip, andaian itu salah:

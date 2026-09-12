@@ -74,6 +74,13 @@ export function hexBytes(hex: string): number {
 /**
  * Menjalankan satu pengiriman lewat WebSocket, lalu menutup soketnya.
  *
+ * `fn` HARUS mencakup `tx.wait()`, bukan hanya pengirimannya. Soketnya ditutup
+ * begitu `fn` selesai, dan resi transaksi datang lewat provider yang sama —
+ * menunggu di luar cakupan ini berarti menunggu pada provider yang sudah mati,
+ * yang muncul sebagai `could not coalesce error` dan diklasifikasikan
+ * `retryable`, sehingga transaksi yang SUDAH terkirim dikirim ulang. Terukur
+ * di produksi 2026-09-12.
+ *
  * Dibuat sesaat dan dibuang, bukan provider kedua yang hidup terus. Fakta
  * sebesar ini langka — 26 sepanjang umur proyek — dan soket yang menetap
  * membawa pekerjaan yang tidak sepadan: menyambung ulang, keepalive, dan satu
