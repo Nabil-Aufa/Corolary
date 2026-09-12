@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
   // @corolary/shared dipublikasikan sebagai ESM ber-`dist`. Transpile agar
   // Next tidak memperlakukannya sebagai paket eksternal yang sudah dibundel.
   transpilePackages: ['@corolary/shared'],
+  // The app is served on `app.localhost` in development (see src/lib/hosts.ts).
+  // Next blocks dev assets requested from any host other than the one it
+  // started on, and the symptom is not an error page: the app renders but
+  // hot reload silently stops working on that host.
+  allowedDevOrigins: ['app.localhost'],
 };
 
 export default nextConfig;
