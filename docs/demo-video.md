@@ -21,7 +21,7 @@ akhir, bukan hanya teks di deskripsi video.
 
 ### 1.1 Angka berubah, naskah tidak boleh ketinggalan
 
-Semua angka di naskah ini dibaca live **2026-09-11**. Registry terus tumbuh, dan
+Semua angka di naskah ini dibaca live **2026-09-12**. Registry terus tumbuh, dan
 skor dompet demo bergerak beberapa poin saat fakta baru masuk. **Baca ulang tepat
 sebelum merekam**, lalu ucapkan angka yang benar-benar ada di layar. Kalau ragu,
 pakai bentuk yang tahan drift: "di atas 800", "lebih dari 67 ribu fakta".
@@ -32,15 +32,20 @@ curl -s $B/v1/indexer/status | jq '{totalFacts:.data.totalFacts, wallets:.data.d
 curl -s $B/v1/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423 | jq '.data | {score, tier, collateralRatioBps}'
 ```
 
-Nilai per 2026-09-11 sebagai patokan:
+Nilai per 2026-09-12 sebagai patokan:
 
 | Angka | Nilai |
 |---|---|
-| Fakta dari Ethereum mainnet | 67.079 |
-| Dompet dengan riwayat terbukti | 10.711 |
-| Fakta 24 jam terakhir | 6.334 |
+| Fakta dari Ethereum mainnet | 72.175 |
+| Dompet dengan riwayat terbukti | 11.288 |
+| Fakta 24 jam terakhir | 5.688 |
 | Lag watcher dari head Ethereum | 0 blok |
-| Dompet demo `0x94963B92...3423` | skor **815**, tier 4, rasio **110%** |
+| Dompet demo `0x94963B92...3423` | skor **818**, tier 4, rasio **110%** |
+
+Arah driftnya satu arah dan cukup cepat: dalam sehari, fakta naik 5.096 dan
+dompet naik 577. Angka yang diucapkan di scene 3 dan 6 karena itu ikut naik,
+tidak pernah turun — kalau lupa membaca ulang, yang terjadi adalah
+MEREMEHKAN registry sendiri, bukan melebih-lebihkannya.
 
 ### 1.2 Gerbang yang wajib hijau sebelum merekam
 
@@ -51,6 +56,10 @@ yang memperlihatkan pasar beku.
 export R=https://rpc.cc3-testnet.creditcoin.network
 export PRICES=0x1fC6c2CFB9e339012B70D45977737B9e411efdc9
 export MARKET=0xd97657E361928298A342D8e5049b7aD440b167d4
+# FACTS dan GRAPH dipakai di scene 6. Diekspor di sini juga supaya terminal
+# yang sama bisa dipakai ulang saat merekam take I tanpa menyetel apa pun lagi.
+export FACTS=0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5
+export GRAPH=0x896E283FB7213650f2C65c239168fEd89F57e952
 export W=0x94963B928498bE7f06637C3D57ea1E74D7f73423
 
 # Harga harus SEGAR di kontrak, bukan di API. API menyajikan mirror Postgres
@@ -79,7 +88,23 @@ Plus cek `"marketFrozen": false` dan `"lagBlocks"` kecil di `/v1/indexer/status`
 - Jangan lakukan "repay all" di depan kamera. Bunga berjalan antara borrow dan
   repay, jadi selalu ada sisa dan itu akan terlihat seperti bug.
 
-### 1.4 Kebersihan layar
+### 1.4 Layar boot di awal setiap take
+
+Landing dan app sekarang dibuka oleh layar boot: logo Corolary digambar sebagai
+satu garis lalu terisi warna, dan ia baru terangkat setelah font dan hero
+WebGL benar-benar siap. Durasinya sekitar **2,7 detik** dan ia muncul di setiap
+pemuatan halaman penuh — termasuk setiap kali kamu me-refresh untuk mengambil
+take ulang.
+
+- Mulai potongan **setelah** layar boot terangkat, kecuali kamu memang ingin
+  memakainya sebagai pembuka video. Kalau dipakai, pakai sekali saja di take A;
+  mengulangnya di take berikutnya terbaca seperti video yang dijahit kasar.
+- Landing dan app disajikan di **host yang berbeda**, jadi membuka app dari
+  landing adalah pemuatan halaman penuh dan layar boot main lagi. Jangan kaget,
+  dan jangan merekam transisi itu sebagai satu potongan mulus.
+- Navigasi di dalam app (misalnya score ke proofs) TIDAK memunculkannya lagi.
+
+### 1.5 Kebersihan layar
 
 - Browser profil bersih: tanpa bookmark bar, tanpa ekstensi selain dompet,
   tanpa tab lain yang memuat email atau chat.
@@ -99,19 +124,36 @@ merekam, dan jangan mengarang ulang kalimat pengungkapan di scene 5: versi
 Inggris di bawah adalah terjemahan setia dari naskah kanonik berbahasa Indonesia
 di `docs/business.md` §13.1.
 
-Naskah ini sengaja pendek: **392 kata, sekitar 2 menit 40 detik** pada kecepatan
-bicara normal (150 kata per menit). Sisa 20 detik dari target 3 menit adalah
+Naskah ini sengaja pendek: **392 kata, sekitar 2 menit 37 detik** pada kecepatan
+bicara normal (150 kata per menit). Sisa 23 detik dari target 3 menit adalah
 jeda, dan jeda itu disengaja karena gambar butuh waktu untuk dibaca. **Jangan
 menambah kalimat untuk mengisi ruang kosong.** Kalau ada yang terasa kurang
 dijelaskan, biarkan: README dan deck yang menjawab, bukan video.
+
+Jeda itu TIDAK dibagi rata, dan batas waktu di judul tiap scene sudah
+memperhitungkannya. Jatah terbesar ada di scene 3, karena di sanalah gambar
+bekerja sendirian: dial dan breakdown butuh dibaca, bukan diceritakan. Yang
+paling ketat adalah scene 5, dan itu disengaja — pengungkapan token testnet
+sendirian sudah 112 kata, dan naskah ini melarang mempercepatnya.
+
+| Scene | Jatah | Bicara | Jeda |
+|---|---|---|---|
+| 1 | 18 dtk | 42 kata, 17 dtk | 1 dtk |
+| 2 | 16 dtk | 36 kata, 14 dtk | 2 dtk |
+| 3 | 28 dtk | 47 kata, 19 dtk | 9 dtk |
+| 4 | 34 dtk | 76 kata, 30 dtk | 4 dtk |
+| 5 | 48 dtk | 112 kata, 45 dtk | 3 dtk |
+| 6 | 18 dtk | 40 kata, 16 dtk | 2 dtk |
+| 7 | 18 dtk | 39 kata, 16 dtk | 2 dtk |
 
 Catatan pengucapan: `tUSDC` dibaca "tee you ess dee see", `tWETH` dibaca "tee
 weth". Alamat kontrak tidak pernah dibacakan, cukup ditampilkan.
 
 ### Scene 1, Masalah (00:00 sampai 00:18)
 
-**[LAYAR]** Landing page Corolary, scroll pelan dari hero ke bagian Statement.
-Tanpa kursor yang berkeliaran.
+**[LAYAR]** Landing page Corolary, mulai setelah layar boot terangkat. Tahan di
+hero sampai koin selesai melintas dan "What this is" terbaca, lalu scroll pelan
+ke bagian **Pipeline** (`#pipeline`). Tanpa kursor yang berkeliaran.
 
 **[SUARA]**
 > "DeFi asks everyone for 150 percent collateral. A wallet that repaid 40 Aave
@@ -119,10 +161,19 @@ Tanpa kursor yang berkeliaran.
 > reputation exists. It is just locked on another chain. Corolary proves it, then
 > prices it."
 
-### Scene 2, Solusi dalam satu kalimat (00:18 sampai 00:36)
+### Scene 2, Solusi dalam satu kalimat (00:18 sampai 00:34)
 
-**[LAYAR]** Bagian arsitektur di landing (FeatureStack atau Preview), berhenti
-pada diagram tiga lapis.
+**[LAYAR]** Lanjutan scroll yang sama: akordeon **Pipeline** (`#pipeline`),
+lima langkah dari "Real mainnet activity" sampai "Collateral efficiency", lalu
+berhenti di **Proof** (`#proof`) pada baris logo di bawah judul "Every fact
+starts on Ethereum mainnet". Label yang terbaca di sana adalah nama penuh yang
+dipakai indexer — Aave V3, Morpho Blue, SparkLend, Compound V3 — bukan nama
+pendeknya.
+
+Tidak ada lagi diagram tiga lapis di landing, dan tidak perlu dicari: akordeon
+itu menceritakan pipeline yang sama secara berurutan, dan baris logo di
+bawahnya adalah versi yang lebih kuat dari kotak arsitektur — ia dibaca dari
+cursor indexer yang hidup, bukan digambar.
 
 **[SUARA]**
 > "We read real lending activity on Ethereum mainnet, prove it through the
@@ -130,22 +181,25 @@ pada diagram tiga lapis.
 > from 150 percent to 110. Still fully over-collateralized. Proven borrowers just
 > lock less capital."
 
-### Scene 3, Skor dompet nyata (00:36 sampai 01:10)
+### Scene 3, Skor dompet nyata (00:34 sampai 01:02)
 
 **[LAYAR]** `/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423`. Tunggu dial
-selesai, lalu scroll ke ComponentBreakdown. Hover satu komponen supaya terlihat
-ia menunjuk ke fakta tertentu. Beri jeda di sini, gambarnya yang bekerja.
+selesai, lalu scroll ke ComponentBreakdown. **Klik** satu komponen supaya
+barisnya terbuka dan daftar `factId`-nya terlihat — barisnya akordeon, bukan
+tooltip, jadi hover saja tidak memperlihatkan apa pun. Hanya satu baris bisa
+terbuka pada satu waktu; pilih **Repayment volume**, yang punya fakta paling
+banyak. Beri jeda di sini, gambarnya yang bekerja.
 
 **[SUARA]**
-> "A real mainnet wallet. Score 815, tier 4. No off-chain model: every component
+> "A real mainnet wallet. Score 818, tier 4. No off-chain model: every component
 > is computed on-chain, and every one points at specific evidence. Repayment
-> volume, 297 of 300. Protocol diversity, two of four. Liquidation penalty, zero.
+> volume, 298 of 300. Protocol diversity, two of four. Liquidation penalty, zero.
 > No black box, which is exactly where earlier credit scores failed."
 
 Catatan: kalau angka di layar berbeda, sebut angka di layar. Bentuk yang tahan
 drift: "score above 800, tier 4".
 
-### Scene 4, Rantai bukti (01:10 sampai 01:40)
+### Scene 4, Rantai bukti (01:02 sampai 01:36)
 
 **[LAYAR]** Klik salah satu fakta, masuk ke `/proofs/<factId>`. Perlihatkan rel
 empat langkah: Ethereum transaction, Attested on Creditcoin, Proof built,
@@ -160,7 +214,7 @@ transaksi mainnet aslinya, dan kembali.
 > **succeeded**. So we check the receipt status ourselves, and we pick the
 > decoder by the emitting address. A copycat faking Aave events has no way in."
 
-### Scene 5, Pasar dan pengungkapan (01:40 sampai 02:20)
+### Scene 5, Pasar dan pengungkapan (01:36 sampai 02:24)
 
 **[LAYAR]** `/market`. Terlihat reserve, panel PriceProvenance, dan
 CollateralSavingsCallout yang menyebut 110 persen. Lalu buka dialog borrow,
@@ -185,7 +239,7 @@ sekitar 12 detik, jangan dipotong dan jangan dipercepat:
 **[SUARA]**, penutup scene:
 > "No centralized oracle anywhere in this system."
 
-### Scene 6, Bukti skala (02:20 sampai 02:42)
+### Scene 6, Bukti skala (02:24 sampai 02:42)
 
 **[LAYAR]** Split atau potong bergantian: halaman `/proofs` dengan daftar fakta
 yang panjang, lalu terminal yang menjalankan tiga `cast call` di bawah ini
@@ -198,15 +252,19 @@ cast call $GRAPH "scoreOf(address)(uint16,uint8)" $W --rpc-url $R
 ```
 
 **[SUARA]**
-> "Not one cherry-picked wallet. Over 67 thousand proven facts, 10 thousand
+> "Not one cherry-picked wallet. Over 70 thousand proven facts, 11 thousand
 > wallets, four mainnet protocols. And this line matters most: Sepolia is refused
 > by contract policy. Only Ethereum mainnet counts, so nobody farms a score with
 > tokens they minted themselves."
 
 ### Scene 7, Penutup (02:42 sampai 03:00)
 
-**[LAYAR]** Kembali ke landing, bagian Outro, lalu freeze pada kartu berisi
-alamat kontrak dan URL repo.
+**[LAYAR]** Kembali ke landing, bagian Outro ("Have a wallet with history?"),
+lalu terus scroll ke footer dan freeze pada kolom **Contracts** di dalam kartu
+footer, dengan wordmark "Corolary" raksasa di bawahnya.
+
+URL repo **tidak ada di halaman mana pun**, jadi ia harus datang dari overlay
+teks editor (§3.4), bukan dari sesuatu yang kamu cari di layar.
 
 **[SUARA]**
 > "FactRegistry is infrastructure. Pay for a proof once, and the fact is free to
@@ -224,17 +282,24 @@ belakangan di atas potongan yang sudah dipilih.
 
 | # | Take | Yang dibuka | Durasi mentah | Dipakai di |
 |---|---|---|---|---|
-| A | Landing, hero sampai Statement | `<URL_WEB>/` | 40 detik | Scene 1 |
-| B | Landing, bagian arsitektur | `<URL_WEB>/` (scroll) | 30 detik | Scene 2 |
+| A | Landing, hero sampai Pipeline | `<URL_WEB>/` | 40 detik | Scene 1 |
+| B | Landing, Pipeline dan Proof | `<URL_WEB>/` (scroll) | 30 detik | Scene 2 |
 | C | Score Explorer | `<URL_WEB>/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423` | 60 detik | Scene 3 |
 | D | Proof Viewer | `<URL_WEB>/proofs/<factId>` | 45 detik | Scene 4 |
 | E | Etherscan transaksi asli | tautan keluar dari take D | 15 detik | Scene 4 |
 | F | Market, keadaan awal | `<URL_WEB>/market` | 30 detik | Scene 5 |
 | G | Market, borrow sampai posisi muncul | dialog borrow plus konfirmasi dompet | 90 detik | Scene 5 |
 | H | Daftar fakta | `<URL_WEB>/proofs` | 20 detik | Scene 6 |
+| H2 | Landing, bagian Registry | `<URL_WEB>/#registry` | 15 detik | Scene 6 (opsional) |
 | I | Terminal `cast call` | iTerm atau Terminal | 40 detik | Scene 6 |
 | J | Blockscout kontrak terverifikasi | `https://creditcoin-testnet.blockscout.com/address/0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5` | 20 detik | Scene 6 atau 7 |
-| K | Landing, Outro | `<URL_WEB>/` | 20 detik | Scene 7 |
+| K | Landing, Outro sampai footer | `<URL_WEB>/` | 25 detik | Scene 7 |
+
+Take H2 opsional tapi murah: bagian **Registry** di landing menampilkan persis
+angka yang diucapkan di scene 6 (total fakta, dompet, fakta 24 jam) dalam bentuk
+yang sudah didesain, dibaca live dari `/v1/indexer/status` yang sama. Kalau
+dipakai, potong ke sana saat kalimat angkanya diucapkan, lalu kembali ke
+terminal untuk baris `allowedChainKeys`.
 
 `<URL_WEB>` diisi setelah frontend naik ke Vercel. Sampai itu ada, rekam dari
 `pnpm dev:web` di `http://localhost:3000` dan jangan pernah memperlihatkan URL
@@ -260,7 +325,8 @@ bar, karena `localhost` di video submission terbaca seperti belum ter-deploy.
 ### 3.3 Urutan kerja
 
 1. Jalankan gerbang di §1.2. Semua harus hijau.
-2. Rekam take A, B, K sekaligus (landing, satu sesi, tiga potongan).
+2. Rekam take A, B, H2, K sekaligus (landing, satu sesi, empat potongan). Satu
+   sesi berarti satu layar boot, di awal saja.
 3. Rekam C, lalu D, lalu E berurutan supaya `factId` yang dipakai konsisten
    antara ketiganya. Catat `factId`-nya.
 4. Rekam F dan G. Ini take paling rapuh; siapkan untuk mengulang.
@@ -282,6 +348,10 @@ Minimal, tapi wajib ada tiga:
   "Market tokens are testnet ERC20. Credit history, prices, and scores come from
   real Ethereum mainnet." Caption ini **melengkapi** suara, tidak menggantikannya.
 - Scene 7: alamat kontrak dan URL repo, cukup lama untuk dibaca (5 detik).
+  Alamatnya juga ada di kolom Contracts pada footer, jadi overlay-nya memperkuat
+  apa yang sudah terlihat. **URL repo tidak ada di UI sama sekali**, jadi untuk
+  URL itu overlay ini adalah satu-satunya tempat penonton bisa melihatnya, dan
+  ia tidak boleh lupa dipasang.
 
 Alamat yang ditampilkan di akhir:
 
