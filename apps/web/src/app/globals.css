@@ -265,6 +265,57 @@
     overflow: hidden;
   }
 
+  /* ── FAQ: jawaban yang membuka dan menutup dengan transisi yang SAMA ──
+   *
+   * Dulu bagian ini memakai `.slide-down`, dan itulah sebabnya terasa kasar:
+   * `.slide-down` adalah `@keyframes` yang cuma berjalan saat elemennya
+   * MUNCUL. Menutup tidak menganimasikan apa pun — kelasnya ditukar dan
+   * jawabannya hilang dalam satu frame. Jadi yang halus cuma separuh
+   * geraknya, dan separuh yang lain tidak pernah ada.
+   *
+   * `transition`, bukan `animation`, karena transisi berlaku untuk kedua arah
+   * dari satu deklarasi. `grid-template-rows` dari `0fr` ke `1fr` bisa
+   * ditransisikan di semua browser sasaran, dan tidak seperti `max-height` ia
+   * tidak menuntut angka tebakan yang harus lebih besar daripada isi
+   * sebenarnya — tebakan yang terlalu besar membuat jawaban pendek menunggu
+   * lama sebelum mulai bergerak. */
+  .faq-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    /* Kurva yang berangkat cepat lalu mendarat panjang. Isi yang tingginya
+       berbeda-beda terbaca paling wajar begini: jawaban pendek dan jawaban
+       tiga paragraf sama-sama terasa berhenti, bukan terpotong. */
+    transition:
+      grid-template-rows 520ms cubic-bezier(0.32, 0.72, 0, 1),
+      opacity 260ms ease-out;
+  }
+
+  .faq-panel.-open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    /* Isinya muncul belakangan saat membuka supaya teks tidak terbaca
+       sementara ruangnya belum ada, tapi langsung hilang saat menutup. */
+    transition:
+      grid-template-rows 520ms cubic-bezier(0.32, 0.72, 0, 1),
+      opacity 300ms ease-out 120ms;
+  }
+
+  /* Yang dipotong HARUS anak langsungnya, dan anak itu tidak boleh punya
+     padding sendiri: `overflow: hidden` memotong ISI sebuah kotak, bukan
+     padding kotak itu. Padding di sini akan bertahan walau barisnya sudah
+     nol tinggi, dan jawaban yang tertutup menyisakan celah. */
+  .faq-panel > * {
+    overflow: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .faq-panel,
+    .faq-panel.-open {
+      transition: none;
+    }
+  }
+
 
   /* ── "Why this is different": lima kartu yang membuka ───────────────────
    *

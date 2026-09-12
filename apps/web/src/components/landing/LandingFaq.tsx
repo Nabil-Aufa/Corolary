@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils';
 
 interface FaqItem {
   question: string;
-  answer: string;
+  /** Per paragraf, bukan satu blok: jawaban sepanjang ini dibaca sebagai
+   *  dinding teks kalau dirender jadi satu `<p>`. */
+  answer: string[];
 }
 
 // Enam pertanyaan yang jawabannya diambil langsung dari fakta jaringan dan
@@ -14,48 +16,72 @@ interface FaqItem {
 const ITEMS: FaqItem[] = [
   {
     question: 'What is actually being proven here?',
-    answer:
-      'Three things, together: that a transaction was included in a specific Ethereum mainnet block, that the source transaction actually succeeded (not reverted), and that the log came from the address of a registered protocol, not an impersonating contract. All three checks run on-chain before a fact is stored.',
+    answer: [
+      'Three things, together: that a transaction was included in a specific Ethereum mainnet block, that the source transaction actually succeeded (not reverted), and that the log came from the address of a registered protocol, not an impersonating contract.',
+      'All three checks run on-chain before a fact is stored.',
+    ],
   },
   {
     question: 'Why Creditcoin testnet if the data is Ethereum mainnet?',
-    answer:
-      'Creditcoin CC3 Testnet can read Ethereum mainnet through Attestcoin using chainKey 3. That lets the product satisfy a testnet deployment requirement without ever falling back to seeded or synthetic data.',
+    answer: [
+      'Creditcoin CC3 Testnet can read Ethereum mainnet through Attestcoin using chainKey 3.',
+      'That lets the product satisfy a testnet deployment requirement without ever falling back to seeded or synthetic data.',
+    ],
   },
   {
     question: 'Is this unsecured lending?',
-    answer:
-      'No. Every loan stays over-collateralized. A proven wallet simply needs to lock up less capital against it — the required ratio moves from 150% down to a floor of 110%, it never reaches zero.',
+    answer: [
+      'No. Every loan stays over-collateralized.',
+      'A proven wallet simply needs to lock up less capital against it. The required ratio moves from 150% down to a floor of 110%, and it never reaches zero.',
+    ],
   },
   {
     question: 'How long until a new transaction counts?',
-    answer:
-      'Roughly eight minutes for Attestcoin attestors to reach consensus on the block, then the proof is built and submitted on-chain. Nothing is proven on demand from stale history.',
+    answer: [
+      'Roughly eight minutes for Attestcoin attestors to reach consensus on the block, then the proof is built and submitted on-chain.',
+      'Nothing is proven on demand from stale history.',
+    ],
   },
   {
     question: 'Which protocols are read?',
-    answer:
-      'Aave V3, Morpho Blue, Compound, and SparkLend for borrowing and repayment history, plus Chainlink for the prices used to value collateral.',
+    answer: [
+      'Aave V3, Morpho Blue, Compound, and SparkLend for borrowing and repayment history.',
+      'Chainlink is read separately, for the prices used to value the collateral behind a loan.',
+    ],
   },
   {
     question: 'Can I check this myself?',
-    answer:
-      'Yes. Every fact carries both the Creditcoin transaction that recorded it and the Ethereum transaction it was proven from, and both can be opened directly in a block explorer.',
+    answer: [
+      'Yes. Every fact carries both the Creditcoin transaction that recorded it and the Ethereum transaction it was proven from.',
+      'Both can be opened directly in a block explorer.',
+    ],
   },
 ];
 
 /**
  * FAQ akordeon di atas panel gelap.
  *
- * Beda dari `Faq.tsx` lama (details/summary murni): di sini state dipegang
- * React supaya hanya SATU jawaban terbuka sekaligus — details/summary asli
- * tidak punya cara bawaan untuk memaksa itu tanpa nama grup, yang belum
- * didukung merata. `aria-expanded`/`aria-controls` menggantikan semantik
- * yang otomatis didapat details/summary secara gratis.
+ * BEBERAPA jawaban boleh terbuka sekaligus, dan itu perubahan dari versi
+ * sebelumnya yang memaksa hanya satu. Membuka satu jawaban lalu menutup
+ * jawaban yang sedang dibaca orangnya adalah hal yang tidak pernah diminta
+ * pembaca; ia juga membuat halaman melompat, karena tinggi yang hilang di
+ * atas menarik seluruh isi ke atas di tengah klik.
+ *
+ * Karena state-nya dipegang React dan bukan `details`/`summary`,
+ * `aria-expanded` dan `aria-controls` harus ditulis sendiri — keduanya
+ * didapat gratis kalau memakai elemen bawaan, dan hilang tanpa gejala kalau
+ * lupa.
  */
 export function LandingFaq() {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [openSet, setOpenSet] = useState<ReadonlySet<number>>(() => new Set());
   const idBase = useId();
+
+  const toggle = (i: number) =>
+    setOpenSet((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(i)) next.add(i);
+      return next;
+    });
 
   return (
     <div id="faq" className="mkt-container py-[clamp(80px,10vw,160px)]">
@@ -63,7 +89,7 @@ export function LandingFaq() {
 
       <div className="mt-14">
         {ITEMS.map((item, i) => {
-          const open = openIndex === i;
+          const open = openSet.has(i);
           const panelId = `${idBase}-panel-${i}`;
           const buttonId = `${idBase}-button-${i}`;
 
@@ -77,15 +103,18 @@ export function LandingFaq() {
                 id={buttonId}
                 aria-expanded={open}
                 aria-controls={panelId}
-                onClick={() => setOpenIndex(open ? null : i)}
-                className="flex w-full items-center justify-between gap-6 py-7 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                onClick={() => toggle(i)}
+                className="flex w-full items-center justify-between gap-6 py-[clamp(22px,2.4vw,34px)] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 <span className="text-mkt-h3 text-panel-ink-900">{item.question}</span>
+                {/* Satu ikon untuk dua keadaan: `+` yang diputar 45 derajat
+                    JADI `×`. Menukar dua ikon berbeda memutus transisinya —
+                    yang tergantikan tidak bisa beranimasi menjadi penggantinya. */}
                 <Plus
                   aria-hidden="true"
                   className={cn(
-                    'h-6 w-6 shrink-0 text-panel-ink-500 transition-transform',
-                    open && 'rotate-45',
+                    'h-6 w-6 shrink-0 text-panel-ink-500 transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
+                    open && 'rotate-45 text-panel-ink-900',
                   )}
                 />
               </button>
@@ -94,11 +123,30 @@ export function LandingFaq() {
                 id={panelId}
                 role="region"
                 aria-labelledby={buttonId}
-                className={cn(open ? 'slide-down' : 'grid grid-rows-[0fr] opacity-0')}
+                className={cn('faq-panel', open && '-open')}
               >
-                <p className="max-w-[60ch] overflow-hidden pb-7 text-body text-panel-ink-700">
-                  {item.answer}
-                </p>
+                <div>
+                  {/* Padding ada di SINI, bukan di anak langsung `.faq-panel`.
+                      Anak itu yang dipotong `overflow: hidden`, dan potongan
+                      itu tidak menyentuh padding miliknya sendiri — jawaban
+                      yang tertutup akan menyisakan celah setinggi paddingnya. */}
+                  <div className="flex flex-col gap-5 pb-[clamp(32px,4vw,64px)] pt-[clamp(4px,1vw,16px)]">
+                    {/* `text-body` (15px) terlalu kecil di sini: ia ukuran untuk
+                        teks pendamping di kolom sempit, sementara jawaban ini
+                        membentang selebar kontainer. Baris sepanjang itu butuh
+                        badan huruf yang lebih besar dan jarak baris yang lebih
+                        longgar supaya mata tidak kehilangan barisnya saat
+                        kembali ke kiri. */}
+                    {item.answer.map((paragraph) => (
+                      <p
+                        key={paragraph}
+                        className="text-[clamp(16px,1.15vw,20px)] leading-[1.6] text-panel-ink-700"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           );
