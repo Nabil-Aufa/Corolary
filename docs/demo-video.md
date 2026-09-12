@@ -102,20 +102,46 @@ mengucapkan "**this** wallet borrows at 110 percent" sambil mengoperasikan
 dompet. Kalimat itu mengubah data publik yang kita buktikan menjadi klaim
 kepemilikan yang tidak benar.
 
+### 1.3b Supply BUKAN kolateral, dan salah memilihnya menggagalkan take G
+
+Pasar ini punya dua ember yang berbeda, dan `MarketActionDialog.tsx` sengaja
+memisahkannya di UI karena perbedaannya mustahil ditebak dari luar:
+
+| Menu di baris aset | Keterangan di layar | Fungsi kontrak |
+|---|---|---|
+| **Supply** | "Earn interest. **Does not back borrowing.**" | `supply` |
+| **Collateral** | "**Backs borrowing.** Earns nothing." | `depositCollateral` |
+| **Borrow** | "Against your collateral, at your proven ratio." | `borrow` |
+
+Menyetor lewat **Supply** membuat kolateral tetap nol, dan `borrow` akan revert.
+Tombol Borrow-nya tetap terlihat siap ditekan sampai detik transaksinya
+dikirim — jadi kalau persiapannya salah, yang gagal adalah rekaman, bukan
+persiapannya.
+
 **Yang harus disiapkan pada dompet tim, sebelum kamera menyala:**
 
 - **CTC untuk gas.** Diperiksa lebih dulu, jangan diasumsikan. Dompet demo yang
   lama ternyata nol, dan itu baru ketahuan saat dicek: `cast balance <ALAMAT>
   --rpc-url $R`.
-- **Klaim tUSDC lewat tombol faucet di halaman Market**, supaya scene borrow
-  tidak terpotong menunggu transaksi faucet.
+- **Sambungkan dompet dan pastikan jaringannya Creditcoin CC3.** Kalau salah
+  jaringan, setiap tombol aksi berubah jadi "Switch to Creditcoin CC3 first"
+  dan mati.
+- **Klaim tUSDC** lewat tombol **"Get testnet tokens"** (ikon tetesan air) di
+  header halaman Market. Sekali per jam per token, langsung dari kontrak.
+- **Setor kolateral lewat menu Collateral → Add**, bukan Supply. Ini butuh DUA
+  tanda tangan — `approve` dulu, lalu `depositCollateral` — dan justru karena
+  itu ia dikerjakan di luar kamera. Jumlah yang disarankan **1.000 tUSDC**:
+  dompet tim berskor 0 sehingga rasionya 150%, jadi pagu pinjamnya sekitar 660.
+- **Verifikasi di bagian "Your position"** bahwa kolateralnya benar-benar
+  tercatat. Kalau di sana masih tertulis "No active position", langkah
+  sebelumnya gagal dan jangan lanjut merekam.
 - **Pinjam tUSDC, bukan tWETH.** Terukur 2026-09-12: reserve tWETH punya
   `totalSupplied` nol dan `borrowEnabled` **false**, jadi tWETH memang tidak
-  bisa dipinjam. tUSDC punya likuiditas 10.000.
-- **Siapkan posisi supply lebih dulu**, sehingga di kamera yang terlihat hanya
-  satu transaksi: borrow.
+  bisa dipinjam. tUSDC punya likuiditas 10.000 dan harganya segar — $0,999864,
+  umur 23.575 detik dari anggaran 100.800.
 - **Jangan lakukan "repay all" di depan kamera.** Bunga berjalan antara borrow
-  dan repay, jadi selalu ada sisa dan itu akan terlihat seperti bug.
+  dan repay, jadi selalu ada sisa — terukur pernah menyisakan 15 unit — dan itu
+  akan terlihat seperti bug.
 
 ### 1.4 Layar boot di awal setiap take
 
@@ -283,11 +309,42 @@ sama (§1.3 menjelaskan kenapa ada dua alamat):
 2. `/market` dengan **dompet tim** terhubung: reserve, panel PriceProvenance,
    dan kartu yang menyebut **150%** karena dompet itu belum punya apa pun yang
    terbukti.
-3. Buka dialog borrow **tUSDC**, kirim transaksi, tunggu konfirmasi, posisi
-   muncul di PositionTable dengan health factor.
+3. Borrow **tUSDC**, langkah demi langkah di bawah.
 
 Borrow-nya nyata dan ditandatangani sendiri. Yang tidak dilakukan adalah
 berpura-pura meminjam sebagai dompet yang kuncinya bukan milik kita.
+
+**Urutan klik untuk potongan ketiga (take G).** Persiapan §1.3 sudah beres,
+jadi yang tersisa di kamera hanya **satu tanda tangan**: `borrow` tidak menarik
+token dari dompet sehingga ia tidak pernah menyentuh `approve`.
+
+1. Baris **tUSDC** di tabel reserve → tombol menu di ujung kanan baris →
+   **Borrow**. Dialog terbuka, berjudul "Borrow · tUSDC".
+2. Ketik **500**. **Jangan tekan Max**: pagunya sudah dipotong 0,5% untuk bunga
+   yang berjalan sehingga angkanya ganjil, dan meminjam mepet pagu membuat
+   health factor terlihat mengkhawatirkan di layar tepat saat produknya sedang
+   dijual.
+3. Dua hal muncul bersamaan di sini, dan keduanya dipakai: **HealthFactorBar**
+   di bawah ringkasan, dan microcopy tepat di bawah tombol — "tUSDC is a testnet
+   ERC-20. Prices, credit history, and scores come from real Ethereum mainnet
+   activity proven through Attestcoin." **Di frame inilah pengungkapan lisan
+   diucapkan**; teksnya sudah di layar mengatakan hal yang sama, jadi suaranya
+   melengkapi, bukan berdiri sendirian.
+4. Klik **Borrow**. Dialog berganti jadi "Borrow in progress — Confirm in your
+   wallet, then wait for the Creditcoin block". Tanda tangani di dompet.
+5. Tunggu blok. Ini satu-satunya bagian video yang durasinya tidak bisa
+   dikendalikan — rekam utuh, percepat 2x sampai 4x saat editing, beri label
+   "sped up" (§3.2).
+6. Layar sukses: **"Borrow confirmed"** dengan tautan "View on Creditcoin
+   explorer". Tahan sebentar; tautan itu yang membuat borrow-nya bisa dicek
+   penonton sendiri.
+7. **"Back to market"** → gulir ke **"Your position"**: baris utang tUSDC dan
+   bilah health factor sekarang terisi.
+
+Kalau borrow gagal, periksa gas SEBELUM menyalahkan kontraknya. CC3
+mengestimasi terhadap state beberapa blok lebih tua, dan kehabisan gas di sini
+menyerupai revert logika — satu-satunya pembeda adalah `gasUsed` yang PERSIS
+sama dengan `gasLimit`.
 
 **[SUARA]**, bagian pertama:
 > "The score arrives here as a price. This wallet has nothing proven yet, so it
@@ -405,7 +462,9 @@ yang belum ter-deploy.
    antara ketiganya. Catat `factId`-nya.
 4. Rekam F2 lebih dulu selagi belum ada dompet terhubung — begitu dompet tim
    tersambung, kartu 110% itu tidak bisa diambil lagi tanpa memutus koneksi.
-   Lalu F dan G. G take paling rapuh; siapkan untuk mengulang.
+   Lalu sambungkan dompet, **selesaikan seluruh persiapan §1.3 di luar
+   kamera** (faucet, lalu Collateral → Add dengan dua tanda tangannya), baru
+   rekam F dan G. G take paling rapuh; siapkan untuk mengulang.
 5. Rekam H, I, J.
 6. Susun kasar tanpa suara, potong ke target 3 menit, baru rekam voice over.
 7. Voice over dalam bahasa Inggris: satu take per scene, mikrofon dekat, ruangan
@@ -463,6 +522,10 @@ sungguhan. Yang ketiga adalah pembeda teknis paling tajam yang kita punya.
 - [ ] Angka yang diucapkan cocok dengan angka di layar
 - [ ] Tidak ada satu kalimat pun yang mengaku memiliki `0x94963B92...3423`
 - [ ] Kontras 150 lawan 110 benar-benar terlihat di layar, bukan cuma diucapkan
+- [ ] Kolateral dompet tim disetor lewat **Collateral → Add**, bukan Supply, dan
+      terlihat di "Your position" sebelum take G dimulai
+- [ ] Take G hanya memperlihatkan SATU tanda tangan; faucet dan approve sudah
+      selesai di luar kamera
 - [ ] Narasi seluruhnya berbahasa Inggris, termasuk kalimat pengungkapan
 - [ ] Pengungkapan token testnet **diucapkan** di scene 5, bukan hanya caption
 - [ ] Tidak ada private key, seed phrase, isi `.env`, atau notifikasi pribadi di frame
