@@ -5,6 +5,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { claimBootGate, resolveBootGate } from '@/lib/boot';
 import { connectLenisToScrollTrigger } from '@/lib/lenis-gsap';
 import { cn } from '@/lib/utils';
 import { coinBlur, coinFog, coinNearFade, projectCoins } from './coin-path';
@@ -103,6 +104,35 @@ export function HeroScroll() {
   useEffect(() => {
     if (mode === 'static') return;
     return connectLenisToScrollTrigger();
+  }, [mode]);
+
+  /**
+   * Gerbang kesiapan untuk layar boot (components/marketing/BootScreen.tsx).
+   *
+   * Diklaim tanpa syarat saat mount dan diselesaikan dari DUA arah, karena
+   * hero punya tiga mode dan hanya satu di antaranya yang pernah menggambar
+   * frame WebGL. Menunggu `onReady` saja berarti klien reduced-motion dan
+   * klien tanpa WebGL menatap layar boot sampai batas waktunya habis.
+   */
+  useEffect(() => claimBootGate('hero'), []);
+
+  useEffect(() => {
+    if (mode !== 'webgl') {
+      resolveBootGate('hero');
+      return;
+    }
+
+    // Dan satu arah ketiga: dokumen yang tersembunyi. CoinCanvas menolak
+    // menggambar selagi `document.hidden` benar, jadi di tab latar `onReady`
+    // BUKAN sesuatu yang datang terlambat, ia tidak akan datang sama sekali
+    // sampai tabnya dilihat. Menunggunya berarti layar boot bertahan sampai
+    // batas waktunya habis untuk halaman yang tidak sedang ditonton siapa pun.
+    const settleIfHidden = () => {
+      if (document.hidden) resolveBootGate('hero');
+    };
+    settleIfHidden();
+    document.addEventListener('visibilitychange', settleIfHidden);
+    return () => document.removeEventListener('visibilitychange', settleIfHidden);
   }, [mode]);
 
   useGSAP(
@@ -258,6 +288,7 @@ export function HeroScroll() {
 
   const handleReady = () => {
     if (placeholder.current !== null) placeholder.current.style.visibility = 'hidden';
+    resolveBootGate('hero');
   };
 
   const handleUnavailable = () => {

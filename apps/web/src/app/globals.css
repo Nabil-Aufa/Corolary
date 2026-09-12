@@ -7,6 +7,21 @@
    ThemeToggle benar-benar menang atas preferensi sistem. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Posisi pena yang menggambar logo di layar boot, 0 sampai 1.
+ *
+ * Harus terdaftar lewat `@property`, bukan sekadar custom property biasa:
+ * properti tak terdaftar bertipe <string> dan TIDAK bisa ditransisi — ia akan
+ * melompat dari 0 ke 1 di tengah durasi tanpa satu pun error. `syntax` inilah
+ * yang membuat browser memperlakukannya sebagai angka dan menginterpolasinya.
+ *
+ * `inherits: true` disengaja: animasinya berjalan di <svg>, sementara yang
+ * membaca nilainya adalah tiap <path> di dalamnya. */
+@property --boot-pen {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 /* Jembatan token CSS → utility Tailwind. Nilainya hidup di tokens.css supaya
    ada SATU tempat yang mendefinisikan warna; di sini hanya dipetakan. */
 @theme inline {
@@ -862,6 +877,216 @@
     .feature-item-accordion {
       grid-template-rows: 1fr;
     }
+  }
+
+
+  /* ── Layar boot landing ──────────────────────────────────────────────
+   * Logo digambar sebagai garis dulu (keyframe, bukan transisi: ini
+   * pembukaan yang hanya pernah berjalan satu arah, dan transisi tidak
+   * pernah menyala dari nilai awalnya sendiri), lalu warnanya terisi naik
+   * dari bawah mengikuti `--boot-fill` yang ditulis React dari progres
+   * kesiapan sungguhan.
+   *
+   * Pemotongnya `overflow: hidden` pada div biasa, bukan mask SVG. Logo di
+   * dalam pemotong WAJIB berukuran sama dengan yang di luar dan menempel ke
+   * dasarnya — kalau ia ikut ukuran pemotongnya, yang terjadi bukan logo
+   * yang tersingkap melainkan logo yang memendek. */
+  .boot-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-bg);
+    color: var(--color-ink-900);
+    /* Sentuhan di layar ini tidak boleh menggulir halaman di belakangnya. */
+    touch-action: none;
+
+    /* Diangkat ke atas seperti isian tombol Launch App, bukan dipudarkan.
+     *
+     * Gerakannya cerminan `.btn-ripple > span` di marketing-navbar.css: di
+     * sana isian NAIK dari bawah dengan tepi depan berkubah yang merata
+     * ketika sampai; di sini layarnya naik keluar dengan tepi bawah yang
+     * justru MEMBENTUK kubah selagi pergi. Easing dan trik lag-nya diambil
+     * persis dari sana, jadi keduanya terasa satu keluarga.
+     *
+     * Dua hal SENGAJA dibalik, karena tombolnya DATANG sementara layar ini
+     * PERGI, dan menyalin angkanya mentah-mentah justru merusak kemiripannya:
+     *
+     * 1. Kurvanya adalah pembalikan waktu persis dari milik tombol —
+     *    `cubic-bezier(1, 0, 0.6, 1)` terhadap `cubic-bezier(0.4, 0, 0, 1)`,
+     *    lewat (1-x2, 1-y2, 1-x1, 1-y1). Jadi kepergian ini benar-benar
+     *    kedatangan tombol yang diputar mundur. Memakai kurva aslinya apa
+     *    adanya terukur memindahkan layar 75% jaraknya dalam 200ms pertama:
+     *    di kotak setinggi 50px itu terasa hidup, di kotak setinggi satu layar
+     *    itu terbaca sebagai sentakan, dan kubahnya belum sempat terbentuk.
+     *
+     * 2. Radiusnya lebih CEPAT daripada perpindahannya (0,42s lawan 0,62s),
+     *    kebalikan dari tombol yang justru melambatkannya. Asimetrinya sama,
+     *    arahnya yang berbeda: saat datang, radius adalah yang terakhir
+     *    selesai; saat pergi, ia yang pertama terjadi — tepi bawahnya
+     *    mengubah bentuk dulu, baru layarnya ditarik naik. Jeda itulah yang
+     *    dicatat tombolnya sebagai penyebab kesan zat cair.
+     *
+     * TIDAK ada opacity. Memudarkan berarti halaman di baliknya menembus
+     * layar boot selama setengah detik, dan keadaan setengah jadi itu persis
+     * yang seluruh gunanya layar ini adalah menutupinya. */
+    transform: translateY(0);
+    border-radius: 0;
+    transition:
+      transform 0.62s cubic-bezier(1, 0, 0.6, 1),
+      border-radius 0.42s cubic-bezier(0.4, 0, 0, 1);
+    will-change: transform;
+  }
+
+  .boot-screen[data-phase='exit'] {
+    /* 101%, sama dengan tombolnya: 100% menyisakan garis rambut di tepi atas
+       pada tinggi viewport yang pecahan. */
+    transform: translateY(-101%);
+
+    /* Sintaks elips, bukan `50%` bulat seperti di tombol. Radius 50% pada
+       kotak setinggi 50px menghasilkan kubah setinggi 25px; pada kotak
+       setinggi satu layar ia menghasilkan lengkung yang berangkat dari
+       tengah-tengah halaman. Jari-jari mendatar tetap selebar setengah layar,
+       jari-jari tegaknya dibatasi 14% tinggi supaya kubahnya lebar dan
+       dangkal — proporsi yang sama dengan yang terbaca di tombolnya. */
+    border-radius: 0 0 50% 50% / 0 0 14% 14%;
+    pointer-events: none;
+  }
+
+  .boot-logo {
+    --boot-logo-size: clamp(120px, 13vw, 200px);
+    position: relative;
+    width: var(--boot-logo-size);
+    height: var(--boot-logo-size);
+  }
+
+  .boot-logo-outline,
+  .boot-logo-solid {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: var(--boot-logo-size);
+    height: var(--boot-logo-size);
+  }
+
+  .boot-logo-outline {
+    stroke: currentColor;
+    /* `non-scaling-stroke` di path-nya membuat angka ini piksel layar, bukan
+       satuan viewBox 439 — jadi ia TIDAK ikut tumbuh bersama logonya, dan
+       harus dinaikkan sendiri ketika logonya dibesarkan. */
+    stroke-width: 1.5;
+    opacity: 0.3;
+  }
+
+  /* Digambar sebagai SATU garis: satu path selesai, baru path berikutnya
+   * mulai, dengan kecepatan pena yang sama dari awal sampai akhir.
+   *
+   * Dua hal yang membuatnya benar-benar terbaca sebagai satu garis, dan
+   * keduanya tidak bisa dilakukan CSS sendirian:
+   *
+   * 1. **Durasi tiap ruas sebanding panjang aslinya.** `pathLength="1"`
+   *    menyeragamkan ketiganya ke panjang 1, jadi durasi yang sama berarti
+   *    palang pendek digambar merayap sementara cincin luar yang jauh lebih
+   *    panjang melesat. Panjang sebenarnya cuma diketahui `getTotalLength()`,
+   *    jadi BootScreen.tsx mengukurnya lalu menuliskan `--boot-seg-*` ke tiap
+   *    path. Sampai itu terjadi, animasinya BELUM dideklarasikan sama sekali
+   *    (kelas `-drawing`) — animasi berdurasi nol dengan `forwards` akan
+   *    langsung melompat ke garis yang sudah jadi.
+   *
+   * 2. **`linear`.** Dua alasan. Easing per ruas berarti pena melambat lalu
+   *    menyentak di tiap sambungan, dan sambungan itulah yang justru tidak
+   *    boleh terlihat. Dan tinta memang tersebar RATA sepanjang tiap path —
+   *    terukur dengan mencacah piksel per 5% panjang: path terpanjang menambah
+   *    0,167% sampai 0,203% luas kanvas di setiap langkah, tanpa satu pun
+   *    bagian mati. Jadi kecepatan panjang yang tetap benar-benar berarti
+   *    kecepatan terlihat yang tetap; tidak ada yang perlu dikompensasi.
+   *
+   * Catatan buat siapa pun yang mengira ini macet di tengah: tiap path adalah
+   * kontur bentuk TERTUTUP, jadi pena berangkat menyusuri tepi luar lalu
+   * kembali menyusuri tepi dalam. Paruh keduanya menggambar lengkung yang
+   * sejajar dan berdekatan dengan yang sudah ada, jadi pada ukuran kecil ia
+   * terlihat seperti tidak berubah padahal berubah. Diperiksa pada render
+   * 300px: 30% tepi luar terbuka, 50% tepi luar menutup dan tepi dalam mulai,
+   * 70% tepi dalam hampir penuh, 100% rapat. */
+  .boot-logo-outline path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .boot-logo-outline.-drawing path {
+    animation: boot-draw var(--boot-seg-duration) linear var(--boot-seg-delay) forwards;
+  }
+
+  /* Pengukuran gagal (SVG tak terpasang, path kosong). Logo yang tidak pernah
+     muncul sama sekali jauh lebih buruk daripada logo tanpa animasi. */
+  .boot-logo-outline.-static path {
+    stroke-dashoffset: 0;
+  }
+
+  /* ── Satu pena, satu easing ──
+   * Tiga animasi berurutan `linear` di atas sudah menyambung mulus di
+   * kecepatan, tapi ia tidak bisa berangkat dari diam dan berhenti dengan
+   * lembut: easing per ruas berarti pena melambat lalu menyentak di tiap
+   * sambungan, dan easing global mustahil kalau timeline-nya ada tiga.
+   *
+   * `--boot-pen` menyatukan ketiganya jadi SATU timeline. Yang dianimasikan
+   * cuma satu angka di <svg>; tiap path menurunkan dashoffset-nya sendiri dari
+   * angka itu lewat `clamp`, jadi ruas yang belum giliran menjawab 1 (kosong)
+   * dan yang sudah lewat menjawab 0 (penuh) tanpa perlu jeda atau durasi
+   * sendiri. Satu easing berlaku untuk seluruh logo.
+   *
+   * Butuh `@property`, jadi ia dipasang oleh JS hanya kalau browsernya sanggup
+   * (BootScreen.tsx). Yang tidak sanggup tetap dapat versi tiga animasi di
+   * atas, yang sudah benar — cuma ujung-ujungnya lebih tegas. */
+  .boot-logo-outline.-pen path {
+    animation: none;
+    stroke-dashoffset: clamp(
+      0,
+      calc((var(--boot-seg-end) - var(--boot-pen)) / var(--boot-seg-span)),
+      1
+    );
+  }
+
+  .boot-logo-outline.-pen.-drawing {
+    /* Ujung lembut di kedua sisi, kecepatan nyaris tetap di tengah. Kurva
+       masuk-keluar yang lebih tajam akan menghabiskan durasinya untuk
+       melambat, dan yang justru ingin dilihat di sini adalah penanya jalan. */
+    animation: boot-pen var(--boot-draw-duration) cubic-bezier(0.16, 0, 0.84, 1) forwards;
+  }
+
+  @keyframes boot-pen {
+    from {
+      --boot-pen: 0;
+    }
+    to {
+      --boot-pen: 1;
+    }
+  }
+
+  @keyframes boot-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .boot-fill {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: var(--boot-fill, 0%);
+    overflow: hidden;
+    /* Easing merata, BUKAN kurva curtain `(0.32, 0.72, 0, 1)` yang dipakai
+       panel. Kurva itu depan-berat: terukur 78% dalam 140ms pertama, jadi
+       isinya menyentak ke hampir penuh lalu merayap — yang membaca seperti
+       lompatan, bukan seperti sesuatu yang sedang terisi. */
+    transition: height 560ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   @media (prefers-reduced-motion: reduce) {
