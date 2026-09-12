@@ -859,6 +859,31 @@
     }
   }
 
+  /* ── Di bawah 600px art-nya menyerah ──
+   * Art lebarnya 40% kartu, dan itu diambil dari kolom teks lewat
+   * `padding-right` pada `-inner`. Sampai sekitar 600px masih ada ruang untuk
+   * keduanya; di bawah itu tidak. Terukur pada 390px dengan art masih
+   * terpasang: kolom teks tinggal 171px dari kartu 342px, dan judulnya pecah
+   * jadi dua baris. Di lebar sekecil itu art juga sudah tidak terbaca sebagai
+   * bentuk apa pun, jadi yang dilepas adalah bagian yang paling sedikit
+   * kehilangan artinya. */
+  @media (width < 600px) {
+    .feature {
+      --fa-pad: 20px;
+      --fa-pad-end: 20px;
+    }
+
+    .feature-item-bg {
+      display: none;
+    }
+
+    /* Wajib ikut: tanpa art, padding sebesar art hanya menyisakan lubang
+       selebar 40% di sisi kanan setiap paragraf. */
+    .feature-item-inner {
+      padding-right: var(--fa-pad);
+    }
+  }
+
   /* ── Reduced motion: langsung di keadaan akhir ──
    * Bukan "animasi yang dipercepat". Seluruh isi teks ada di dalam akordeon,
    * jadi memotong durasinya saja akan menyisakan lima kartu yang isinya tetap
