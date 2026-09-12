@@ -2,6 +2,7 @@ import { sql } from '../db/client.js';
 import { stageLogger } from '../logger.js';
 import { backfillSubject } from '../backfill/run.js';
 import { oldestUnprovenAgeSeconds, CRITICAL_AGE_SECONDS } from '../metrics.js';
+import { priceFreshness } from '../prices/run.js';
 
 const log = stageLogger('backfill');
 
@@ -86,7 +87,6 @@ const WATCHER_STALE_SECONDS = 300;
  * Verifikasi sungguhan wajib lewat `cast call tryToUsd1e18` terhadap kontrak,
  * bukan lewat tabel ini: mirror bisa terlihat sehat sementara registry kosong.
  */
-const PRICE_STALE_SECONDS = 90 * 60;
 
 /** Berapa lama job yang ditunda diam sebelum dicek ulang. */
 const POSTPONE_MINUTES = 5;
@@ -110,22 +110,19 @@ interface HealthCheck {
  * a. Watcher tertinggal — cursor mana pun basi lebih dari `WATCHER_STALE_SECONDS`.
  * b. Backlog proving sudah menua — melewati `CRITICAL_AGE_SECONDS` (metrics.ts).
  * c. Harga mendekati basi — mirror `prices` menunjukkan feed mana pun sudah
- *    melewati `PRICE_STALE_SECONDS` sejak update on-chain terakhirnya.
+ *    melewati anggaran kontraknya sendiri (`maxAgeFor`), per feed.
  *
  * Tabel kosong (belum ada cursor / belum ada harga) TIDAK dianggap tertekan —
  * itu kondisi bootstrap, bukan kondisi macet.
  */
 async function checkHealth(): Promise<HealthCheck> {
-  const [cursorRows, unprovenAge, priceRows] = await Promise.all([
+  const [cursorRows, unprovenAge, feeds] = await Promise.all([
     sql<{ stalest_seconds: number | null }[]>`
       SELECT EXTRACT(EPOCH FROM (now() - min(updated_at)))::float8 AS stalest_seconds
       FROM source_cursors
     `,
     oldestUnprovenAgeSeconds(),
-    sql<{ oldest_seconds: number | null }[]>`
-      SELECT max(EXTRACT(EPOCH FROM now())::bigint - updated_at) AS oldest_seconds
-      FROM prices
-    `,
+    priceFreshness(),
   ]);
 
   const cursorStaleSeconds = cursorRows[0]?.stalest_seconds ?? null;
@@ -143,12 +140,31 @@ async function checkHealth(): Promise<HealthCheck> {
     };
   }
 
-  const priceOldestSeconds = priceRows[0]?.oldest_seconds ?? null;
-  if (priceOldestSeconds !== null && priceOldestSeconds > PRICE_STALE_SECONDS) {
-    return {
-      ok: false,
-      reason: `harga mendekati basi — feed paling tua ${Math.round(priceOldestSeconds)}s sejak update on-chain (ambang ${PRICE_STALE_SECONDS}s)`,
-    };
+  // Diukur terhadap anggaran MASING-MASING feed yang dibaca dari kontrak, bukan
+  // terhadap satu angka bulat. Ambang lama 90 menit adalah dua kesalahan
+  // sekaligus, dan keduanya terukur di produksi 2026-09-12.
+  //
+  // Pertama, ia mustahil tidak tersandung: heartbeat USDC/USD dan USDT/USD
+  // adalah 24 jam dengan anggaran kontrak 100.800 detik, jadi umur 68.502
+  // detik itu SEHAT menurut kontrak sementara ambang ini menyebutnya basi.
+  // Artinya setiap job backfill ditunda selamanya — fitur "scan dompet ini"
+  // tidak pernah berjalan sekali pun.
+  //
+  // Kedua, `max(... ::bigint - updated_at)` membuat postgres.js mengembalikan
+  // BigInt, dan `Math.round` atas BigInt MELEMPAR. Jadi cabang yang selalu
+  // diambil itu juga selalu melempar: `TypeError: Cannot convert a BigInt
+  // value to a number`, tiap 20 detik, di level `info` sehingga tidak
+  // menonjol. Kueri tetangga di fungsi ini memakai `::float8` dan aman —
+  // perbedaan satu cast.
+  //
+  // `priceFreshness()` adalah sumber yang sama yang dipakai loop harga dan
+  // gerbang pasar, jadi tidak ada definisi "segar" kedua yang bisa menyimpang.
+  const stale = feeds.filter((f) => f.slackSeconds !== null && f.slackSeconds <= 0);
+  if (stale.length > 0) {
+    const detail = stale
+      .map((f) => `${f.pair} lewat ${-(f.slackSeconds ?? 0)}s dari anggaran ${f.budgetSeconds}s`)
+      .join('; ');
+    return { ok: false, reason: `harga sudah melewati anggaran kontraknya — ${detail}` };
   }
 
   return { ok: true, reason: null };
@@ -188,6 +204,21 @@ async function postponeNextJob(reason: string): Promise<void> {
 
 export async function runBackfillJobs(): Promise<void> {
   if (running) return;
+
+  // Ada yang menunggu? Kalau tidak, berhenti di sini.
+  //
+  // Pemeriksaan kesehatan memanggil kontrak enam kali lewat `priceFreshness()`,
+  // dan loop ini berputar tiap 20 detik sepanjang hari — hampir selalu tanpa
+  // satu pun job. Menjalankannya lebih dulu berarti membayar panggilan RPC
+  // untuk keputusan yang tidak perlu diambil, dan membiarkan kegagalan di
+  // dalamnya menjatuhkan iterasi yang sebenarnya tidak punya pekerjaan.
+  const waiting = await sql`
+    SELECT 1 FROM jobs
+    WHERE kind = 'backfill' AND status = 'pending'
+      AND (run_after IS NULL OR run_after <= now())
+    LIMIT 1
+  `;
+  if (waiting.length === 0) return;
 
   const health = await checkHealth();
   if (!health.ok) {
