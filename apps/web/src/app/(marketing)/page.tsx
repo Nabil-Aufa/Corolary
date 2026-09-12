@@ -1,10 +1,9 @@
 import { FeatureAccordion } from '@/components/landing/FeatureAccordion';
-import { Insights } from '@/components/landing/Insights';
 import { LandingFaq } from '@/components/landing/LandingFaq';
 import { Outro } from '@/components/landing/Outro';
 import { Preview } from '@/components/landing/Preview';
 import { ProtocolGrid } from '@/components/landing/ProtocolGrid';
-import { ScoreShowcase } from '@/components/landing/ScoreShowcase';
+import { RegistryStats } from '@/components/landing/RegistryStats';
 import { WhyDifferent } from '@/components/landing/WhyDifferent';
 import { Statement } from '@/components/landing/Statement';
 import { TopHead } from '@/components/landing/TopHead';
@@ -15,10 +14,8 @@ import type { Address } from '@/types';
  * Dompet yang dipamerkan di halaman ini — alamat mainnet NYATA dengan riwayat
  * terbukti, bukan contoh.
  *
- * Disebut SEKALI di sini lalu dioper ke `Preview` dan `ScoreShowcase`. Dua
- * sumber alamat yang bisa menyimpang berarti halaman memamerkan skor satu
- * dompet di layar pertama sambil membedah dompet lain di tengah halaman, dan
- * tidak ada satu pun yang akan terlihat salah.
+ * Dipakai `Preview`, satu-satunya bagian di halaman ini yang menampilkan skor
+ * sebuah dompet.
  */
 const FEATURED = (process.env.NEXT_PUBLIC_FEATURED_ADDRESS ??
   '0x94963B928498bE7f06637C3D57ea1E74D7f73423') as Address;
@@ -32,10 +29,10 @@ const FEATURED = (process.env.NEXT_PUBLIC_FEATURED_ADDRESS ??
  * terbaca kalau warnanya benar-benar berbalik. Dua panel gelap berurutan tanpa
  * bagian terang di antaranya hanya terlihat seperti situs yang berubah gelap.
  *
- * Karena itu `Insights` dan `LandingFaq` — dua bagian gelap yang bersebelahan —
- * berbagi SATU `Panel`. Membungkus keduanya sendiri-sendiri akan menggambar
- * sudut membulat kedua di tengah bidang hitam, yang terbaca sebagai jahitan
- * yang lupa dirapikan.
+ * Karena itu `RegistryStats` di antara `WhyDifferent` dan `LandingFaq` bukan
+ * cuma soal urutan isi: tanpa bagian terang di sana, dua panel gelap jadi
+ * bersebelahan dan sudut membulat 80px di antara keduanya terbaca sebagai
+ * jahitan yang lupa dirapikan, bukan sebagai sesuatu yang datang menutup.
  *
  * Argumen produknya habis di tiga layar pertama: kalimat pembuka, skor hidup
  * yang bisa diklik, dan pipeline. Sisanya untuk orang yang benar-benar
@@ -57,10 +54,7 @@ export default function HomePage() {
       <FeatureAccordion />
       <ProtocolGrid />
 
-      {/* Curtain pertama: panel gelap menutupi warna halaman — latar yang sama
-          dengan "The registry, right now" di bawah. Keduanya gelap, tapi ada
-          bagian terang di antaranya, jadi masing masing tetap terbaca sebagai
-          sesuatu yang datang menutup. */}
+      {/* Curtain pertama: panel gelap menutupi warna halaman. */}
       <Panel tone="dark">
         <WhyDifferent />
       </Panel>
@@ -69,13 +63,12 @@ export default function HomePage() {
           seluruh sisa halaman tetap gelap dan curtain berikutnya tidak punya
           apa pun untuk ditutupi. */}
       <Panel tone="page">
-        <ScoreShowcase address={FEATURED} />
+        <RegistryStats />
       </Panel>
 
-      {/* Curtain terakhir — dua bagian dalam satu panel, lalu menyatu dengan
-          Outro dan footer yang juga berlatar panel. */}
+      {/* Curtain terakhir, lalu menyatu dengan Outro dan footer yang juga
+          berlatar panel. */}
       <Panel tone="dark">
-        <Insights />
         <LandingFaq />
       </Panel>
 
