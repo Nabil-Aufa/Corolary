@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { FeatureArt, type FeatureArtVariant } from '@/components/landing/FeatureArt';
 import { connectLenisToScrollTrigger } from '@/lib/lenis-gsap';
+import { cn } from '@/lib/utils';
 
 interface Feature {
   title: string;
@@ -97,7 +98,7 @@ const DESKTOP = '(min-width: 768px)';
  * menyala di waktu yang salah".
  */
 export function FeatureAccordion() {
-  const rootRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState<number | null>(0);
   const [interactive, setInteractive] = useState(false);
   const { resolvedTheme } = useTheme();
@@ -342,84 +343,105 @@ export function FeatureAccordion() {
   return (
     <section
       id="pipeline"
-      // Read by the navbar, which takes its tone from whichever section
-      // sits behind it (MarketingHeader.tsx).
       data-nav="light"
-      ref={rootRef}
-      className="feature mkt-container"
+      // The same curtain the Panel components draw, on the one section that is
+      // not a Panel. Values copied verbatim from Panel.tsx rather than tuned to
+      // taste: a curtain that is 4px off the others reads as a mistake, and
+      // this one is directly above another curtain on the same page.
+      //
+      // It has to live on THIS element, not on `.mkt-container` below it. The
+      // container is `max-width: 1600px` with auto margins, so past 1600px the
+      // ::before stopped where the content column stopped and the hero stayed
+      // visible down both edges — a notch with the page torn off either side.
+      // Panel never showed this because its <section> is full-bleed and the
+      // container sits inside it.
+      //
+      // `bg-bg` explicitly, because the ::before inherits it and a transparent
+      // notch is an invisible one. `relative z-10` puts it over the hero's
+      // canvas; the ::before sits at bottom-full, so it already overlaps the
+      // frame's last 80px without a negative margin dragging the section up.
+      className={cn(
+        'relative z-10 bg-bg pb-[clamp(28px,7vw,80px)]',
+        'before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-[clamp(28px,7vw,80px)] before:rounded-t-[clamp(28px,7vw,80px)] before:bg-inherit',
+      )}
     >
-      <div className="feature-main">
-        {/* Spacer. Kosong dengan sengaja — inilah yang memberi section-nya
-            tinggi dan inilah yang dipicu ScrollTrigger. */}
-        <div className="feature-fakes" aria-hidden="true">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="feature-fake" />
-          ))}
-        </div>
+      {/* `.feature` stays on the element the ref points at: the `--fa-*` scale
+          is defined by that class and read back with getComputedStyle, so a ref
+          on the parent would read empty strings and tween to nothing. */}
+      <div ref={rootRef} className="feature mkt-container">
+        <div className="feature-main">
+          {/* Spacer. Kosong dengan sengaja — inilah yang memberi section-nya
+              tinggi dan inilah yang dipicu ScrollTrigger. */}
+          <div className="feature-fakes" aria-hidden="true">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="feature-fake" />
+            ))}
+          </div>
 
-        <div className="feature-items">
-          {FEATURES.map((f, i) => {
-            const headId = `feature-head-${i}`;
-            const panelId = `feature-panel-${i}`;
-            const expanded = open === i;
+          <div className="feature-items">
+            {FEATURES.map((f, i) => {
+              const headId = `feature-head-${i}`;
+              const panelId = `feature-panel-${i}`;
+              const expanded = open === i;
 
-            const head = (
-              <>
-                <h3 className="feature-item-title">{f.title}</h3>
-                <span className="feature-item-num num">{String(i + 1).padStart(2, '0')}</span>
-              </>
-            );
+              const head = (
+                <>
+                  <h3 className="feature-item-title">{f.title}</h3>
+                  <span className="feature-item-num num">{String(i + 1).padStart(2, '0')}</span>
+                </>
+              );
 
-            return (
-              <div
-                key={f.title}
-                className={`feature-item${interactive && expanded ? ' -active' : ''}`}
-              >
-                <div className="feature-item-fill" aria-hidden="true" />
-
-                <div className="feature-item-bg" aria-hidden="true">
-                  <FeatureArt variant={f.art} />
-                </div>
-
-                {interactive ? (
-                  <button
-                    type="button"
-                    id={headId}
-                    className="feature-item-head"
-                    aria-expanded={expanded}
-                    aria-controls={panelId}
-                    onClick={() => setOpen(expanded ? null : i)}
-                  >
-                    {head}
-                  </button>
-                ) : (
-                  <div className="feature-item-head">{head}</div>
-                )}
-
+              return (
                 <div
-                  className="feature-item-accordion"
-                  id={panelId}
-                  {...(interactive ? { role: 'region', 'aria-labelledby': headId } : {})}
+                  key={f.title}
+                  className={`feature-item${interactive && expanded ? ' -active' : ''}`}
                 >
-                  {/* `overflow: hidden` ada di sini, dan ia bukan kerapian:
-                      trik 0fr→1fr bekerja dengan mengecilkan BARIS grid, dan
-                      isi yang tidak dipotong akan tetap tergambar penuh di
-                      luar baris setinggi nol. */}
-                  <div className="feature-item-content">
-                    {/* Padding ada di sini, bukan di `-content`: `overflow:
-                        hidden` memotong isi, bukan padding pemiliknya. */}
-                    <div className="feature-item-inner">
-                      <p className="feature-item-body">{f.body}</p>
-                      <Link className="feature-item-link" href={f.href}>
-                        {f.linkLabel}
-                        <span aria-hidden="true">→</span>
-                      </Link>
+                  <div className="feature-item-fill" aria-hidden="true" />
+
+                  <div className="feature-item-bg" aria-hidden="true">
+                    <FeatureArt variant={f.art} />
+                  </div>
+
+                  {interactive ? (
+                    <button
+                      type="button"
+                      id={headId}
+                      className="feature-item-head"
+                      aria-expanded={expanded}
+                      aria-controls={panelId}
+                      onClick={() => setOpen(expanded ? null : i)}
+                    >
+                      {head}
+                    </button>
+                  ) : (
+                    <div className="feature-item-head">{head}</div>
+                  )}
+
+                  <div
+                    className="feature-item-accordion"
+                    id={panelId}
+                    {...(interactive ? { role: 'region', 'aria-labelledby': headId } : {})}
+                  >
+                    {/* `overflow: hidden` ada di sini, dan ia bukan kerapian:
+                        trik 0fr→1fr bekerja dengan mengecilkan BARIS grid, dan
+                        isi yang tidak dipotong akan tetap tergambar penuh di
+                        luar baris setinggi nol. */}
+                    <div className="feature-item-content">
+                      {/* Padding ada di sini, bukan di `-content`: `overflow:
+                          hidden` memotong isi, bukan padding pemiliknya. */}
+                      <div className="feature-item-inner">
+                        <p className="feature-item-body">{f.body}</p>
+                        <Link className="feature-item-link" href={f.href}>
+                          {f.linkLabel}
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
