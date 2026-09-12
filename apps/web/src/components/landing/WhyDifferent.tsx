@@ -45,7 +45,7 @@ const REASONS: Reason[] = [
   },
   {
     label: 'Sourcing',
-    body: 'The market runs on Creditcoin testnet, but the credit history behind it is read from Ethereum mainnet. The tokens are stand-ins; the record is not.',
+    body: 'The market runs on Creditcoin testnet, but the credit history behind it is read from Ethereum mainnet. The tokens are stand-ins. The record is not.',
   },
 ];
 

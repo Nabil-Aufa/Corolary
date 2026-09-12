@@ -121,7 +121,7 @@ export function ProveDialog({ open, onClose }: { open: boolean; onClose: () => v
           <>
             <p className="text-small text-ink-500">
               Paste any Ethereum mainnet transaction. If it carries a lending event we index, it
-              becomes a permanent fact on Creditcoin: proven, not asserted.
+              becomes a permanent fact on Creditcoin, proven rather than asserted.
             </p>
 
             <label htmlFor="txhash" className="mt-5 block text-micro uppercase tracking-wide text-ink-400">

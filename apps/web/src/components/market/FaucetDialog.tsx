@@ -170,7 +170,7 @@ export function FaucetDialog({
 
         <p className="mt-5 text-micro leading-relaxed text-ink-400">
           These are testnet ERC-20s with no value. What is real is everything they are measured
-          against: the credit history, the Chainlink prices, and the scores, all proven from
+          against. The credit history, the Chainlink prices and the scores are all proven from
           Ethereum mainnet.
         </p>
       </div>

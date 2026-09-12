@@ -31,7 +31,7 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: 'Corolary: Proven credit, portable collateral',
+  title: 'Corolary · Proven credit, portable collateral',
   description:
     'Cryptographically proven on-chain credit history from Ethereum mainnet, unlocking collateral efficiency on Creditcoin.',
 };

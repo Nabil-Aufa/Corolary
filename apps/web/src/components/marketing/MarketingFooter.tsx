@@ -159,8 +159,8 @@ export function MarketingFooter() {
             {/* Dinyatakan di muka, bukan disembunyikan (docs/open-issues.md B2). */}
             <p className="max-w-xl text-small text-panel-ink-500">
               Market tokens are testnet ERC-20s. Credit history, prices and scores all come from
-              real Ethereum mainnet transactions proven through the Attestcoin Protocol — the
-              tokens are stand-ins, the prices are not.
+              real Ethereum mainnet transactions proven through the Attestcoin Protocol. The tokens
+              are stand-ins, the prices are not.
             </p>
           </div>
         </div>

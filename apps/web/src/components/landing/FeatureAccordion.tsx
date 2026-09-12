@@ -58,7 +58,7 @@ const FEATURES: Feature[] = [
   },
   {
     title: 'Collateral efficiency',
-    body: 'CreditGraph turns those facts into a score from 0 to 1000, and the market prices required collateral against it: 150% for an unproven wallet, 110% at the top tier.',
+    body: 'CreditGraph turns those facts into a score from 0 to 1000, and the market prices required collateral against it, from 150% for an unproven wallet down to 110% at the top tier.',
     art: 'ratio',
     href: '/market',
     linkLabel: 'Open the market',

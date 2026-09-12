@@ -17,7 +17,7 @@ const ITEMS: FaqItem[] = [
   {
     question: 'What is actually being proven here?',
     answer: [
-      'Three things, together: that a transaction was included in a specific Ethereum mainnet block, that the source transaction actually succeeded (not reverted), and that the log came from the address of a registered protocol, not an impersonating contract.',
+      'Three things at once. A transaction was included in a specific Ethereum mainnet block, that source transaction actually succeeded rather than reverted, and the log came from the address of a registered protocol, not an impersonating contract.',
       'All three checks run on-chain before a fact is stored.',
     ],
   },
