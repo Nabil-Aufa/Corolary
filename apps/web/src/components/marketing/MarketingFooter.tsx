@@ -1,5 +1,4 @@
 import { ArrowUpRight } from 'lucide-react';
-import { creditcoinTestnet } from '@corolary/shared/chains';
 import { CorolaryLogo } from '@/components/brand/CorolaryLogo';
 import { creditcoinAddress } from '@/lib/explorer';
 import { shortenAddress } from '@/lib/format';
@@ -158,9 +157,6 @@ export function MarketingFooter() {
                   </li>
                 ))}
               </ul>
-              <p className="num mt-4 text-micro text-ink-400">
-                {creditcoinTestnet.name} · chainId {creditcoinTestnet.id}
-              </p>
             </div>
           </nav>
         </div>
