@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '../styles/tokens.css';
+@import '../styles/marketing-navbar.css';
 
 /* next-themes menaruh class `.dark` di <html>. Tailwind v4 defaultnya memakai
    prefers-color-scheme, jadi variannya dipetakan ulang ke class supaya

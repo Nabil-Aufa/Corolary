@@ -23,7 +23,9 @@ const googleSans = Google_Sans({
 // body — pemisahan dibayar hanya di tempat yang membuatnya terlihat.
 const geist = Geist({
   subsets: ['latin'],
-  weight: ['500', '600'],
+  // 400 is for the landing navbar links. Without it loaded, the browser
+  // silently substitutes 500 and the links read heavier than the reference.
+  weight: ['400', '500', '600'],
   variable: '--font-display-family',
   display: 'swap',
 });

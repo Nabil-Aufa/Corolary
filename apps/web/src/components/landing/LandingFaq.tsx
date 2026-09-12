@@ -58,7 +58,7 @@ export function LandingFaq() {
   const idBase = useId();
 
   return (
-    <div className="mkt-container py-[clamp(80px,10vw,160px)]">
+    <div id="faq" className="mkt-container py-[clamp(80px,10vw,160px)]">
       <h2 className="font-display font-medium text-mkt-h2 text-panel-ink-900">FAQ</h2>
 
       <div className="mt-14">

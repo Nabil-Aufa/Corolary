@@ -340,7 +340,7 @@ export function FeatureAccordion() {
   }, [resolvedTheme]);
 
   return (
-    <section ref={rootRef} className="feature mkt-container">
+    <section id="pipeline" ref={rootRef} className="feature mkt-container">
       <div className="feature-main">
         {/* Spacer. Kosong dengan sengaja — inilah yang memberi section-nya
             tinggi dan inilah yang dipicu ScrollTrigger. */}

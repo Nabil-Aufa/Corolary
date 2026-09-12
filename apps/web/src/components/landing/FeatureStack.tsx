@@ -70,7 +70,7 @@ const STAGES: Stage[] = [
  */
 export function FeatureStack() {
   return (
-    <section className="mkt-container pb-[clamp(80px,10vw,160px)] pt-[clamp(48px,6vw,96px)]">
+    <section id="pipeline" className="mkt-container pb-[clamp(80px,10vw,160px)] pt-[clamp(48px,6vw,96px)]">
       <ol className="[&>li]:list-none">
         {STAGES.map((s, i) => (
           <li

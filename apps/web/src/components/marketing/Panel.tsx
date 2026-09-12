@@ -69,9 +69,9 @@ interface PanelProps {
 export function Panel({ children, className, tone = 'dark', roundTop = true }: PanelProps) {
   return (
     <section
-      // Dibaca oleh navbar lewat IntersectionObserver untuk membalik warnanya
-      // sendiri. Navbar TIDAK bisa menyimpulkan ini dari posisi scroll: tinggi
-      // tiap panel bergantung pada data yang baru datang setelah render.
+      // Penanda nada bagian ini untuk siapa pun yang perlu tahu apakah ia gelap.
+      // Saat ini tidak ada yang membacanya: navbar landing tidak lagi membalik
+      // warna, ia bersembunyi saat digulir ke bawah (MarketingHeader.tsx).
       data-tone={tone}
       className={cn(
         // Mengembalikan 80px yang dimakan oleh panel BERIKUTNYA saat ia

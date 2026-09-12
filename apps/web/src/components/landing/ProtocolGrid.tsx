@@ -58,7 +58,7 @@ export function ProtocolGrid() {
     // Jeda bawahnya ditambah setinggi radius curtain, karena panel gelap
     // berikutnya menumpuk 80px bagian bawah ini — tanpa itu jaraknya menyusut
     // persis sebanyak lengkungannya.
-    <section className="pb-[calc(clamp(96px,12vw,184px)+clamp(28px,7vw,80px))] pt-[clamp(48px,6vw,96px)]">
+    <section id="proof" className="pb-[calc(clamp(96px,12vw,184px)+clamp(28px,7vw,80px))] pt-[clamp(48px,6vw,96px)]">
       <div className="mkt-container">
         {/* `text-mkt-h2`, sama seperti judul section lain di landing ini.
             Sebelumnya `text-mkt-h3`, yang di halaman ini adalah ukuran
