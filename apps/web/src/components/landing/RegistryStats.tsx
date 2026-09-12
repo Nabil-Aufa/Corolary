@@ -1,12 +1,17 @@
 'use client';
 
+import { Activity, Blocks, Layers, ShieldCheck, TrendingUp, Wallet } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
 import { Reveal } from '@/components/marketing/Reveal';
 import { ErrorState } from '@/components/shared/ErrorState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIndexerStatus, usePrices } from '@/hooks/useApi';
 import { formatCount } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 interface Metric {
+  icon: LucideIcon;
   value: string | null;
   label: string;
 }
@@ -41,20 +46,28 @@ export function RegistryStats() {
   // dari enam, jadi kegagalannya tidak boleh menghapus lima angka yang sudah
   // ada — sel itu yang dilepas, bukan bagiannya.
   const metrics: Metric[] = [
-    { value: status.data ? formatCount(status.data.totalFacts) : null, label: 'Proven facts recorded' },
     {
+      icon: ShieldCheck,
+      value: status.data ? formatCount(status.data.totalFacts) : null,
+      label: 'Proven facts recorded',
+    },
+    {
+      icon: Wallet,
       value: status.data ? formatCount(status.data.distinctSubjects) : null,
       label: 'Wallets with a proven history',
     },
     {
+      icon: Activity,
       value: status.data ? formatCount(status.data.queue.recorded24h) : null,
-      label: 'Facts recorded in the last 24 hours',
+      label: 'Facts recorded in 24 hours',
     },
     {
+      icon: Blocks,
       value: status.data ? formatCount(status.data.latestEthereumBlock) : null,
       label: 'Latest mainnet block scanned',
     },
     {
+      icon: Layers,
       value: status.data ? formatCount(status.data.cursors.length) : null,
       label: 'Lending protocols indexed',
     },
@@ -62,6 +75,7 @@ export function RegistryStats() {
       ? []
       : [
           {
+            icon: TrendingUp,
             value: prices.data ? formatCount(prices.data.length) : null,
             label: 'Chainlink price feeds proven',
           },
@@ -77,24 +91,67 @@ export function RegistryStats() {
           <ErrorState error={status.error} onRetry={() => void status.refetch()} />
         </div>
       ) : (
-        <div className="mt-10 grid gap-px sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-[clamp(40px,5vw,72px)] grid grid-cols-1 gap-[clamp(12px,1.2vw,20px)] sm:grid-cols-2 lg:grid-cols-3">
           {metrics.map((m, i) => (
-            <Reveal key={m.label} delay={i * 0.05} className="flex flex-col gap-2 py-6">
-              {m.value === null ? (
-                <>
-                  <Skeleton className="h-10 w-32" />
-                  <Skeleton className="h-4 w-40" />
-                </>
-              ) : (
-                <>
-                  <span className="num font-display text-mkt-h3 text-ink-900">{m.value}</span>
-                  <span className="text-small text-ink-500">{m.label}</span>
-                </>
-              )}
+            <Reveal key={m.label} delay={i * 0.05}>
+              <StatCard metric={m} tint={i % 2 === 0 ? 'mint' : 'lavender'} />
             </Reveal>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Kartu bento: ikon di atas, angka dan keterangannya menempel ke DASAR kartu.
+ *
+ * Yang menahannya di dasar `mt-auto`, bukan `justify-between`, dan bedanya
+ * kelihatan justru saat datanya belum datang: dengan `justify-between` kartu
+ * yang isinya kerangka muat tidak akan setinggi kartu yang isinya angka, jadi
+ * kisinya bergoyang begitu angka pertama mendarat. Tinggi minimumnya yang
+ * memastikan keenam kartu sudah punya bentuk akhirnya sebelum itu.
+ */
+function StatCard({ metric, tint }: { metric: Metric; tint: 'mint' | 'lavender' }) {
+  const Icon = metric.icon;
+
+  return (
+    <div
+      className={cn(
+        'flex h-full min-h-[clamp(200px,20vw,320px)] flex-col rounded-card p-[clamp(24px,2.4vw,40px)]',
+        // Kedua warna ini sudah ada di tokens dan punya pasangan gelapnya, jadi
+        // kartunya ikut membalik bersama halaman. Menuliskan hex pucat di sini
+        // akan jadi dua bidang terang di atas halaman gelap.
+        tint === 'mint' ? 'bg-verified-soft' : 'bg-accent-soft',
+      )}
+    >
+      <Icon aria-hidden="true" className="size-7 shrink-0 stroke-[1.5] text-ink-900" />
+
+      <div className="mt-auto pt-10">
+        {metric.value === null ? (
+          <>
+            <Skeleton className="h-[clamp(30px,2.8vw,56px)] w-40" />
+            <Skeleton className="mt-3 h-3 w-32" />
+          </>
+        ) : (
+          <>
+            {/* Ukurannya dibatasi oleh nilai TERPANJANG, bukan oleh selera.
+                Nomor blok mainnet sepuluh karakter, dan pada font ini satu
+                karakter tabular selebar 0,53em — terukur, bukan ditaksir.
+                Jebakannya ada di lebar 1440px: `.mkt-container` melompat dari
+                padding 120px ke 240px di sana, jadi kartunya MENYUSUT persis
+                saat fontnya masih membesar. Pada 3,4vw angkanya 261px di dalam
+                kartu selebar 239px — meluber tanpa ada yang error, dan hanya
+                di dua rentang lebar itu. */}
+            <p className="num font-display text-[clamp(30px,2.8vw,56px)] font-medium leading-[1.05] text-ink-900">
+              {metric.value}
+            </p>
+            <p className="mt-3 text-micro font-medium uppercase tracking-[0.12em] text-ink-500">
+              {metric.label}
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }
