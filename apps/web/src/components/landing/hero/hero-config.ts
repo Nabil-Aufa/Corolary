@@ -304,8 +304,8 @@ export const CONFIG = {
    * depth is density and parallax, and both of those are free.
    */
   stars: {
-    countDesktop: 2500,
-    countMobile: 1000,
+    countDesktop: 6080,
+    countMobile: 2250,
     /**
      * Base positions cover the whole camera path — startZ + zAhead down to
      * endZ − zBeyond — which is also one period of the depth wrap, so folding a
@@ -340,14 +340,29 @@ export const CONFIG = {
     clusterSigma: 9,
     seed: 20260911,
     /** Point size in CSS px before DPR and perspective attenuation, and its ceiling. */
-    sizeRange: [1, 2.2],
-    maxPointPx: 3,
+    sizeRange: [1.5, 3.2],
+    /**
+     * The brightest tier is sized outright rather than by a multiplier on
+     * `sizeRange`: it is meant to be a different kind of star, not a larger
+     * ordinary one.
+     */
+    brightSizeRange: [5, 9],
+    /** Has to clear brightSizeRange, or the ceiling quietly flattens the tier it exists for. */
+    maxPointPx: 8,
     /**
      * The brightest tier reads as a highlight: a size multiplier and one soft
      * falloff inside its own sprite. Deliberately not a bloom and not a glint —
      * it stops well before the sprite border, so the star still reads as a
      * point with a lit centre rather than as a ball of light.
      */
+    /**
+     * How much smaller a highlight's CORE is than its sprite. It has to track
+     * the real size ratio — mean brightSizeRange over mean sizeRange, about 3 —
+     * or a 9px bright star gets a 5px flat disc instead of a sharp point with a
+     * skirt, and the tier stops reading as a highlight at all.
+     */
+    highlightSize: 3,
+    highlightHalo: 0.55,
     /**
      * Distance at which a star is drawn at its nominal size. The wrap makes
      * distance uniform over the whole span, so half the field sits beyond 35
@@ -356,8 +371,8 @@ export const CONFIG = {
      */
     referenceDepth: 20,
     /** Shares of the count that are pale blue and pale violet; the rest is white. */
-    blueShare: 0.11,
-    violetShare: 0.07,
+    blueShare: 0.15,
+    violetShare: 0.08,
     blue: '#aec2ff',
     violet: '#c9b8ff',
     /**
@@ -365,11 +380,12 @@ export const CONFIG = {
      * reads as one grey haze, while tiers read as stars at different distances.
      * Shares are dim, mid, bright; the remainder of each pair is its range.
      */
-    dimShare: 0.6,
-    midShare: 0.3,
-    dimAlpha: [0.35, 0.55],
-    midAlpha: [0.6, 0.8],
-    brightAlpha: [0.9, 1],
+    dimShare: 0.55,
+    midShare: 0.33,
+    /** Every tier raised by 15%; the bright one lands on the 1.0 ceiling and flattens there. */
+    dimAlpha: [0.4, 0.63],
+    midAlpha: [0.69, 0.92],
+    brightAlpha: [1, 1],
     /** Peak alpha swing, and the seconds a full cycle takes. Anything more reads as flicker. */
     twinkleAmount: 0.08,
     twinklePeriod: [6, 12],

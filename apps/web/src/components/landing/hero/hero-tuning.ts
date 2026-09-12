@@ -29,6 +29,7 @@ export interface HeroTuning {
   starSizeMin: number;
   starSizeMax: number;
   starTwinkle: number;
+  starHighlight: number;
   starFogDensity: number;
 }
 
@@ -61,6 +62,7 @@ export function defaultTuning(): HeroTuning {
     starSizeMin: CONFIG.stars.sizeRange[0],
     starSizeMax: CONFIG.stars.sizeRange[1],
     starTwinkle: CONFIG.stars.twinkleAmount,
+    starHighlight: CONFIG.stars.highlightHalo,
     starFogDensity: CONFIG.stars.fogDensity,
   };
 }

@@ -313,10 +313,13 @@ uniform float uTime;
 uniform float uTwinkle;
 uniform float uFogDensity;
 uniform float uFocusDist;
+uniform float uHighlight;
+uniform float uHighlightSize;
 
 varying vec3 vTint;
 varying float vAlpha;
-
+varying float vHighlight;
+varying float vCore;
 
 void main() {
   // 1. Drift and the depth wrap, in one expression. This runs FIRST: the yaw
@@ -375,6 +378,15 @@ void main() {
 
   vTint = aTint;
   vAlpha = aBright * nearSeam * farSeam * vertical * lateral * twinkle * fog;
+  // The top brightness tier and nothing else. Derived rather than given its own
+  // attribute: those stars already carry the only thing that distinguishes them.
+  float isHighlight = step(0.85, aBright);
+  vHighlight = isHighlight * uHighlight;
+  // A highlight's sprite is uHighlightSize larger, but its CORE is not: the
+  // radius shrinks by the same factor so the disc stays the size an ordinary
+  // star's would be. That is what leaves room for a skirt — without it the
+  // halo lands inside a disc whose alpha is already 1 and does nothing at all.
+  vCore = 0.5 / mix(1.0, uHighlightSize, isHighlight);
 }
 `;
 
@@ -383,11 +395,18 @@ precision highp float;
 
 varying vec3 vTint;
 varying float vAlpha;
+varying float vHighlight;
+varying float vCore;
 
 void main() {
-  // A disc with one thin antialiased edge, and nothing else. No core, no halo,
-  // no glint: those are what turn a star into a glowing ball.
-  float alpha = vAlpha * smoothstep(0.5, 0.35, length(gl_PointCoord - 0.5));
+  float r = length(gl_PointCoord - 0.5);
+  // A disc with one thin antialiased edge. Still no glint.
+  float disc = smoothstep(vCore, vCore * 0.7, r);
+  // The skirt, on the brightest tier only, in the sprite room the shrunken core
+  // left behind. Faded to nothing before the border, so it can never end in the
+  // visible square a wider halo would.
+  float halo = exp(-r * r * 10.0) * vHighlight * smoothstep(0.5, 0.4, r);
+  float alpha = vAlpha * min(disc + halo, 1.0);
   if (alpha < 0.004) discard;
   // Premultiplied, like everything else in this pass.
   gl_FragColor = vec4(vTint * alpha, alpha);
@@ -600,9 +619,13 @@ export function createCoinScene(ogl: Ogl, options: SceneOptions): CoinScene {
       tints[i * 3 + 2] = tint[2] ?? 1;
 
       const tier = random();
-      const range = tier < S.dimShare ? S.dimAlpha : tier < S.dimShare + S.midShare ? S.midAlpha : S.brightAlpha;
+      const isHighlight = tier >= S.dimShare + S.midShare;
+      const range = tier < S.dimShare ? S.dimAlpha : isHighlight ? S.brightAlpha : S.midAlpha;
       brights[i] = pick(range, random());
-
+      // The bright tier takes its size outright, not as a multiple of the
+      // slider-driven one: it is a different kind of star, and tying it to the
+      // ordinary range means tuning the ordinary stars silently resizes it too.
+      if (isHighlight) sizes[i] = pick(S.brightSizeRange, random());
     }
 
     return new ogl.Geometry(gl, {
@@ -629,6 +652,8 @@ export function createCoinScene(ogl: Ogl, options: SceneOptions): CoinScene {
     uTwinkle: uniform(CONFIG.stars.twinkleAmount),
     uFogDensity: uniform(CONFIG.stars.fogDensity),
     uFocusDist: uniform(CONFIG.depth.focusDist),
+    uHighlight: uniform(CONFIG.stars.highlightHalo),
+    uHighlightSize: { value: CONFIG.stars.highlightSize },
   };
   const starProgram = new ogl.Program(gl, {
     vertex: STAR_VERTEX,
@@ -933,6 +958,7 @@ export function createCoinScene(ogl: Ogl, options: SceneOptions): CoinScene {
       starField.uFade.value = tuning.starFade;
       starField.uTwinkle.value = tuning.starTwinkle;
       starField.uFogDensity.value = tuning.starFogDensity;
+      starField.uHighlight.value = tuning.starHighlight;
       starField.uFocusDist.value = tuning.focusDist;
 
       const [r, g, b] = input.clearColor;
