@@ -12,6 +12,7 @@ import { splitToSingles, type BatchBundleJson, type SingleBundleJson } from '../
 import { nextRetryDelayMs } from '../prover/run.js';
 import { persistReceipt } from './persist.js';
 import { checkSubmitterBalance } from './balance.js';
+import { hexBytes, needsWebSocket, withWebSocketRegistry } from './transport.js';
 
 const log = stageLogger('submitter');
 
@@ -244,7 +245,7 @@ async function submitBatch(row: BatchRow): Promise<void> {
   const nonce = await claimNextNonce();
 
   try {
-    const tx = await registry().getFunction('recordFactBatch')(
+    const args = [
       {
         chainKey: payload.chainKey,
         heights: payload.heights,
@@ -253,8 +254,18 @@ async function submitBatch(row: BatchRow): Promise<void> {
       },
       payload.encodedTransactions,
       payload.observedAts,
-      { nonce },
+    ] as const;
+    // Jalurnya dipilih dari ukuran calldata, bukan dari error yang terjadi
+    // nanti. Dihitung lokal lewat `encodeFunctionData`, jadi angkanya ukuran
+    // sebenarnya dan bukan taksiran.
+    const send = (c: ethers.Contract): Promise<ethers.ContractTransactionResponse> =>
+      c.getFunction('recordFactBatch')(...args, { nonce });
+    const callDataBytes = hexBytes(
+      registry().interface.encodeFunctionData('recordFactBatch', args as unknown as unknown[]),
     );
+    const tx = needsWebSocket(callDataBytes)
+      ? await withWebSocketRegistry(send)
+      : await send(registry());
 
     const receipt = await tx.wait();
     if (!receipt || receipt.status !== 1) {
@@ -430,7 +441,7 @@ async function submitSingle(
 ): Promise<void> {
   const nonce = await claimNextNonce();
   try {
-    const tx = await registry().getFunction('recordFact')(
+    const args = [
       {
         chainKey: bundle.chainKey,
         blockHeight: bundle.blockHeight,
@@ -441,8 +452,19 @@ async function submitSingle(
       },
       bundle.encodedTransaction,
       bundle.observedAt,
-      { nonce },
+    ] as const;
+    // Inilah jalur yang membunuh 26 event: satu fakta dengan receipt besar,
+    // dikirim lewat HTTP, dijawab 413, lalu ditandai fatal karena tidak ada
+    // lagi yang bisa dipecah. Sekarang ukurannya diperiksa lebih dulu dan yang
+    // tidak muat berjalan lewat WebSocket.
+    const send = (c: ethers.Contract): Promise<ethers.ContractTransactionResponse> =>
+      c.getFunction('recordFact')(...args, { nonce });
+    const callDataBytes = hexBytes(
+      registry().interface.encodeFunctionData('recordFact', args as unknown as unknown[]),
     );
+    const tx = needsWebSocket(callDataBytes)
+      ? await withWebSocketRegistry(send)
+      : await send(registry());
 
     const receipt = await tx.wait();
     if (!receipt || receipt.status !== 1) {

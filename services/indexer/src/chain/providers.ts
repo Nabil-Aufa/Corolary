@@ -116,6 +116,21 @@ export const creditcoin = new ethers.JsonRpcProvider(
   { staticNetwork: true, batchMaxCount: CREDITCOIN_BATCH_MAX },
 );
 
+/**
+ * Alamat WebSocket node CC3 yang sama, diturunkan kalau tidak disetel.
+ *
+ * Diturunkan, bukan diwajibkan: node yang sama melayani keduanya di host yang
+ * sama (diuji 2026-09-12 — `wss://rpc.cc3-testnet.creditcoin.network` menjawab
+ * `eth_blockNumber` dan menerima body 1,8 MB yang HTTP-nya jawab 413), jadi
+ * memaksa satu variabel env baru hanya akan membuat perbaikan ini gagal diam
+ * di lingkungan yang lupa mengisinya.
+ */
+export function creditcoinWsUrl(): string {
+  const explicit = config.CREDITCOIN_WS_URL;
+  if (explicit !== undefined && explicit !== '') return explicit;
+  return config.CREDITCOIN_RPC_URL.replace(/^http/, 'ws');
+}
+
 export const submitter = new ethers.Wallet(config.SUBMITTER_PRIVATE_KEY, creditcoin);
 
 export const ETH_CHAIN_KEY = config.ETHEREUM_CHAIN_KEY;

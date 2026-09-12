@@ -22,6 +22,16 @@ const schema = z.object({
   ETHEREUM_RPC_URL_FALLBACK: z.url().or(z.literal('')).optional(),
   ETHEREUM_CHAIN_KEY: z.coerce.number().int().positive(),
   CREDITCOIN_RPC_URL: z.url(),
+  /**
+   * Jalur WebSocket ke node CC3 yang sama. Opsional; kalau kosong, diturunkan
+   * dari `CREDITCOIN_RPC_URL` dengan menukar skemanya.
+   *
+   * Ia ada untuk SATU hal: nginx di depan RPC HTTP memotong body di 1 MiB, dan
+   * karena body `eth_sendRawTransaction` adalah heks (dua kali ukuran
+   * transaksi), fakta dengan receipt besar mustahil dikirim lewat HTTP. WS
+   * tidak lewat `client_max_body_size` sama sekali. Lihat `submitter/transport.ts`.
+   */
+  CREDITCOIN_WS_URL: z.url().or(z.literal('')).optional(),
   CREDITCOIN_CHAIN_ID: z.coerce.number().int().positive(),
   PROOF_BUILDER_URL: z.url(),
   SUBMITTER_PRIVATE_KEY: hex32,
