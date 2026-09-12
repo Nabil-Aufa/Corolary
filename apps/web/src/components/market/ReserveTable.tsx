@@ -4,13 +4,24 @@ import { ExternalLink } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StackedCell } from '@/components/ui/stacked-cell';
 import { etherscanTx } from '@/lib/explorer';
 import { formatBps, formatTokenAmount, formatUsdPrice } from '@/lib/format';
 import type { Reserve } from '@/types';
 import type { ActionGroup } from './MarketActionDialog';
 import { ActionMenu } from './ActionMenu';
 
-const COLS = 'grid-cols-[1fr_6rem_6rem_6rem_8rem_4rem]';
+/**
+ * Kolom hanya berlaku dari `md` ke atas.
+ *
+ * Dulu tanpa awalan `md:`, dan lima kolom tetapnya (6+6+6+8+4rem) ditambah
+ * lima jarak 16px menuntut ~560px sebelum kolom aset dihitung. Di ponsel itu
+ * berarti barisnya tidak bisa menyusut dan halaman menggulir ke samping; di
+ * viewport ~1038px ia juga membuat grid dua kolom halaman market 53px lebih
+ * pendek daripada kolomnya sendiri. Di bawah `md` barisnya menumpuk, mengikuti
+ * pola yang sudah dipakai `proofs/RawFields.tsx`.
+ */
+const COLS = 'md:grid-cols-[1fr_6rem_6rem_6rem_8rem_4rem]';
 
 export function ReserveTable({
   reserves,
@@ -50,13 +61,13 @@ export function ReserveTable({
         ? Array.from({ length: 2 }, (_, i) => (
             <div key={i} className="flex min-h-[76px] flex-1 items-center gap-4 border-b border-border px-5 last:border-b-0">
               <Skeleton className="h-4 w-28" />
-              <Skeleton className="ml-auto h-4 w-40" />
+              <Skeleton className="ml-auto h-4 w-40 max-w-[45%]" />
             </div>
           ))
         : reserves.map((r) => (
             <div
               key={r.asset}
-              className={`grid ${COLS} flex-1 items-center gap-4 border-b border-border px-5 py-4 last:border-b-0 md:min-h-[76px] md:py-0`}
+              className={`flex flex-1 flex-col gap-2 border-b border-border px-5 py-4 last:border-b-0 md:grid ${COLS} md:items-center md:gap-4 md:py-0 md:min-h-[76px]`}
             >
               <div className="min-w-0">
                 <p className="text-body font-medium text-ink-900">{r.symbol}</p>
@@ -79,18 +90,18 @@ export function ReserveTable({
                 </p>
               </div>
 
-              <span className="num text-right text-small text-ink-900">
+              <StackedCell label="Supply APY" className="text-ink-900">
                 {formatBps(r.supplyApyBps)}
-              </span>
-              <span className="num text-right text-small text-ink-900">
+              </StackedCell>
+              <StackedCell label="Borrow APY" className="text-ink-900">
                 {formatBps(r.borrowApyBps)}
-              </span>
-              <span className="num text-right text-small text-ink-500">
+              </StackedCell>
+              <StackedCell label="Utilization" className="text-ink-500">
                 {formatBps(r.utilizationBps, 1)}
-              </span>
-              <span className="num text-right text-small text-ink-900">
+              </StackedCell>
+              <StackedCell label="Total supplied" className="text-ink-900">
                 {formatTokenAmount(r.totalSupplied, r.decimals)}
-              </span>
+              </StackedCell>
 
               {onAct !== undefined && (
                 <span className="flex justify-end">

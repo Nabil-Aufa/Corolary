@@ -1,10 +1,16 @@
 import { Card } from '@/components/ui/card';
+import { StackedCell } from '@/components/ui/stacked-cell';
 import { formatTokenAmount } from '@/lib/format';
 import type { Address, PositionEntry } from '@/types';
 import type { ActionGroup } from './MarketActionDialog';
 import { ActionMenu } from './ActionMenu';
 
-const COLS = 'grid-cols-[1fr_7rem_7rem_7rem_4rem]';
+/**
+ * Kolom hanya dari `md` ke atas — di bawahnya baris menumpuk, mengikuti
+ * `proofs/RawFields.tsx`. Tanpa awalan `md:` kolom tetapnya menuntut lebar
+ * yang tidak bisa disusutkan dan halaman menggulir ke samping di ponsel.
+ */
+const COLS = 'md:grid-cols-[1fr_7rem_7rem_7rem_4rem]';
 
 export function PositionTable({
   positions,
@@ -28,18 +34,18 @@ export function PositionTable({
       {positions.map((p) => (
         <div
           key={p.asset}
-          className={`grid ${COLS} items-center gap-4 border-b border-border px-5 py-4 last:border-b-0 md:h-[68px] md:py-0`}
+          className={`flex flex-col gap-2 border-b border-border px-5 py-4 last:border-b-0 md:grid ${COLS} md:h-[68px] md:items-center md:gap-4 md:py-0`}
         >
           <span className="text-body font-medium text-ink-900">{p.symbol}</span>
-          <span className="num text-right text-small text-ink-900">
+          <StackedCell label="Supplied" className="text-ink-900">
             {formatTokenAmount(p.supplied, p.decimals)}
-          </span>
-          <span className="num text-right text-small text-ink-900">
+          </StackedCell>
+          <StackedCell label="Borrowed" className="text-ink-900">
             {formatTokenAmount(p.borrowed, p.decimals)}
-          </span>
-          <span className="num text-right text-small text-ink-900">
+          </StackedCell>
+          <StackedCell label="Collateral" className="text-ink-900">
             {formatTokenAmount(p.collateral, p.decimals)}
-          </span>
+          </StackedCell>
 
           {/* Hanya ember yang benar-benar berisi yang dapat tombol. Tombol
               "Repay" pada baris tanpa utang adalah kontrol yang tidak bisa

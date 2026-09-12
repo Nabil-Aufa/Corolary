@@ -4,13 +4,20 @@ import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { formatUnits } from 'viem';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StackedCell } from '@/components/ui/stacked-cell';
 import { ErrorState } from '@/components/shared/ErrorState';
 import { usePrices } from '@/hooks/useApi';
 import { etherscanTx } from '@/lib/explorer';
 import { formatDuration, formatUsdPrice } from '@/lib/format';
 import type { PriceEntry } from '@/types';
 
-const COLS = 'grid-cols-[1fr_8rem_9rem_7rem_4rem]';
+/**
+ * Kolom hanya dari `md` ke atas — di bawahnya baris menumpuk, mengikuti
+ * `proofs/RawFields.tsx`. Tanpa awalan `md:` keempat kolom tetapnya (8+9+7+4rem)
+ * menuntut 448px sebelum kolom feed dihitung, dan halaman menggulir ke samping
+ * di ponsel.
+ */
+const COLS = 'md:grid-cols-[1fr_8rem_9rem_7rem_4rem]';
 
 /**
  * Ambang peringatan, sebagai pecahan dari anggaran aset itu sendiri.
@@ -78,7 +85,7 @@ function Row({ price }: { price: PriceEntry }) {
 
   return (
     <div
-      className={`grid ${COLS} items-center gap-4 border-b border-border px-5 py-4 last:border-b-0 md:h-[68px] md:py-0`}
+      className={`flex flex-col gap-2 border-b border-border px-5 py-4 last:border-b-0 md:grid ${COLS} md:h-[68px] md:items-center md:gap-4 md:py-0`}
     >
       <div className="min-w-0">
         <p className="text-body font-medium text-ink-900">{price.pair}</p>
@@ -88,11 +95,11 @@ function Row({ price }: { price: PriceEntry }) {
         <p className="text-micro text-ink-400">prices {price.assetSymbol}</p>
       </div>
 
-      <span className="num text-right text-small text-ink-900">
+      <StackedCell label="Price" className="text-ink-900">
         {formatUsdPrice(formatUnits(BigInt(price.answer), price.decimals))}
-      </span>
+      </StackedCell>
 
-      <span className="flex items-center justify-end gap-1.5 text-right text-small">
+      <StackedCell label="Round age" className="flex items-center justify-end gap-1.5">
         {(stale || nearing) && (
           <AlertTriangle
             size={14}
@@ -106,11 +113,13 @@ function Row({ price }: { price: PriceEntry }) {
           {formatDuration(price.ageSeconds)}
         </span>
         <span className="text-micro text-ink-400">/ {formatDuration(price.maxAgeSeconds)}</span>
-      </span>
+      </StackedCell>
 
-      <span className="num text-right text-small text-ink-500">{price.roundId}</span>
+      <StackedCell label="Round" className="text-ink-500">
+        {price.roundId}
+      </StackedCell>
 
-      <span className="flex justify-end">
+      <StackedCell label="Proof" className="flex justify-end">
         <a
           href={etherscanTx(price.sourceTxHash)}
           target="_blank"
@@ -120,7 +129,7 @@ function Row({ price }: { price: PriceEntry }) {
         >
           <ExternalLink size={14} strokeWidth={1.5} />
         </a>
-      </span>
+      </StackedCell>
     </div>
   );
 }
