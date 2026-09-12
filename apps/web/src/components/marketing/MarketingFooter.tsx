@@ -90,10 +90,44 @@ export function MarketingFooter() {
   return (
     <footer data-nav="dark" className="bg-panel p-6">
       <div className="rounded-[clamp(20px,2vw,28px)] bg-bg px-5 pb-6 pt-[clamp(32px,4vw,64px)] sm:px-[clamp(20px,3vw,56px)]">
-        <div className="grid gap-x-10 gap-y-12 min-[900px]:grid-cols-[45fr_55fr]">
+        {/* Jarak mendatarnya jauh lebih besar daripada `gap-x-10` yang biasa,
+            dan itu perlu karena kalimat di kiri MENGISI penuh lebar traknya.
+            `max-w-[30ch]` pada ukuran h3 ternyata lebih lebar daripada trak
+            itu sendiri, jadi ia tidak membatasi apa pun: terukur di 1669px,
+            paragraf itu selebar 666px, persis selebar traknya. Akibatnya
+            satu-satunya pemisah dari kolom "This page" adalah gap itu sendiri,
+            dan 40px terbaca seperti dua blok yang bersenggolan.
+
+            Melebarkan gap ikut menyempitkan trak kiri, jadi kalimatnya
+            berganti baris lebih awal. Itu memang konsekuensinya dan diterima —
+            yang dijaga adalah kalimat itu tetap tidak pernah dipotong
+            `max-w`-nya sendiri, sehingga pergantian barisnya selalu mengikuti
+            lebar kolom, bukan angka yang ditebak.
+
+            Kolom tautan ikut menyempit sedikit (terukur 205px ke 197px pada
+            1405px), dan itu TIDAK mengubah apa pun: pembungkusan baris di
+            kolom Contracts sama persis pada kedua nilai gap. */}
+        <div className="grid gap-x-[clamp(40px,6vw,112px)] gap-y-12 min-[900px]:grid-cols-[45fr_55fr] min-[1400px]:grid-cols-[58fr_42fr] min-[1400px]:gap-x-12">
           {/* Kiri: satu kalimat, satu pintu, lalu barisan legal. */}
           <div>
-            <p className="max-w-[30ch] font-display text-mkt-h3 font-medium leading-tight text-ink-900">
+            {/* `15.6em` bukan angka desain, itu ambang dua baris yang diukur.
+                Disapu pada tujuh ukuran font dari 26px sampai 56px, kalimat ini
+                berganti dari tiga baris ke dua baris pada lebar yang selalu
+                sama dalam satuan em: 15,46 sampai 15,48. Jadi 15,6em adalah
+                ambang itu plus sedikit sisa, dan ia ikut mengecil bersama
+                fontnya sendiri — tidak seperti `30ch`, yang pada ukuran h3
+                ternyata LEBIH LEBAR daripada traknya dan karena itu tidak
+                pernah membatasi apa pun.
+
+                Sisa trak di sebelah kanannya sengaja dibiarkan kosong: itulah
+                yang mendorong kolom tautan ke kanan tanpa menyentuh gap.
+
+                Hanya di atas 1400px. Di bawah itu `--text-mkt-h3` masih
+                mengecil mengikuti `3vw` sementara traknya mengecil lebih cepat,
+                jadi dua baris menuntut porsi trak yang terus naik: 53% di
+                1440px, 55% di 1280px, 58% di 900px. Memaksakannya di sana
+                menyisakan kolom tautan selebar 85px. */}
+            <p className="max-w-[30ch] font-display text-mkt-h3 font-medium leading-tight text-ink-900 min-[1400px]:max-w-[15.6em]">
               Every number here can be traced back to a mainnet transaction.
             </p>
 
@@ -108,7 +142,17 @@ export function MarketingFooter() {
           {/* Kanan: tiga kolom tautan. */}
           <nav
             aria-label="Footer"
-            className="grid grid-cols-1 gap-x-8 gap-y-10 min-[600px]:grid-cols-2 min-[900px]:grid-cols-3"
+            // 250px bukan tebakan, itu ambang satu baris yang diukur. Lebar
+            // kolom Contracts disapu 160px sampai 340px: di 250px ke atas
+            // keempat tautan muat satu baris (tinggi 36px), di 220 sampai 240
+            // hanya ikon panah yang turun (37px), dan di 210px ke bawah
+            // alamatnya ikut turun ke bawah labelnya (48px).
+            //
+            // Kolom ini yang paling dulu patah karena isinya label PLUS alamat
+            // PLUS ikon, jauh lebih panjang daripada "Proofs" atau "FAQ". Dua
+            // kolom lain memberi ruangnya; kata terpanjang di sana "Portfolio",
+            // yang muat jauh di bawah jatah tersempitnya.
+            className="grid grid-cols-1 gap-x-8 gap-y-10 min-[600px]:grid-cols-2 min-[900px]:grid-cols-3 min-[1400px]:grid-cols-[1fr_1fr_minmax(250px,1.3fr)]"
           >
             <div>
               <h2 className={COLUMN_TITLE_CLASS}>This page</h2>
