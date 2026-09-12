@@ -880,6 +880,55 @@
   }
 
 
+  /* ── Tautan penutup di Outro ────────────────────────────────────────
+   * Garisnya `::after`, BUKAN `text-decoration` dan bukan `border-bottom`.
+   *
+   * Bukan `text-decoration`: pada ukuran 80px garis bawaan menempel ke huruf
+   * berekor dan terpotong oleh 'y' dan 'p'. Yang ini menggambar satu garis
+   * lurus di bawah seluruh baris.
+   *
+   * Bukan `border-bottom`: border tidak punya panjang yang bisa dianimasikan.
+   * Saat di-hover garisnya menyusut dari penuh ke nol lewat `scaleX`: kedua
+   * ujungnya berjalan ke dalam, bertemu di tengah, lalu hilang. `transform`
+   * satu-satunya cara melakukan itu tanpa membuat browser menghitung ulang
+   * tata letak tiap frame.
+   *
+   * Ditulis di sini, bukan sebagai utility Tailwind bervarian arbitrer.
+   * `[@media(pointer:fine)]:hover:after:scale-x-0` tidak pernah berlaku, dan
+   * kegagalannya SUNYI: build lolos, kelasnya tetap tercetak di HTML. Terukur
+   * dengan hover sungguhan — elemennya benar `:hover`, warna teksnya ikut
+   * berubah, tapi `::after` tetap `transform: none` dan nol transisi berjalan.
+   * Pola yang sama dengan tombol di navbar, yang juga tinggal di CSS biasa. */
+  .outro-link {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 0.12em;
+  }
+
+  .outro-link::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 1px;
+    background-color: var(--color-panel-ink-500);
+    transform: scaleX(1);
+    /* `center`, jadi garisnya mengatup dari dua sisi. `right` (atau `left`)
+       membuatnya tersapu ke satu tepi, yang terbaca seperti garis yang
+       ditarik pergi alih-alih garis yang menutup. */
+    transform-origin: center;
+    transition: transform 520ms cubic-bezier(0.65, 0, 0.35, 1);
+  }
+
+  /* Dikurung `pointer: fine`, sama seperti tombol di navbar dan karena alasan
+     yang sama: di layar sentuh `:hover` menempel setelah diketuk, jadi
+     garisnya akan hilang permanen setelah sentuhan pertama. */
+  @media (pointer: fine) {
+    .outro-link:hover::after {
+      transform: scaleX(0);
+    }
+  }
+
   /* ── Layar boot landing ──────────────────────────────────────────────
    * Logo digambar sebagai garis dulu (keyframe, bukan transisi: ini
    * pembukaan yang hanya pernah berjalan satu arah, dan transisi tidak

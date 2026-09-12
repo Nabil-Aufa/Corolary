@@ -39,16 +39,12 @@ export function Outro() {
         </Reveal>
 
         <Reveal delay={0.08} distance={20}>
-          {/* Garis bawahnya `border-bottom` pada elemen sebaris, BUKAN
-              `text-decoration`. Pada ukuran 80px, garis bawaan menempel ke
-              huruf berekor dan terpotong oleh huruf 'y' dan 'p'; border
-              menggambar satu garis lurus di bawah seluruh baris, seperti di
-              referensi. Jaraknya ikut ukuran teks supaya tidak menempel saat
-              judulnya mengecil di layar sempit. */}
+          {/* Gaya garis bawah dan animasinya ada di `.outro-link`
+              (globals.css), termasuk alasan ia tidak ditulis sebagai utility. */}
           <p className="mt-2">
             <a
               href={appHref('/score')}
-              className="inline-block border-b border-panel-ink-500 pb-[0.12em] font-display text-mkt-outro text-panel-ink-700 transition-colors hover:border-panel-ink-900 hover:text-panel-ink-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+              className="outro-link font-display text-mkt-outro text-panel-ink-700 transition-colors hover:text-panel-ink-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
             >
               Check its score
             </a>
