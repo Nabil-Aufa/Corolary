@@ -55,7 +55,10 @@ export function ProtocolGrid() {
     // berikutnya adalah panel gelap bersudut yang meluncur MENUTUPI bagian ini;
     // ia butuh ruang ancang ancang supaya terbaca sebagai sesuatu yang datang
     // menutup, bukan sebagai bagian yang kebetulan menempel di bawah kisi.
-    <section className="pb-[clamp(96px,12vw,184px)] pt-[clamp(48px,6vw,96px)]">
+    // Jeda bawahnya ditambah setinggi radius curtain, karena panel gelap
+    // berikutnya menumpuk 80px bagian bawah ini — tanpa itu jaraknya menyusut
+    // persis sebanyak lengkungannya.
+    <section className="pb-[calc(clamp(96px,12vw,184px)+clamp(28px,7vw,80px))] pt-[clamp(48px,6vw,96px)]">
       <div className="mkt-container">
         {/* `text-mkt-h2`, sama seperti judul section lain di landing ini.
             Sebelumnya `text-mkt-h3`, yang di halaman ini adalah ukuran
