@@ -93,10 +93,27 @@ export function ethCall<T>(
   return withFailover(label, ethereum, ethereumFallback, fn);
 }
 
+/**
+ * Batas batch untuk CC3, dan alasannya BUKAN jumlah permintaan.
+ *
+ * `mirror-rebuild.ts` mencatat "node Creditcoin melayani batch sampai 100, jadi
+ * batasnya kesopanan" — itu benar tentang node-nya dan menyesatkan tentang
+ * jalurnya. Yang membatasi adalah nginx di depan node: `client_max_body_size`
+ * 1 MiB, diukur 2026-09-12 (body 1.048.575 lolos, 1.048.577 dijawab 413).
+ * Dengan default ethers 100, seratus permintaan bisa menyatu dalam SATU body —
+ * dan begitu salah satunya `eth_sendRawTransaction` berisi receipt besar, yang
+ * gagal bukan satu permintaan melainkan seluruh isi body.
+ *
+ * 3 dipilih supaya body gabungan tetap jauh di bawah 1 MiB pada ukuran
+ * permintaan yang wajar, tanpa mematikan penggabungan yang memang menghemat
+ * perjalanan bolak-balik.
+ */
+const CREDITCOIN_BATCH_MAX = 3;
+
 export const creditcoin = new ethers.JsonRpcProvider(
   config.CREDITCOIN_RPC_URL,
   config.CREDITCOIN_CHAIN_ID,
-  { staticNetwork: true },
+  { staticNetwork: true, batchMaxCount: CREDITCOIN_BATCH_MAX },
 );
 
 export const submitter = new ethers.Wallet(config.SUBMITTER_PRIVATE_KEY, creditcoin);
