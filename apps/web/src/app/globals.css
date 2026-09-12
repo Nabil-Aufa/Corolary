@@ -805,12 +805,29 @@
     grid-template-rows: 1fr !important;
   }
 
-  /* ── Mobile: tidak ada scrub sama sekali ──
+  /* ── Mobile: tidak ada scrub, dan tidak ada yang perlu dibuka ──
    * Di layar sekecil ini seluruh kartu hampir setinggi viewport, jadi "dibuka
-   * oleh scroll" tidak punya ruang untuk terbaca sebagai gerakan. Ia jadi
-   * akordeon klik biasa — dan di sinilah, dan hanya di sini, transition CSS
-   * aman dipakai. */
-  @media (max-width: 767px) {
+   * oleh scroll" tidak punya ruang untuk terbaca sebagai gerakan. Sebelumnya
+   * ia jadi akordeon klik; itu dibuang, dan bukan karena selera.
+   *
+   * `transition: grid-template-rows` pada blok ini MEMBUAT KARTU TIDAK PERNAH
+   * TERBUKA. Terukur di Chrome pada 390px: menambahkan `-active` membiarkan
+   * barisnya di `0px` selamanya, dan elemen yang sama langsung menghitung
+   * 216,29px begitu transition-nya dilepas. Jadi selama ini mengetuk kartu di
+   * ponsel tidak menyingkapkan apa pun — kegagalan yang tidak terlihat karena
+   * kepala kartunya tetap tampil rapi. Yang menggantikannya: semua kartu
+   * langsung terbuka, tanpa satu pun properti yang perlu dianimasikan.
+   *
+   * Karena tidak ada keadaan tertutup, tidak ada pula `-active`, tidak ada
+   * tombol, dan tidak ada `aria-expanded` yang harus dijaga kejujurannya.
+   *
+   * Sintaks rentang, bukan `max-width: 767px` — jebakan yang sama yang sudah
+   * dicatat di `marketing-navbar.css`. Pada lebar viewport pecahan (penskalaan
+   * layar membuat jendela 767px jadi 767,2 CSS px) `max-width: 767px` gagal
+   * sementara `min-width: 768px` juga gagal, dan yang tersisa adalah celah
+   * tempat kartu memakai gaya desktop TANPA scrub yang membukanya: lima kartu
+   * tertutup permanen. Terukur persis begitu pada 767px sebelum diganti. */
+  @media (width < 768px) {
     .feature-fakes {
       display: none;
     }
@@ -819,32 +836,25 @@
       position: static;
     }
 
-    .feature-item,
-    .feature-item-fill,
-    .feature-item-bg {
-      transition:
-        color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-        background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-        opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .feature-item-accordion {
-      transition: grid-template-rows 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .feature-item.-active {
+    .feature-item {
       color: var(--fa-ink-to);
     }
 
-    .feature-item.-active .feature-item-fill {
+    .feature-item-fill {
       background-color: var(--fa-fill-to);
     }
 
-    .feature-item.-active .feature-item-bg {
+    /* Art-nya ikut keadaan terbuka. Basisnya `opacity: 0` karena di desktop
+       scrub yang memunculkannya; tanpa baris ini ia tetap tak terlihat
+       sementara `padding-right` selebar art TETAP memakan kolom teks —
+       terukur 261px dari kartu 652px di 700px, untuk sesuatu yang tidak
+       pernah tergambar. Tingginya tidak perlu dipatok di sini: `measure()`
+       hanya berjalan di desktop, jadi `height: 100%` masih berlaku. */
+    .feature-item-bg {
       opacity: 1;
     }
 
-    .feature-item.-active .feature-item-accordion {
+    .feature-item-accordion {
       grid-template-rows: 1fr;
     }
   }

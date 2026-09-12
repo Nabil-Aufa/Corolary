@@ -5,7 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Route } from 'next';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { FeatureArt, type FeatureArtVariant } from '@/components/landing/FeatureArt';
 import { connectLenisToScrollTrigger } from '@/lib/lenis-gsap';
@@ -66,9 +66,8 @@ const FEATURES: Feature[] = [
   },
 ];
 
-/** Kueri desktop. Ditulis sekali karena dipakai oleh GSAP maupun oleh
- *  penentu bentuk `<head>` di bawah, dan dua salinan yang bisa menyimpang
- *  berarti markup interaktif yang tidak pernah bisa diklik. */
+/** Kueri desktop: di bawahnya tidak ada scrub, dan kartunya sudah terbuka
+ *  semua lewat CSS. */
 const DESKTOP = '(min-width: 768px)';
 
 /**
@@ -99,21 +98,7 @@ const DESKTOP = '(min-width: 768px)';
  */
 export function FeatureAccordion() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState<number | null>(0);
-  const [interactive, setInteractive] = useState(false);
   const { resolvedTheme } = useTheme();
-
-  // Di bawah 768px tidak ada scrub sama sekali, jadi kepalanya harus benar-benar
-  // bisa diklik — dan hanya di sana. Membuatnya selalu `<button>` akan
-  // mengumumkan `aria-expanded` yang bohong di desktop, tempat mengkliknya tidak
-  // melakukan apa pun.
-  useEffect(() => {
-    const mq = window.matchMedia(DESKTOP);
-    const sync = () => setInteractive(!mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -380,48 +365,25 @@ export function FeatureAccordion() {
 
           <div className="feature-items">
             {FEATURES.map((f, i) => {
-              const headId = `feature-head-${i}`;
-              const panelId = `feature-panel-${i}`;
-              const expanded = open === i;
-
-              const head = (
-                <>
-                  <h3 className="feature-item-title">{f.title}</h3>
-                  <span className="feature-item-num num">{String(i + 1).padStart(2, '0')}</span>
-                </>
-              );
-
               return (
-                <div
-                  key={f.title}
-                  className={`feature-item${interactive && expanded ? ' -active' : ''}`}
-                >
+                <div key={f.title} className="feature-item">
                   <div className="feature-item-fill" aria-hidden="true" />
 
                   <div className="feature-item-bg" aria-hidden="true">
                     <FeatureArt variant={f.art} />
                   </div>
 
-                  {interactive ? (
-                    <button
-                      type="button"
-                      id={headId}
-                      className="feature-item-head"
-                      aria-expanded={expanded}
-                      aria-controls={panelId}
-                      onClick={() => setOpen(expanded ? null : i)}
-                    >
-                      {head}
-                    </button>
-                  ) : (
-                    <div className="feature-item-head">{head}</div>
-                  )}
+                  {/* Bukan `<button>`. Tidak ada lagi yang bisa diketuk di sini
+                      pada lebar mana pun: desktop dibuka oleh posisi scroll,
+                      mobile sudah terbuka sejak awal. Sebuah tombol di sini
+                      akan mengumumkan `aria-expanded` untuk keadaan yang tidak
+                      pernah berubah. */}
+                  <div className="feature-item-head">
+                    <h3 className="feature-item-title">{f.title}</h3>
+                    <span className="feature-item-num num">{String(i + 1).padStart(2, '0')}</span>
+                  </div>
 
-                  <div
-                    className="feature-item-accordion"
-                    id={panelId}
-                    {...(interactive ? { role: 'region', 'aria-labelledby': headId } : {})}
-                  >
+                  <div className="feature-item-accordion">
                     {/* `overflow: hidden` ada di sini, dan ia bukan kerapian:
                         trik 0fr→1fr bekerja dengan mengecilkan BARIS grid, dan
                         isi yang tidak dipotong akan tetap tergambar penuh di
