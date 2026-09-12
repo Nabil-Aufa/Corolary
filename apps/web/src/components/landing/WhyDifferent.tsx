@@ -33,7 +33,7 @@ const REASONS: Reason[] = [
   },
   {
     label: 'Coverage',
-    body: 'History is read from Aave V3, Morpho Blue, Compound and SparkLend. A record that has to hold across four protocols is far more expensive to fake.',
+    body: 'History is read from Aave V3, Morpho Blue, Compound V3 and SparkLend. A record that has to hold across four protocols is far more expensive to fake.',
   },
   {
     label: 'Risk',

@@ -45,7 +45,7 @@ const ITEMS: FaqItem[] = [
   {
     question: 'Which protocols are read?',
     answer: [
-      'Aave V3, Morpho Blue, Compound, and SparkLend for borrowing and repayment history.',
+      'Aave V3, Morpho Blue, Compound V3 and SparkLend for borrowing and repayment history.',
       'Chainlink is read separately, for the prices used to value the collateral behind a loan.',
     ],
   },

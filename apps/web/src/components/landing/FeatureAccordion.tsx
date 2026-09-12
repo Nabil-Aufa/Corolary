@@ -30,7 +30,7 @@ interface Feature {
 const FEATURES: Feature[] = [
   {
     title: 'Real mainnet activity',
-    body: 'A watcher follows Aave V3, Morpho Blue, Compound and SparkLend on Ethereum mainnet. Nothing is simulated and nothing is seeded. The only input is a transaction that actually settled.',
+    body: 'A watcher follows Aave V3, Morpho Blue, Compound V3 and SparkLend on Ethereum mainnet. Nothing is simulated and nothing is seeded. The only input is a transaction that actually settled.',
     art: 'activity',
     href: '/proofs',
     linkLabel: 'See the source events',
