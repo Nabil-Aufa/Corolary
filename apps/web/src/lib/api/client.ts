@@ -6,6 +6,13 @@ const RAW_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
 // beberapa router — kegagalan yang terlihat seperti endpoint hilang.
 const BASE_URL = `${RAW_BASE.replace(/\/+$/, '')}/v1`;
 
+/** Dipakai footer untuk menautkan endpoint status apa adanya. Endpoint itu
+ *  menjawab JSON, dan justru itu gunanya di sini: ia bukti yang bisa dibuka
+ *  siapa pun tanpa melewati UI kita. */
+export function apiBaseUrl(): string {
+  return BASE_URL;
+}
+
 export interface ApiResult<T> {
   data: T;
   meta: ApiMeta | undefined;

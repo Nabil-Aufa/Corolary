@@ -4,6 +4,12 @@ const CREDITCOIN_EXPLORER = (
   process.env.NEXT_PUBLIC_CREDITCOIN_EXPLORER_URL ?? 'https://creditcoin-testnet.blockscout.com'
 ).replace(/\/+$/, '');
 
+/** Akar explorer Creditcoin. Footer menautkannya tanpa alamat tertentu, dan
+ *  membaca ulang env-nya di sana berarti dua tempat yang bisa menyimpang. */
+export function creditcoinExplorer(): string {
+  return CREDITCOIN_EXPLORER;
+}
+
 export function etherscanTx(txHash: Hex | string): string {
   return `https://etherscan.io/tx/${txHash}`;
 }
