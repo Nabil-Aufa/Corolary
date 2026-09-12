@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 const SECTIONS = [
   { id: 'pipeline', label: 'Pipeline' },
   { id: 'proof', label: 'Proof' },
-  { id: 'score', label: 'Score' },
+  { id: 'registry', label: 'Registry' },
   { id: 'faq', label: 'FAQ' },
 ] as const;
 
