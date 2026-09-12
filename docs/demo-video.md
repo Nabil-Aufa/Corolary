@@ -22,7 +22,7 @@ akhir, bukan hanya teks di deskripsi video.
 ### 1.1 Angka berubah, naskah tidak boleh ketinggalan
 
 Semua angka di naskah ini dibaca live **2026-09-12**. Registry terus tumbuh, dan
-skor dompet demo bergerak beberapa poin saat fakta baru masuk. **Baca ulang tepat
+skor dompet terbukti bergerak beberapa poin saat fakta baru masuk. **Baca ulang tepat
 sebelum merekam**, lalu ucapkan angka yang benar-benar ada di layar. Kalau ragu,
 pakai bentuk yang tahan drift: "di atas 800", "lebih dari 67 ribu fakta".
 
@@ -36,14 +36,14 @@ Nilai per 2026-09-12 sebagai patokan:
 
 | Angka | Nilai |
 |---|---|
-| Fakta dari Ethereum mainnet | 72.175 |
-| Dompet dengan riwayat terbukti | 11.288 |
-| Fakta 24 jam terakhir | 5.688 |
+| Fakta dari Ethereum mainnet | 72.366 |
+| Dompet dengan riwayat terbukti | 11.315 |
+| Fakta 24 jam terakhir | 5.474 |
 | Lag watcher dari head Ethereum | 0 blok |
-| Dompet demo `0x94963B92...3423` | skor **818**, tier 4, rasio **110%** |
+| Dompet terbukti `0x94963B92...3423` | skor **818**, tier 4, rasio **110%** |
 
-Arah driftnya satu arah dan cukup cepat: dalam sehari, fakta naik 5.096 dan
-dompet naik 577. Angka yang diucapkan di scene 3 dan 6 karena itu ikut naik,
+Arah driftnya satu arah dan cukup cepat: sekitar 5.500 fakta dan 500 dompet
+per hari. Angka yang diucapkan di scene 3 dan 6 karena itu ikut naik,
 tidak pernah turun — kalau lupa membaca ulang, yang terjadi adalah
 MEREMEHKAN registry sendiri, bukan melebih-lebihkannya.
 
@@ -69,24 +69,51 @@ cast call $PRICES "tryToUsd1e18(address,uint256)(uint256,bool)" \
 cast call $PRICES "tryToUsd1e18(address,uint256)(uint256,bool)" \
   0x886E3d92314c037206bB789Ee3A9016EE67b661E 1000000000000000000 --rpc-url $R  # harus true
 
-# Rasio efektif dompet demo harus benar-benar 11000, bukan baseline 15000.
+# Rasio efektif dompet terbukti harus benar-benar 11000, bukan baseline 15000.
+# Inilah angka yang dikontraskan scene 5 terhadap 15000 milik dompet tim.
 cast call $MARKET "effectiveRatioBps(address)(uint16)" $W --rpc-url $R   # 11000
 ```
 
 Plus cek `"marketFrozen": false` dan `"lagBlocks"` kecil di `/v1/indexer/status`.
 
-### 1.3 Persiapan dompet dan pasar
+### 1.3 Dua dompet, dan hanya satu yang bisa menandatangani
 
-- Dompet yang dipakai di layar adalah **dompet demo**, bukan dompet pribadi.
-  Isinya hanya CTC testnet dan token faucet.
-- Ambil `tUSDC` dan `tWETH` lewat tombol faucet di halaman Market **sebelum**
-  merekam, supaya scene borrow tidak terpotong menunggu transaksi faucet.
-- Pastikan ada likuiditas di reserve yang akan dipinjam. Kolam kosong membuat
-  tombol borrow benar, tapi ceritanya mati.
-- Siapkan posisi supply secukupnya lebih dulu, sehingga di kamera yang terlihat
-  hanya satu transaksi: **borrow**.
-- Jangan lakukan "repay all" di depan kamera. Bunga berjalan antara borrow dan
-  repay, jadi selalu ada sisa dan itu akan terlihat seperti bug.
+Ini bagian yang paling mudah salah, dan salahnya tidak akan terlihat sampai
+rekaman sudah jadi. **Video ini memakai DUA alamat yang berbeda, dan itu
+disengaja.**
+
+| Peran | Alamat | Bisa menandatangani? |
+|---|---|---|
+| Dompet TERBUKTI, yang skornya ditampilkan | `0x94963B92...3423` | **TIDAK** |
+| Dompet TIM, yang melakukan borrow di kamera | dompet kalian sendiri | ya |
+
+`0x94963B92...3423` adalah alamat Ethereum mainnet nyata yang riwayatnya kita
+indeks. **Kunci privatnya bukan milik tim.** Ia tidak pernah mengirim satu pun
+transaksi di CC3 — terverifikasi 2026-09-12, saldo 0 CTC dan nonce 0. Jadi ia
+hanya boleh muncul sebagai layar yang DIBACA, tidak pernah sebagai dompet yang
+menandatangani apa pun.
+
+Menampilkannya sama sekali tidak bermasalah: itu data on-chain publik, dan
+naskah scene 3 menyebutnya apa adanya, "a real mainnet wallet, not one of
+ours". Yang dilarang cuma satu hal, dan versi lama naskah ini melanggarnya:
+mengucapkan "**this** wallet borrows at 110 percent" sambil mengoperasikan
+dompet. Kalimat itu mengubah data publik yang kita buktikan menjadi klaim
+kepemilikan yang tidak benar.
+
+**Yang harus disiapkan pada dompet tim, sebelum kamera menyala:**
+
+- **CTC untuk gas.** Diperiksa lebih dulu, jangan diasumsikan. Dompet demo yang
+  lama ternyata nol, dan itu baru ketahuan saat dicek: `cast balance <ALAMAT>
+  --rpc-url $R`.
+- **Klaim tUSDC lewat tombol faucet di halaman Market**, supaya scene borrow
+  tidak terpotong menunggu transaksi faucet.
+- **Pinjam tUSDC, bukan tWETH.** Terukur 2026-09-12: reserve tWETH punya
+  `totalSupplied` nol dan `borrowEnabled` **false**, jadi tWETH memang tidak
+  bisa dipinjam. tUSDC punya likuiditas 10.000.
+- **Siapkan posisi supply lebih dulu**, sehingga di kamera yang terlihat hanya
+  satu transaksi: borrow.
+- **Jangan lakukan "repay all" di depan kamera.** Bunga berjalan antara borrow
+  dan repay, jadi selalu ada sisa dan itu akan terlihat seperti bug.
 
 ### 1.4 Layar boot di awal setiap take
 
@@ -124,27 +151,31 @@ merekam, dan jangan mengarang ulang kalimat pengungkapan di scene 5: versi
 Inggris di bawah adalah terjemahan setia dari naskah kanonik berbahasa Indonesia
 di `docs/business.md` §13.1.
 
-Naskah ini sengaja pendek: **392 kata, sekitar 2 menit 37 detik** pada kecepatan
-bicara normal (150 kata per menit). Sisa 23 detik dari target 3 menit adalah
+Naskah ini sengaja pendek: **420 kata, sekitar 2 menit 48 detik** pada kecepatan
+bicara normal (150 kata per menit). Sisa 12 detik dari target 3 menit adalah
 jeda, dan jeda itu disengaja karena gambar butuh waktu untuk dibaca. **Jangan
 menambah kalimat untuk mengisi ruang kosong.** Kalau ada yang terasa kurang
 dijelaskan, biarkan: README dan deck yang menjawab, bukan video.
 
 Jeda itu TIDAK dibagi rata, dan batas waktu di judul tiap scene sudah
-memperhitungkannya. Jatah terbesar ada di scene 3, karena di sanalah gambar
-bekerja sendirian: dial dan breakdown butuh dibaca, bukan diceritakan. Yang
-paling ketat adalah scene 5, dan itu disengaja — pengungkapan token testnet
-sendirian sudah 112 kata, dan naskah ini melarang mempercepatnya.
+memperhitungkannya. Jatah terbesar tetap di scene 3, karena di sanalah gambar
+bekerja sendirian: dial dan breakdown butuh dibaca, bukan diceritakan. Scene 5
+memakan lebih dari sepertiga video, dan itu memang harganya — pengungkapan token
+testnet sendirian 112 kata dan tidak boleh dipercepat, sementara kontras 150
+lawan 110 sekarang ikut diucapkan di sana.
+
+Ruangnya sudah habis. **Menambah satu kalimat saja membuat video lewat dari tiga
+menit**, karena 420 kata sudah 168 detik dan sisanya cuma 12 detik jeda.
 
 | Scene | Jatah | Bicara | Jeda |
 |---|---|---|---|
-| 1 | 18 dtk | 42 kata, 17 dtk | 1 dtk |
-| 2 | 16 dtk | 36 kata, 14 dtk | 2 dtk |
-| 3 | 28 dtk | 47 kata, 19 dtk | 9 dtk |
-| 4 | 34 dtk | 76 kata, 30 dtk | 4 dtk |
-| 5 | 48 dtk | 112 kata, 45 dtk | 3 dtk |
-| 6 | 18 dtk | 40 kata, 16 dtk | 2 dtk |
-| 7 | 18 dtk | 39 kata, 16 dtk | 2 dtk |
+| 1 | 18 dtk | 42 kata, 16,8 dtk | 1,2 dtk |
+| 2 | 15 dtk | 36 kata, 14,4 dtk | 0,6 dtk |
+| 3 | 26 dtk | 51 kata, 20,4 dtk | 5,6 dtk |
+| 4 | 32 dtk | 76 kata, 30,4 dtk | 1,6 dtk |
+| 5 | 56 dtk | 136 kata, 54,4 dtk | 1,6 dtk |
+| 6 | 17 dtk | 40 kata, 16,0 dtk | 1,0 dtk |
+| 7 | 16 dtk | 39 kata, 15,6 dtk | 0,4 dtk |
 
 Catatan pengucapan: `tUSDC` dibaca "tee you ess dee see", `tWETH` dibaca "tee
 weth". Alamat kontrak tidak pernah dibacakan, cukup ditampilkan.
@@ -161,7 +192,7 @@ ke bagian **Pipeline** (`#pipeline`). Tanpa kursor yang berkeliaran.
 > reputation exists. It is just locked on another chain. Corolary proves it, then
 > prices it."
 
-### Scene 2, Solusi dalam satu kalimat (00:18 sampai 00:34)
+### Scene 2, Solusi dalam satu kalimat (00:18 sampai 00:33)
 
 **[LAYAR]** Lanjutan scroll yang sama: akordeon **Pipeline** (`#pipeline`),
 lima langkah dari "Real mainnet activity" sampai "Collateral efficiency", lalu
@@ -181,7 +212,7 @@ cursor indexer yang hidup, bukan digambar.
 > from 150 percent to 110. Still fully over-collateralized. Proven borrowers just
 > lock less capital."
 
-### Scene 3, Skor dompet nyata (00:34 sampai 01:02)
+### Scene 3, Skor dompet nyata (00:33 sampai 00:59)
 
 **[LAYAR]** `/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423`. Tunggu dial
 selesai, lalu scroll ke ComponentBreakdown. **Klik** satu komponen supaya
@@ -191,7 +222,7 @@ terbuka pada satu waktu; pilih **Repayment volume**, yang punya fakta paling
 banyak. Beri jeda di sini, gambarnya yang bekerja.
 
 **[SUARA]**
-> "A real mainnet wallet. Score 818, tier 4. No off-chain model: every component
+> "A real mainnet wallet, not one of ours. Score 818, tier 4. No off-chain model: every component
 > is computed on-chain, and every one points at specific evidence. Repayment
 > volume, 298 of 300. Protocol diversity, two of four. Liquidation penalty, zero.
 > No black box, which is exactly where earlier credit scores failed."
@@ -199,7 +230,7 @@ banyak. Beri jeda di sini, gambarnya yang bekerja.
 Catatan: kalau angka di layar berbeda, sebut angka di layar. Bentuk yang tahan
 drift: "score above 800, tier 4".
 
-### Scene 4, Rantai bukti (01:02 sampai 01:36)
+### Scene 4, Rantai bukti (00:59 sampai 01:31)
 
 **[LAYAR]** Klik salah satu fakta, masuk ke `/proofs/<factId>`. Perlihatkan rel
 empat langkah: Ethereum transaction, Attested on Creditcoin, Proof built,
@@ -214,17 +245,28 @@ transaksi mainnet aslinya, dan kembali.
 > **succeeded**. So we check the receipt status ourselves, and we pick the
 > decoder by the emitting address. A copycat faking Aave events has no way in."
 
-### Scene 5, Pasar dan pengungkapan (01:36 sampai 02:24)
+### Scene 5, Pasar dan pengungkapan (01:31 sampai 02:27)
 
-**[LAYAR]** `/market`. Terlihat reserve, panel PriceProvenance, dan
-CollateralSavingsCallout yang menyebut 110 persen. Lalu buka dialog borrow,
-kirim transaksi, tunggu konfirmasi, posisi muncul di PositionTable dengan health
-factor.
+**[LAYAR]**, tiga potongan yang memperlihatkan DUA ujung dari satu fungsi yang
+sama (§1.3 menjelaskan kenapa ada dua alamat):
+
+1. Kembali sebentar ke layar skor `0x94963B92...3423` pada kartu **Required
+   collateral 110%**. Ini murni dibaca; tidak ada dompet yang terhubung.
+2. `/market` dengan **dompet tim** terhubung: reserve, panel PriceProvenance,
+   dan kartu yang menyebut **150%** karena dompet itu belum punya apa pun yang
+   terbukti.
+3. Buka dialog borrow **tUSDC**, kirim transaksi, tunggu konfirmasi, posisi
+   muncul di PositionTable dengan health factor.
+
+Borrow-nya nyata dan ditandatangani sendiri. Yang tidak dilakukan adalah
+berpura-pura meminjam sebagai dompet yang kuncinya bukan milik kita.
 
 **[SUARA]**, bagian pertama:
-> "The score arrives here as a price. This wallet borrows at 110 percent, not
-> 150. The ratio is locked at borrow time, so a later score drop cannot make a
-> healthy position liquidatable."
+> "The score arrives here as a price. This wallet has nothing proven yet, so it
+> posts the same 150 percent everyone posts. The wallet from a moment ago is
+> quoted 110 by the same contract, on the same market. The ratio is locked at
+> borrow time, so a later score drop cannot make a healthy position
+> liquidatable."
 
 **[SUARA]**, pengungkapan, ucapkan **tepat saat `tUSDC` terbaca di layar**,
 sekitar 12 detik, jangan dipotong dan jangan dipercepat:
@@ -239,7 +281,7 @@ sekitar 12 detik, jangan dipotong dan jangan dipercepat:
 **[SUARA]**, penutup scene:
 > "No centralized oracle anywhere in this system."
 
-### Scene 6, Bukti skala (02:24 sampai 02:42)
+### Scene 6, Bukti skala (02:27 sampai 02:44)
 
 **[LAYAR]** Split atau potong bergantian: halaman `/proofs` dengan daftar fakta
 yang panjang, lalu terminal yang menjalankan tiga `cast call` di bawah ini
@@ -257,7 +299,7 @@ cast call $GRAPH "scoreOf(address)(uint16,uint8)" $W --rpc-url $R
 > by contract policy. Only Ethereum mainnet counts, so nobody farms a score with
 > tokens they minted themselves."
 
-### Scene 7, Penutup (02:42 sampai 03:00)
+### Scene 7, Penutup (02:44 sampai 03:00)
 
 **[LAYAR]** Kembali ke landing, bagian Outro ("Have a wallet with history?"),
 lalu terus scroll ke footer dan freeze pada kolom **Contracts** di dalam kartu
@@ -287,8 +329,9 @@ belakangan di atas potongan yang sudah dipilih.
 | C | Score Explorer | `<URL_WEB>/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423` | 60 detik | Scene 3 |
 | D | Proof Viewer | `<URL_WEB>/proofs/<factId>` | 45 detik | Scene 4 |
 | E | Etherscan transaksi asli | tautan keluar dari take D | 15 detik | Scene 4 |
-| F | Market, keadaan awal | `<URL_WEB>/market` | 30 detik | Scene 5 |
-| G | Market, borrow sampai posisi muncul | dialog borrow plus konfirmasi dompet | 90 detik | Scene 5 |
+| F | Market, keadaan awal, dompet tim terhubung | `<URL_WEB>/market` | 30 detik | Scene 5 |
+| F2 | Kartu Required collateral 110%, tanpa dompet | `<URL_WEB>/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423` | 10 detik | Scene 5 |
+| G | Market, borrow tUSDC sampai posisi muncul | dialog borrow plus konfirmasi dompet | 90 detik | Scene 5 |
 | H | Daftar fakta | `<URL_WEB>/proofs` | 20 detik | Scene 6 |
 | H2 | Landing, bagian Registry | `<URL_WEB>/#registry` | 15 detik | Scene 6 (opsional) |
 | I | Terminal `cast call` | iTerm atau Terminal | 40 detik | Scene 6 |
@@ -329,7 +372,9 @@ bar, karena `localhost` di video submission terbaca seperti belum ter-deploy.
    sesi berarti satu layar boot, di awal saja.
 3. Rekam C, lalu D, lalu E berurutan supaya `factId` yang dipakai konsisten
    antara ketiganya. Catat `factId`-nya.
-4. Rekam F dan G. Ini take paling rapuh; siapkan untuk mengulang.
+4. Rekam F2 lebih dulu selagi belum ada dompet terhubung — begitu dompet tim
+   tersambung, kartu 110% itu tidak bisa diambil lagi tanpa memutus koneksi.
+   Lalu F dan G. G take paling rapuh; siapkan untuk mengulang.
 5. Rekam H, I, J.
 6. Susun kasar tanpa suara, potong ke target 3 menit, baru rekam voice over.
 7. Voice over dalam bahasa Inggris: satu take per scene, mikrofon dekat, ruangan
@@ -370,9 +415,14 @@ Urutan yang dipotong, dari yang paling boleh hilang:
 2. Take E (Etherscan) dipersingkat jadi 5 detik.
 3. Scene 6 kehilangan bagian `/proofs`, sisakan terminal saja.
 
-Yang **tidak boleh** dipotong dalam keadaan apa pun: pengungkapan token testnet
-di scene 5, dan `allowedChainKeys(1) == false` di scene 6. Yang pertama soal
-kejujuran, yang kedua adalah pembeda teknis paling tajam yang kita punya.
+Yang **tidak boleh** dipotong dalam keadaan apa pun, ada tiga: pengungkapan
+token testnet di scene 5, kontras 150 lawan 110 di scene 5, dan
+`allowedChainKeys(1) == false` di scene 6.
+
+Dua yang pertama soal kejujuran dan saling mengunci. Tanpa kontrasnya, satu-
+satunya angka rasio yang terlihat adalah 150% milik dompet tim, dan seluruh
+premis produk hilang. Tanpa pengungkapannya, videonya mengaku memakai USDC
+sungguhan. Yang ketiga adalah pembeda teknis paling tajam yang kita punya.
 
 ---
 
@@ -380,6 +430,8 @@ kejujuran, yang kedua adalah pembeda teknis paling tajam yang kita punya.
 
 - [ ] Gerbang §1.2 hijau pada hari perekaman
 - [ ] Angka yang diucapkan cocok dengan angka di layar
+- [ ] Tidak ada satu kalimat pun yang mengaku memiliki `0x94963B92...3423`
+- [ ] Kontras 150 lawan 110 benar-benar terlihat di layar, bukan cuma diucapkan
 - [ ] Narasi seluruhnya berbahasa Inggris, termasuk kalimat pengungkapan
 - [ ] Pengungkapan token testnet **diucapkan** di scene 5, bukan hanya caption
 - [ ] Tidak ada private key, seed phrase, isi `.env`, atau notifikasi pribadi di frame
