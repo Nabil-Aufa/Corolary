@@ -493,8 +493,15 @@
    * Kartu sepertiga lebar pada 375px hanya ~110px, dan teks 1.125vw jadi 4px.
    * Tumpukan yang saling mengunci juga butuh ruang mendatar yang memang tidak
    * ada di sini, jadi animasinya pun tidak dipasang (lihat `matchMedia` di
-   * `WhyDifferent.tsx`) — bukan cuma disembunyikan lewat CSS. */
-  @media (max-width: 767px) {
+   * `WhyDifferent.tsx`) — bukan cuma disembunyikan lewat CSS.
+   *
+   * Sintaks rentang, bukan `max-width`. Pada lebar viewport pecahan
+   * (penskalaan layar membuat jendela 767px jadi 767,2 CSS px) `max-width:
+   * 767px` gagal sementara `min-width: 768px` juga gagal, dan yang tersisa
+   * celah tempat gaya desktop berlaku di layar yang tidak sanggup
+   * menampungnya. Terukur 2026-09-12 pada viewport 767px: `.why-cards` tetap
+   * enam kolom. Jebakan yang sama sudah dicatat di `marketing-navbar.css`. */
+  @media (width < 768px) {
     .why-cards {
       grid-template-columns: 1fr;
       gap: 16px;
@@ -564,7 +571,7 @@
      logo 40px karena itu kembali lebih besar daripada judulnya yang 30px.
      `!important` dipakai karena yang harus dikalahkan adalah gaya INLINE yang
      ditulis `BrandMark`, dan tidak ada spesifisitas selektor yang bisa. */
-  @media (max-width: 640px) {
+  @media (width < 641px) {
     .protocol-mark {
       width: 26px !important;
       height: 26px !important;
