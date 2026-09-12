@@ -58,10 +58,10 @@ yang memperlihatkan pasar beku.
 export R=https://rpc.cc3-testnet.creditcoin.network
 export PRICES=0x1fC6c2CFB9e339012B70D45977737B9e411efdc9
 export MARKET=0xd97657E361928298A342D8e5049b7aD440b167d4
-# FACTS dan GRAPH dipakai di scene 6. Diekspor di sini juga supaya terminal
-# yang sama bisa dipakai ulang saat merekam take I tanpa menyetel apa pun lagi.
+# FACTS dipakai sebagai alamat yang dibuka take J di Blockscout, bukan di
+# terminal — scene 6 tidak lagi memakai `cast`. Diekspor di sini supaya alamat
+# yang sama tidak perlu dicari ulang saat merekam.
 export FACTS=0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5
-export GRAPH=0x896E283FB7213650f2C65c239168fEd89F57e952
 export W=0x94963B928498bE7f06637C3D57ea1E74D7f73423
 
 # Harga harus SEGAR di kontrak, bukan di API. API menyajikan mirror Postgres
@@ -169,8 +169,10 @@ take ulang.
 - Browser profil bersih: tanpa bookmark bar, tanpa ekstensi selain dompet,
   tanpa tab lain yang memuat email atau chat.
 - Notifikasi sistem dimatikan (Do Not Disturb).
-- Terminal: font besar (16 sampai 18 pt), tema terang atau gelap konsisten
-  dengan web app, prompt dipendekkan supaya tidak memperlihatkan path pribadi.
+- Tidak ada terminal di video ini. Satu-satunya bagian yang dulu memakainya,
+  `allowedChainKeys` di scene 6, sekarang dibaca lewat Blockscout — jadi
+  seluruh syarat kebersihan terminal (font, tema, prompt yang menyingkap path
+  pribadi) tidak berlaku lagi.
 - Tidak ada private key, seed phrase, atau isi `.env` yang pernah masuk frame.
   Kalau perlu menampilkan `.env`, tampilkan `.env.example`.
 
@@ -393,15 +395,44 @@ sekitar 12 detik, jangan dipotong dan jangan dipercepat:
 
 ### Scene 6, Bukti skala (02:27 sampai 02:44)
 
-**[LAYAR]** Split atau potong bergantian: halaman `/proofs` dengan daftar fakta
-yang panjang, lalu terminal yang menjalankan tiga `cast call` di bawah ini
-dengan hasil terlihat.
+**[LAYAR]** Dua klaim, dua gambar, dipotong bergantian — **bukan split
+screen**. Di 1080p, membelah layar membuat kedua sisinya terlalu kecil untuk
+dibaca, dan scene ini seluruhnya tentang teks kecil.
 
-```bash
-cast call $FACTS "allowedChainKeys(uint64)(bool)" 3 --rpc-url $R   # true, mainnet
-cast call $FACTS "allowedChainKeys(uint64)(bool)" 1 --rpc-url $R   # false, Sepolia
-cast call $GRAPH "scoreOf(address)(uint16,uint8)" $W --rpc-url $R
-```
+| Waktu | Take | Yang terlihat |
+|---|---|---|
+| 02:27–02:31 | **H** | Daftar `/proofs`, digulir; barisnya terus memuat sendiri |
+| 02:31–02:35 | **H2** | Bagian Registry di landing, ketiga angkanya tercetak besar |
+| 02:35–02:44 | **J** | Blockscout, `allowedChainKeys` dijawab `true` lalu `false` |
+
+**Take H tidak digulir seperti halaman biasa.** `/proofs` sengaja setinggi
+viewport dan halamannya TIDAK bergerak; yang bergulir adalah daftar di dalam
+kartu, dan barisnya dimuat bertahap lewat IntersectionObserver. Arahkan kursor
+ke dalam kartu. Baris yang terus bermunculan tanpa habis adalah "not one
+cherry-picked wallet" yang tidak perlu diucapkan.
+
+**Take J menggantikan terminal, dan itu disengaja.** Dulu bagian ini dua baris
+`cast call`. Blockscout menjawab pertanyaan yang sama tanpa Foundry, tanpa
+variabel shell yang bisa kosong, dan tanpa satu pun syarat kebersihan terminal —
+sekaligus memperlihatkan centang verifikasi dan sumber Solidity-nya di halaman
+yang sama dengan jawabannya. Untuk baris yang naskahnya sendiri sebut "this
+line matters most", juri yang bisa mengulanginya lewat satu tautan jauh lebih
+berharga daripada juri yang harus memasang Foundry.
+
+Langkahnya, diverifikasi 2026-09-12 tanpa menyambungkan dompet:
+
+1. Buka alamat `FactRegistry` di Blockscout (tautannya di §3.1), tab
+   **Contract** → **Read/Write contract**.
+2. Ketik `allowedChainKeys` di kotak pencarian metode, klik barisnya. Muncul
+   satu kolom isian `uint64` dan tombol **Read**.
+3. Isi **3**, klik Read → `(bool) : true`.
+4. **Ganti isinya jadi 1**, klik Read lagi → `(bool) : false`.
+
+Rekam langkah 3 dan 4 sebagai **satu gerakan menerus**, jangan dua potongan
+terpisah. Blockscout hanya menampilkan satu hasil pada satu waktu, jadi
+kontrasnya tidak bisa berdiri dalam satu frame seperti di terminal — yang bisa
+berdiri adalah perubahannya: satu karakter diganti, jawabannya berbalik. Itu
+justru gambar yang lebih baik daripada dua baris yang diam.
 
 **[SUARA]**
 > "Not one cherry-picked wallet. Over 70 thousand proven facts, 11 thousand
@@ -421,7 +452,7 @@ teks editor (§3.4), bukan dari sesuatu yang kamu cari di layar.
 **[SUARA]**
 > "FactRegistry is infrastructure. Pay for a proof once, and the fact is free to
 > read forever, by any Creditcoin dApp. Cost scales with facts, not reads. Every
-> number here you can check yourself with one `cast call`. Thank you."
+> number here you can check yourself on the verified contract. Thank you."
 
 ---
 
@@ -444,15 +475,14 @@ belakangan di atas potongan yang sudah dipilih.
 | G | Market, borrow tUSDC sampai posisi muncul | dialog borrow plus konfirmasi dompet | 90 detik | Scene 5 |
 | H | Daftar fakta | `https://corolary.vercel.app/proofs` | 20 detik | Scene 6 |
 | H2 | Landing, bagian Registry | `https://corolary.vercel.app/#registry` | 15 detik | Scene 6 (opsional) |
-| I | Terminal `cast call` | iTerm atau Terminal | 40 detik | Scene 6 |
-| J | Blockscout kontrak terverifikasi | `https://creditcoin-testnet.blockscout.com/address/0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5` | 20 detik | Scene 6 atau 7 |
+| J | Blockscout, `allowedChainKeys` dibaca `3` lalu `1` | `https://creditcoin-testnet.blockscout.com/address/0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5?tab=read_contract` | 40 detik | Scene 6 dan 7 |
 | K | Landing, Outro sampai footer | `https://corolary.vercel.app/` | 25 detik | Scene 7 |
 
 Take H2 opsional tapi murah: bagian **Registry** di landing menampilkan persis
 angka yang diucapkan di scene 6 (total fakta, dompet, fakta 24 jam) dalam bentuk
 yang sudah didesain, dibaca live dari `/v1/indexer/status` yang sama. Kalau
-dipakai, potong ke sana saat kalimat angkanya diucapkan, lalu kembali ke
-terminal untuk baris `allowedChainKeys`.
+dipakai, potong ke sana saat kalimat angkanya diucapkan, lalu lanjut ke
+Blockscout untuk `allowedChainKeys`.
 
 Semua take direkam dari **`https://corolary.vercel.app`**, bukan dari
 `pnpm dev:web`. Frontend produksi memanggil API Railway yang sama — diverifikasi
@@ -467,8 +497,9 @@ yang belum ter-deploy.
   1920x1080 secara logis (bukan 2x) supaya teks tidak buram setelah kompresi.
 - Zoom browser **110 sampai 125 persen**. Video ditonton di jendela kecil, dan
   teks berukuran default akan hilang.
-- Perekam: QuickTime (bawaan, cukup) atau OBS (kalau butuh split layar untuk
-  scene 6). Screen Studio kalau ada, terutama untuk zoom otomatis di take C dan D.
+- Perekam: QuickTime sudah cukup — seluruh video ini satu jendela browser, dan
+  split layar tidak dipakai di mana pun. Screen Studio kalau ada, terutama
+  untuk zoom otomatis di take C, D, dan J.
 - Gerakan kursor pelan dan sedikit. Setiap klik harus punya jeda satu detik
   sebelum dan sesudah, supaya editor punya ruang potong.
 - Scroll dengan trackpad dua jari, pelan dan konstan. Scroll yang tersentak
@@ -490,7 +521,7 @@ yang belum ter-deploy.
    Lalu sambungkan dompet, **selesaikan seluruh persiapan §1.3 di luar
    kamera** (faucet, lalu Collateral → Add dengan dua tanda tangannya), baru
    rekam F dan G. G take paling rapuh; siapkan untuk mengulang.
-5. Rekam H, I, J.
+5. Rekam H, H2, J.
 6. Susun kasar tanpa suara, potong ke target 3 menit, baru rekam voice over.
 7. Voice over dalam bahasa Inggris: satu take per scene, mikrofon dekat, ruangan
    kecil dan berperabot. Audio jelek merusak video bagus lebih cepat daripada
@@ -528,7 +559,7 @@ Urutan yang dipotong, dari yang paling boleh hilang:
 
 1. Scene 2 dipadatkan jadi 10 detik (diagram muncul, satu kalimat saja).
 2. Take E (Etherscan) dipersingkat jadi 5 detik.
-3. Scene 6 kehilangan bagian `/proofs`, sisakan terminal saja.
+3. Scene 6 kehilangan take H dan H2, sisakan Blockscout saja.
 
 Yang **tidak boleh** dipotong dalam keadaan apa pun, ada tiga: pengungkapan
 token testnet di scene 5, kontras 150 lawan 110 di scene 5, dan
