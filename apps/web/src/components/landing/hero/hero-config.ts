@@ -415,8 +415,8 @@ export const CONFIG = {
      * because its unit changed; it is set to about twice the on-screen rate the
      * old yaw gave at mid depth.
      */
-    driftSpeed: 0.35,
-    slideSpeed: 0.036,
+    driftSpeed: 2.625,
+    slideSpeed: 0.27,
   },
 
   /**

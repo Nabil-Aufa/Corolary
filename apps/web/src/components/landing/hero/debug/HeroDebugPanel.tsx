@@ -69,8 +69,8 @@ const GROUPS: readonly { title: string; fields: readonly Field[] }[] = [
     title: 'Starfield',
     fields: [
       { key: 'starCount', label: 'count', min: 200, max: 12000, step: 100 },
-      { key: 'driftSpeed', label: 'driftSpeed (units/s)', min: 0, max: 1, step: 0.01 },
-      { key: 'slideSpeed', label: 'slideSpeed (units/s)', min: 0, max: 0.5, step: 0.002 },
+      { key: 'driftSpeed', label: 'driftSpeed (units/s)', min: 0, max: 6, step: 0.01 },
+      { key: 'slideSpeed', label: 'slideSpeed (units/s)', min: 0, max: 1, step: 0.005 },
       { key: 'starSpan', label: 'span', min: 10, max: 140, step: 1 },
       { key: 'starFade', label: 'fade', min: 0, max: 30, step: 0.5 },
       { key: 'starSizeMin', label: 'sizeMin (px)', min: 0.4, max: 8, step: 0.05 },
