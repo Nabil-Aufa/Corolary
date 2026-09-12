@@ -84,7 +84,9 @@ export function RegistryStats() {
 
   return (
     <div id="registry" className="mkt-container py-[clamp(80px,10vw,160px)]">
-      <h2 className="font-display font-medium text-mkt-h2 text-ink-900">The registry, right now</h2>
+      <h2 className="text-center font-display font-medium text-mkt-h2 text-ink-900">
+        The registry, right now
+      </h2>
 
       {status.isError ? (
         <div className="mt-10">
