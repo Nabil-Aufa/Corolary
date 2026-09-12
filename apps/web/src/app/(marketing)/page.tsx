@@ -1,29 +1,16 @@
 import { FeatureAccordion } from '@/components/landing/FeatureAccordion';
+import { HeroScroll } from '@/components/landing/hero/HeroScroll';
 import { LandingFaq } from '@/components/landing/LandingFaq';
 import { Outro } from '@/components/landing/Outro';
-import { Preview } from '@/components/landing/Preview';
 import { ProtocolGrid } from '@/components/landing/ProtocolGrid';
 import { RegistryStats } from '@/components/landing/RegistryStats';
 import { WhyDifferent } from '@/components/landing/WhyDifferent';
-import { Statement } from '@/components/landing/Statement';
-import { TopHead } from '@/components/landing/TopHead';
 import { Panel } from '@/components/marketing/Panel';
-import type { Address } from '@/types';
-
-/**
- * Dompet yang dipamerkan di halaman ini — alamat mainnet NYATA dengan riwayat
- * terbukti, bukan contoh.
- *
- * Dipakai `Preview`, satu-satunya bagian di halaman ini yang menampilkan skor
- * sebuah dompet.
- */
-const FEATURED = (process.env.NEXT_PUBLIC_FEATURED_ADDRESS ??
-  '0x94963B928498bE7f06637C3D57ea1E74D7f73423') as Address;
 
 /**
  * Landing.
  *
- * Sebelas bagian, disusun terang → gelap → terang → gelap. Pergantian itu
+ * Bagian-bagiannya disusun terang → gelap → terang → gelap. Pergantian itu
  * bukan selera: tiap peralihan ke gelap adalah panel bersudut membulat 80px
  * yang meluncur MENUTUPI bagian sebelumnya, dan efek "menutupi" itu hanya
  * terbaca kalau warnanya benar-benar berbalik. Dua panel gelap berurutan tanpa
@@ -34,22 +21,26 @@ const FEATURED = (process.env.NEXT_PUBLIC_FEATURED_ADDRESS ??
  * bersebelahan dan sudut membulat 80px di antara keduanya terbaca sebagai
  * jahitan yang lupa dirapikan, bukan sebagai sesuatu yang datang menutup.
  *
- * Argumen produknya habis di tiga layar pertama: kalimat pembuka, skor hidup
- * yang bisa diklik, dan pipeline. Sisanya untuk orang yang benar-benar
+ * Tidak ada bagian "What this is" di sini. Judul itu dan paragrafnya sekarang
+ * adalah dua plane BERTEXTURE di dalam scene hero (hero/coin-scene.ts), dibuka
+ * oleh kamera yang mendekat lalu turun, dengan kalimat yang sama persis.
+ * Menyisakan versi DOM-nya berarti pembaca menerima kalimat itu dua kali
+ * berturut-turut: sekali sebagai adegan, sekali sebagai teks datar. Salinan
+ * untuk pembaca layar tetap ada, `sr-only`, di dalam HeroScroll.
+ *
+ * Tidak ada dompet yang dipamerkan di sini lagi, jadi tidak ada `FEATURED`.
+ * `Preview` adalah satu-satunya bagian yang pernah menampilkan skor satu
+ * dompet, dan hero menggantikannya. Angka yang tersisa di halaman ini semuanya
+ * milik registry, bukan milik satu alamat.
+ *
+ * Argumen produknya habis di tiga layar pertama: kalimat pembuka, frame yang
+ * menembus pasar pinjaman, dan pipeline. Sisanya untuk orang yang benar-benar
  * menggulir.
  */
 export default function HomePage() {
   return (
     <main>
-      <TopHead />
-      <Preview address={FEATURED} />
-
-      <div className="py-[clamp(48px,6vw,96px)]">
-        <Statement label="What this is">
-          Every number on this page comes from an Ethereum mainnet transaction proven
-          cryptographically — not from our database.
-        </Statement>
-      </div>
+      <HeroScroll />
 
       <FeatureAccordion />
       <ProtocolGrid />
