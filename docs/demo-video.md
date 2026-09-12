@@ -42,10 +42,12 @@ Nilai per 2026-09-12 sebagai patokan:
 | Lag watcher dari head Ethereum | 0 blok |
 | Dompet terbukti `0x94963B92...3423` | skor **818**, tier 4, rasio **110%** |
 
-Arah driftnya satu arah dan cukup cepat: sekitar 5.500 fakta dan 500 dompet
-per hari. Angka yang diucapkan di scene 3 dan 6 karena itu ikut naik,
-tidak pernah turun — kalau lupa membaca ulang, yang terjadi adalah
-MEREMEHKAN registry sendiri, bukan melebih-lebihkannya.
+Total fakta dan total dompet hanya bergerak naik, sekitar 5.500 fakta dan 500
+dompet per hari — jadi angka yang diucapkan di scene 3 dan 6 kalau lupa dibaca
+ulang akan MEREMEHKAN registry sendiri, bukan melebih-lebihkannya. Yang TIDAK
+berlaku begitu adalah "fakta 24 jam terakhir": itu jendela bergulir dan bisa
+turun (72.544 / 11.342 / **5.283** pada pengecekan berikutnya di hari yang
+sama). Ia tidak diucapkan di naskah mana pun; kalau mau dipakai, baca ulang.
 
 ### 1.2 Gerbang yang wajib hijau sebelum merekam
 
@@ -126,9 +128,14 @@ take ulang.
 - Mulai potongan **setelah** layar boot terangkat, kecuali kamu memang ingin
   memakainya sebagai pembuka video. Kalau dipakai, pakai sekali saja di take A;
   mengulangnya di take berikutnya terbaca seperti video yang dijahit kasar.
-- Landing dan app disajikan di **host yang berbeda**, jadi membuka app dari
-  landing adalah pemuatan halaman penuh dan layar boot main lagi. Jangan kaget,
-  dan jangan merekam transisi itu sebagai satu potongan mulus.
+- Landing dan app berbagi **satu host** di produksi. Pemisahan dua domain ada
+  di kode (`apps/web/src/proxy.ts`) tapi tidak aktif di `corolary.vercel.app`,
+  karena `NEXT_PUBLIC_SITE_URL` dan `NEXT_PUBLIC_APP_URL` tidak diset —
+  diverifikasi 2026-09-12: `/score` dan `/market` menjawab 200, bukan 307. Tidak
+  ada lompatan domain yang perlu dijelaskan di video.
+- Layar boot **tetap main lagi** saat pindah dari landing ke app, karena
+  tautannya `<a href>` biasa dan itu pemuatan halaman penuh walau host-nya sama.
+  Jangan merekam transisi itu sebagai satu potongan mulus.
 - Navigasi di dalam app (misalnya score ke proofs) TIDAK memunculkannya lagi.
 
 ### 1.5 Kebersihan layar
@@ -182,9 +189,30 @@ weth". Alamat kontrak tidak pernah dibacakan, cukup ditampilkan.
 
 ### Scene 1, Masalah (00:00 sampai 00:18)
 
-**[LAYAR]** Landing page Corolary, mulai setelah layar boot terangkat. Tahan di
-hero sampai koin selesai melintas dan "What this is" terbaca, lalu scroll pelan
-ke bagian **Pipeline** (`#pipeline`). Tanpa kursor yang berkeliaran.
+**[LAYAR]** Landing page Corolary, mulai setelah layar boot terangkat. Hero
+dipin selama **delapan tinggi viewport** (`pinEnd: '+=800%'`), jadi seluruh
+urutannya dikendalikan scroll, bukan waktu:
+
+| progres | yang terjadi |
+|---|---|
+| 0 sampai 0,20 | zoom dari placeholder ke layar penuh |
+| 0,05 sampai 0,55 | kamera melaju melewati koin |
+| 0,55 sampai 0,62 | beat diam, "What this is" terbaca |
+| 0,62 sampai 0,95 | kamera turun, judul keluar frame |
+| 0,75 sampai 0,98 | paragraf ter-wipe per karakter |
+
+Frame terakhir hero adalah paragraf yang sudah putih penuh, "Every number on
+this page comes from an Ethereum mainnet transaction, proven cryptographically,
+not from our database" — **di situ potongan hero berakhir**, bukan di beat
+judul. Setelah itu pin lepas dan halaman bergulir normal; scroll pelan ke
+**Pipeline** (`#pipeline`). Tanpa kursor yang berkeliaran.
+
+Delapan tinggi viewport itu masalah nyata untuk take ini: scroll berkecepatan
+nyaman menghabiskan seluruh jatah 18 detik di hero saja dan Pipeline tidak akan
+sempat masuk. Rekam mentah 40 detik seperti di §3.1, lalu **percepat bagian
+dolly-nya saat editing** — gerakan di situ murni translasi kamera dan tahan
+dipercepat 2x. Beat judul dan wipe paragraf punya ritme sendiri; keduanya
+dibiarkan real-time.
 
 **[SUARA]**
 > "DeFi asks everyone for 150 percent collateral. A wallet that repaid 40 Aave
@@ -324,19 +352,19 @@ belakangan di atas potongan yang sudah dipilih.
 
 | # | Take | Yang dibuka | Durasi mentah | Dipakai di |
 |---|---|---|---|---|
-| A | Landing, hero sampai Pipeline | `<URL_WEB>/` | 40 detik | Scene 1 |
-| B | Landing, Pipeline dan Proof | `<URL_WEB>/` (scroll) | 30 detik | Scene 2 |
-| C | Score Explorer | `<URL_WEB>/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423` | 60 detik | Scene 3 |
-| D | Proof Viewer | `<URL_WEB>/proofs/<factId>` | 45 detik | Scene 4 |
+| A | Landing, hero sampai Pipeline | `https://corolary.vercel.app/` | 40 detik | Scene 1 |
+| B | Landing, Pipeline dan Proof | `https://corolary.vercel.app/` (scroll) | 30 detik | Scene 2 |
+| C | Score Explorer | `https://corolary.vercel.app/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423` | 60 detik | Scene 3 |
+| D | Proof Viewer | `https://corolary.vercel.app/proofs/<factId>` | 45 detik | Scene 4 |
 | E | Etherscan transaksi asli | tautan keluar dari take D | 15 detik | Scene 4 |
-| F | Market, keadaan awal, dompet tim terhubung | `<URL_WEB>/market` | 30 detik | Scene 5 |
-| F2 | Kartu Required collateral 110%, tanpa dompet | `<URL_WEB>/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423` | 10 detik | Scene 5 |
+| F | Market, keadaan awal, dompet tim terhubung | `https://corolary.vercel.app/market` | 30 detik | Scene 5 |
+| F2 | Kartu Required collateral 110%, tanpa dompet | `https://corolary.vercel.app/score/0x94963B928498bE7f06637C3D57ea1E74D7f73423` | 10 detik | Scene 5 |
 | G | Market, borrow tUSDC sampai posisi muncul | dialog borrow plus konfirmasi dompet | 90 detik | Scene 5 |
-| H | Daftar fakta | `<URL_WEB>/proofs` | 20 detik | Scene 6 |
-| H2 | Landing, bagian Registry | `<URL_WEB>/#registry` | 15 detik | Scene 6 (opsional) |
+| H | Daftar fakta | `https://corolary.vercel.app/proofs` | 20 detik | Scene 6 |
+| H2 | Landing, bagian Registry | `https://corolary.vercel.app/#registry` | 15 detik | Scene 6 (opsional) |
 | I | Terminal `cast call` | iTerm atau Terminal | 40 detik | Scene 6 |
 | J | Blockscout kontrak terverifikasi | `https://creditcoin-testnet.blockscout.com/address/0xF7283aDefb2801db75160A49dA2F7E5e8fDc36c5` | 20 detik | Scene 6 atau 7 |
-| K | Landing, Outro sampai footer | `<URL_WEB>/` | 25 detik | Scene 7 |
+| K | Landing, Outro sampai footer | `https://corolary.vercel.app/` | 25 detik | Scene 7 |
 
 Take H2 opsional tapi murah: bagian **Registry** di landing menampilkan persis
 angka yang diucapkan di scene 6 (total fakta, dompet, fakta 24 jam) dalam bentuk
@@ -344,9 +372,12 @@ yang sudah didesain, dibaca live dari `/v1/indexer/status` yang sama. Kalau
 dipakai, potong ke sana saat kalimat angkanya diucapkan, lalu kembali ke
 terminal untuk baris `allowedChainKeys`.
 
-`<URL_WEB>` diisi setelah frontend naik ke Vercel. Sampai itu ada, rekam dari
-`pnpm dev:web` di `http://localhost:3000` dan jangan pernah memperlihatkan URL
-bar, karena `localhost` di video submission terbaca seperti belum ter-deploy.
+Semua take direkam dari **`https://corolary.vercel.app`**, bukan dari
+`pnpm dev:web`. Frontend produksi memanggil API Railway yang sama — diverifikasi
+2026-09-12, halaman skor `0x94963B92...3423` menampilkan 818, tier 4, dan 110%
+dari `corolary-production.up.railway.app`. URL bar boleh terlihat; yang tidak
+boleh adalah `localhost`, karena di video submission ia terbaca seperti proyek
+yang belum ter-deploy.
 
 ### 3.2 Setelan teknis
 
