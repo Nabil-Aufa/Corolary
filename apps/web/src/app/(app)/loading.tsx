@@ -19,11 +19,17 @@ export default function Loading() {
   return (
     <div className="mx-auto max-w-[1280px] px-6 py-12 md:px-8">
       <div className="flex flex-wrap items-start justify-between gap-4 pb-8">
-        <div>
-          <Skeleton className="h-9 w-48" />
-          <Skeleton className="mt-3 h-4 w-[28rem] max-w-full" />
+        {/* `min-w-0` pada item flex, dan lebar subjudulnya `w-full` dengan
+            `max-w`, bukan `w-[28rem]` dengan `max-w-full`. Yang kedua tidak
+            pernah menyusut: `max-w-full` berarti 100% dari div ini, dan div ini
+            ikut melebar mengikuti anaknya yang 448px. Terukur di 390px —
+            halaman menggulir 97px ke samping sebelum satu baris data pun
+            dimuat. */}
+        <div className="min-w-0">
+          <Skeleton className="h-9 w-48 max-w-full" />
+          <Skeleton className="mt-3 h-4 w-full max-w-[28rem]" />
         </div>
-        <Skeleton className="h-14 w-56" />
+        <Skeleton className="h-14 w-56 max-w-full shrink-0" />
       </div>
 
       <Skeleton className="h-[320px]" />
