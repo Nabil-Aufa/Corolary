@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corolary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f7fa; --surface:#ffffff; --border:#e1e4ea; --border-strong:#c7ccd6;
+  --ink-900:#0b0e14; --ink-700:#3d4657; --ink-500:#667085;
+  --accent:#1d4fd8; --accent-soft:#e8edff;
+  --verified:#0e8f7d; --verified-soft:#e3f5f1;
+  --panel:#0b0e14; --panel-raised:#151a24; --panel-border:#262d3c;
+  --p900:#f4f6f9; --p700:#c6ccd9; --p500:#8b93a7;
+}
+@page{ size:20in 11.25in; margin:0; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Geist','Helvetica Neue',Arial,sans-serif;color:var(--ink-900)}
+
+.s{width:1920px;height:1080px;position:relative;overflow:hidden;
+   padding:104px 128px;background:var(--bg);page-break-after:always;display:flex;flex-direction:column}
+.s:last-child{page-break-after:auto}
+.s.dark{background:var(--panel);color:var(--p900)}
+
+.kicker{font-size:20px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-500)}
+.dark .kicker{color:var(--p500)}
+.num{position:absolute;right:128px;bottom:76px;font-size:20px;color:var(--ink-500);font-variant-numeric:tabular-nums}
+.dark .num{color:var(--p500)}
+.rule{height:1px;background:var(--border);margin:28px 0 56px}
+.dark .rule{background:var(--panel-border)}
+
+h1{font-size:132px;line-height:1.02;font-weight:600;letter-spacing:-.03em}
+h2{font-size:80px;line-height:1.06;font-weight:600;letter-spacing:-.025em;max-width:26ch}
+h3{font-size:34px;line-height:1.2;font-weight:600;letter-spacing:-.01em}
+.lead{font-size:36px;line-height:1.42;color:var(--ink-700);max-width:44ch;font-weight:400}
+.dark .lead{color:var(--p700)}
+.big{font-size:56px;line-height:1.26;font-weight:500;letter-spacing:-.02em;max-width:30ch}
+p.body{font-size:26px;line-height:1.5;color:var(--ink-700)}
+.dark p.body{color:var(--p700)}
+.mono{font-family:'SF Mono',ui-monospace,Menlo,monospace}
+
+.grid{display:grid;gap:28px;margin-top:auto}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:28px;padding:44px}
+.dark .card{background:var(--panel-raised);border-color:var(--panel-border)}
+.card .t{font-size:30px;font-weight:600;letter-spacing:-.01em}
+.card .d{font-size:23px;line-height:1.46;color:var(--ink-500);margin-top:14px}
+.dark .card .d{color:var(--p500)}
+.card .n{font-size:66px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.card .lbl{font-size:19px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-500);margin-top:12px}
+.dark .card .lbl{color:var(--p500)}
+.tint-a{background:var(--accent-soft);border-color:transparent}
+.tint-v{background:var(--verified-soft);border-color:transparent}
+
+table{width:100%;border-collapse:collapse;font-size:26px}
+th{text-align:left;font-size:19px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--ink-500);padding:0 0 20px;border-bottom:1px solid var(--border-strong)}
+td{padding:26px 0;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.42}
+td.k{font-weight:600;width:30%;padding-right:40px}
+td.v{color:var(--ink-700)}
+tr:last-child td{border-bottom:none}
+.dark th{color:var(--p500);border-color:var(--panel-border)}
+.dark td{border-color:var(--panel-border)}
+.dark td.v{color:var(--p700)}
+
+.flow{display:flex;align-items:stretch;gap:0;margin-top:auto}
+.step{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:28px;padding:40px}
+.step .st{font-size:19px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.step .sn{font-size:32px;font-weight:600;margin-top:16px;letter-spacing:-.01em}
+.step .sd{font-size:22px;line-height:1.44;color:var(--ink-500);margin-top:14px}
+.arrow{display:flex;align-items:center;padding:0 22px;color:var(--border-strong);font-size:34px}
+
+ul{list-style:none}
+li{font-size:27px;line-height:1.46;color:var(--ink-700);padding-left:38px;position:relative;margin-top:26px}
+li:first-child{margin-top:0}
+li::before{content:'';position:absolute;left:0;top:14px;width:14px;height:2px;background:var(--accent)}
+.dark li{color:var(--p700)}
+.dark li::before{background:var(--p500)}
+li b{color:var(--ink-900);font-weight:600}
+.dark li b{color:var(--p900)}
+
+.mark{width:104px;height:104px}
+.mark path{fill:var(--p900)}
+.foot{position:absolute;left:128px;bottom:76px;font-size:22px;color:var(--ink-500)}
+.dark .foot{color:var(--p500)}
+.spacer{flex:1}
+.dense h2{font-size:66px}
+.dense table{font-size:24px}
+.dense th{font-size:18px;padding-bottom:16px}
+.dense td{padding:24px 0;line-height:1.38}
+.dense .card{padding:36px}
+.dense .rule{margin:24px 0 44px}
+</style>
+</head>
+<body>
+
+<!-- 1 COVER -->
+<section class="s dark">
+  <svg class="mark" viewBox="0 0 439 439" xmlns="http://www.w3.org/2000/svg">
+    <path d="M351.455 219.086C351.455 192.906 343.692 167.314 329.147 145.546C314.602 123.778 293.929 106.812 269.741 96.7928C245.554 86.7741 218.939 84.1527 193.262 89.2602C167.585 94.3677 143.999 106.975 125.487 125.487C106.975 143.999 94.3677 167.585 89.2602 193.262C84.1527 218.939 86.7741 245.554 96.7928 269.741C106.812 293.929 123.778 314.602 145.546 329.147C167.314 343.692 192.906 351.455 219.086 351.455L219.086 299.525C203.177 299.525 187.624 294.808 174.396 285.969C161.168 277.13 150.858 264.567 144.769 249.869C138.681 235.17 137.088 218.997 140.192 203.393C143.296 187.789 150.957 173.456 162.207 162.207C173.456 150.957 187.789 143.296 203.393 140.192C218.997 137.088 235.17 138.681 249.869 144.769C264.567 150.858 277.13 161.168 285.969 174.396C294.808 187.624 299.525 203.176 299.525 219.086H351.455Z"/>
+    <path d="M438.172 219.086C438.172 165.944 418.856 114.612 383.821 74.6531C348.787 34.6939 300.422 8.83118 247.736 1.88181C195.049 -5.06755 141.633 7.37027 97.4351 36.8787C53.2376 66.3872 21.2724 110.954 7.49305 162.28C-6.28634 213.605 -0.940449 268.189 22.535 315.866C46.0105 363.543 86.015 401.061 135.098 421.434C184.181 441.807 238.995 443.645 289.332 426.605C340.879 409.157 400.499 363.496 420.002 301.771L361.979 301.771C341.923 336.433 309.951 362.622 272.02 375.462C234.088 388.302 192.783 386.917 155.797 371.565C118.811 356.213 88.6655 327.941 70.9756 292.014C53.2857 256.088 49.2573 214.956 59.6407 176.28C70.0241 137.604 94.1114 104.02 127.416 81.7843C160.721 59.5483 200.973 50.1758 240.675 55.4125C280.377 60.6492 316.822 80.138 343.222 110.249C369.622 140.36 384.178 179.041 384.178 219.086H438.172Z"/>
+    <path d="M268.508 202.096C268.508 202.096 427.496 202.092 437.505 202.096C437.682 202.659 438.381 219.746 438.172 246.183C431.888 246.183 268.508 246.183 268.508 246.183V202.096Z"/>
+  </svg>
+  <div class="spacer"></div>
+  <h1>Corolary</h1>
+  <p class="lead" style="margin-top:40px">Reputation that follows you, backed by proof.</p>
+  <div class="spacer"></div>
+  <div style="display:flex;gap:72px;font-size:24px;color:var(--p500)">
+    <div><div style="color:var(--p900);font-weight:600">BUIDL CTC 2026 Fall</div><div style="margin-top:8px">DeFi track</div></div>
+    <div><div style="color:var(--p900);font-weight:600">Creditcoin CC3 Testnet</div><div style="margin-top:8px">chainId 102031</div></div>
+    <div><div style="color:var(--p900);font-weight:600">Wangsit Nursyahada</div><div style="margin-top:8px">Nabil Aufa Danaputra</div></div>
+  </div>
+</section>
+
+<!-- 2 PROBLEM -->
+<section class="s">
+  <div class="kicker">The problem</div>
+  <div class="rule"></div>
+  <h2>DeFi charges everyone the same price for being a stranger</h2>
+  <p class="lead" style="margin-top:44px">Aave and Compound require 150 to 200 percent collateral from every borrower, without exception. A wallet that has repaid 40 loans over two years is priced exactly like a wallet created five minutes ago.</p>
+  <div class="grid g2">
+    <div class="card">
+      <div class="t">Capital sits idle</div>
+      <div class="d">Every extra dollar of collateral is capital that is not lent, not earning, and not doing anything except sitting as excess security.</div>
+    </div>
+    <div class="card">
+      <div class="t">Reputation has no value</div>
+      <div class="d">A perfect repayment record cannot travel. It is locked inside Ethereum contract storage, and it cannot be proven anywhere else, including on the chain built around credit.</div>
+    </div>
+  </div>
+  <div class="num">02</div>
+</section>
+
+<!-- 3 WHY UNSOLVED -->
+<section class="s">
+  <div class="kicker">Why this is still open</div>
+  <div class="rule"></div>
+  <h2>On-chain credit scoring is five years old and still has no economic traction</h2>
+  <div class="grid g2" style="margin-top:auto">
+    <div>
+      <ul>
+        <li><b>They sell a number you have to trust.</b> A score computed off-chain, delivered as an assertion, with no way for a lender to check the evidence underneath it.</li>
+        <li><b>The ones that reached a market reached the wrong one.</b> Undercollateralized lending to anonymous wallets with no recourse. That product has been tried, and the losses are on record.</li>
+      </ul>
+    </div>
+    <div class="card tint-a">
+      <div class="t" style="font-size:34px;line-height:1.24">Corolary changes the output, not just the model.</div>
+      <div class="d" style="font-size:25px;color:var(--ink-700)">Every loan stays fully over-collateralized. What a proven borrower gets is a smaller number, not a waived one. That single decision is what separates this from the category behind it.</div>
+    </div>
+  </div>
+  <div class="num">03</div>
+</section>
+
+<!-- 4 SOLUTION -->
+<section class="s dark">
+  <div class="kicker">The solution</div>
+  <div class="rule"></div>
+  <div class="spacer"></div>
+  <div class="big">Corolary proves real Ethereum mainnet lending history on Creditcoin, and turns it into a price. Required collateral falls from 150 percent to 110 percent.</div>
+  <div class="spacer"></div>
+  <p class="lead" style="max-width:60ch;font-size:30px">Not uncollateralized lending. Proven borrowers simply lock far less capital, and every number can be traced back to a real mainnet transaction.</p>
+  <div class="num">04</div>
+</section>
+
+<!-- 5 HOW IT WORKS -->
+<section class="s">
+  <div class="kicker">How it works</div>
+  <div class="rule"></div>
+  <h2>Three layers on one proof</h2>
+  <div class="flow">
+    <div class="step">
+      <div class="st">Layer 1</div>
+      <div class="sn">FactRegistry</div>
+      <div class="sd">Verifies an Ethereum transaction through the Attestcoin precompile, decodes the receipt, and stores the fact permanently. Paid once, readable forever by any Creditcoin dApp.</div>
+    </div>
+    <div class="arrow">&#8594;</div>
+    <div class="step">
+      <div class="st">Layer 2</div>
+      <div class="sn">CreditGraph</div>
+      <div class="sd">Computes a score from 0 to 1000 entirely on-chain. Every component points at the specific facts behind it, so a lender can audit the number instead of trusting it.</div>
+    </div>
+    <div class="arrow">&#8594;</div>
+    <div class="step">
+      <div class="st">Layer 3</div>
+      <div class="sn">EfficiencyMarket</div>
+      <div class="sd">Reads the score and prices collateral against it. The ratio is locked at borrow time, so a later score drop cannot make a healthy position liquidatable.</div>
+    </div>
+  </div>
+  <p class="body" style="margin-top:56px;max-width:90ch">An indexer watches Aave V3, Morpho Blue, SparkLend and Compound V3 on Ethereum mainnet, waits for attestor consensus, buys proofs in batches, and submits them to Creditcoin.</p>
+  <div class="num">05</div>
+</section>
+
+<!-- 6 ATTESTCOIN DEPTH -->
+<section class="s dense">
+  <div class="kicker">Attestcoin integration</div>
+  <div class="rule"></div>
+  <h2>Attestcoin is not a feature here. It is the floor</h2>
+  <table style="margin-top:56px">
+    <tr><td class="k">Mainnet only</td><td class="v">FactRegistry accepts chainKey 3, Ethereum mainnet, and nothing else. Sepolia returns false by contract policy, so nobody can farm a score with tokens they minted themselves.</td></tr>
+    <tr><td class="k">Inclusion is not success</td><td class="v">The Block Prover proves a transaction was included in a mined block, not that it succeeded. Every path decodes the receipt and requires receiptStatus 1 before recording anything.</td></tr>
+    <tr><td class="k">Emitter validation</td><td class="v">Proving a log exists is not proving it came from Aave. The decoder is selected by the emitting address, so a copycat contract emitting fake events has no valid path in.</td></tr>
+    <tr><td class="k">Eager proving</td><td class="v">A proof built inside the cheap window costs roughly 10x less. We prove events while they are fresh and store the fact permanently, never on demand in a hot path.</td></tr>
+    <tr><td class="k">Batched verification</td><td class="v">One call amortizes cost across up to 10 transactions within a 999 block span. The batch is all or nothing, so a corrupt member is split out rather than retried.</td></tr>
+  </table>
+  <div class="num">06</div>
+</section>
+
+<!-- 7 PROOF -->
+<section class="s">
+  <div class="kicker">Auditable by anyone</div>
+  <div class="rule"></div>
+  <h2>One fact, opened all the way down</h2>
+  <p class="lead" style="margin-top:40px">A score in this product is never an assertion. Open any component, pick any fact, and the chain of custody is on screen.</p>
+  <div class="flow" style="margin-top:auto">
+    <div class="step"><div class="st">Step 1</div><div class="sn">Ethereum transaction</div><div class="sd">Included in a mined mainnet block. The receipt confirms success, and the link goes to Etherscan.</div></div>
+    <div class="arrow">&#8594;</div>
+    <div class="step"><div class="st">Step 2</div><div class="sn">Attested on Creditcoin</div><div class="sd">Attestor consensus reached on that block, roughly eight minutes after observation.</div></div>
+    <div class="arrow">&#8594;</div>
+    <div class="step"><div class="st">Step 3</div><div class="sn">Proof built</div><div class="sd">Bought inside the cheap window, with the exact age recorded against the fact.</div></div>
+    <div class="arrow">&#8594;</div>
+    <div class="step"><div class="st">Step 4</div><div class="sn">Recorded permanently</div><div class="sd">Replay protected. The same log cannot be recorded twice, by anyone, ever.</div></div>
+  </div>
+  <div class="num">07</div>
+</section>
+
+<!-- 8 DISCLOSURE -->
+<section class="s dark dense">
+  <div class="kicker">Stated plainly</div>
+  <div class="rule"></div>
+  <h2 style="max-width:30ch">What is real here, and the one thing that is testnet</h2>
+  <table style="margin-top:56px">
+    <tr><td class="k" style="width:38%">Credit history</td><td class="v">Real Ethereum mainnet transactions, proven cryptographically</td></tr>
+    <tr><td class="k">Prices</td><td class="v">Real Chainlink mainnet feeds, proven cryptographically</td></tr>
+    <tr><td class="k">Scores</td><td class="v">Computed on-chain from those proven facts</td></tr>
+    <tr><td class="k">Market tokens</td><td class="v">tUSDC and tWETH are testnet ERC-20s</td></tr>
+  </table>
+  <div class="card tint-a" style="margin-top:auto;background:var(--panel-raised);border:1px solid var(--accent)">
+    <div class="t" style="font-size:32px;color:var(--p900);line-height:1.3">The market tokens are testnet tokens. The credit history, the prices, and the scores come from real Ethereum mainnet.</div>
+    <div class="d" style="font-size:24px;color:var(--p700)">The hackathon requires a testnet deployment and CC3 has no real USDC. Testnet tokens are the container, never the data. tUSDC is itself priced using genuine mainnet USDC proven through Chainlink.</div>
+  </div>
+  <div class="num">08</div>
+</section>
+
+<!-- 9 SYBIL -->
+<section class="s">
+  <div class="kicker">Why it resists gaming</div>
+  <div class="rule"></div>
+  <h2>Faking a history costs the same as having one</h2>
+  <div class="grid g3" style="margin-top:auto">
+    <div class="card"><div class="t">Mainnet gas is the toll</div><div class="d">Every fact behind a score is a real Ethereum transaction that someone already paid for. There is no cheap chain to manufacture a record on, because chainKey 3 is the only one accepted.</div></div>
+    <div class="card"><div class="t">Time cannot be bought</div><div class="d">History duration is measured from the first proven fact. A wallet created today cannot buy its way to a two year record at any price.</div></div>
+    <div class="card"><div class="t">Self dealing earns nothing</div><div class="d">Compound base asset flows are deliberately not mapped, because supplying and repaying are indistinguishable there. Only unambiguous events count.</div></div>
+  </div>
+  <p class="body" style="margin-top:56px;max-width:92ch">Every check lives in the contract rather than in an off-chain policy, so the rules are readable by the same people who are subject to them.</p>
+  <div class="num">09</div>
+</section>
+
+<!-- 10 BUSINESS MODEL -->
+<section class="s">
+  <div class="kicker">Business model</div>
+  <div class="rule"></div>
+  <h2>Five streams on one set of facts</h2>
+  <table style="margin-top:48px">
+    <tr><td class="k" style="width:34%">Origination fee</td><td class="v">0.5 percent of principal, taken once at drawdown. A 10,000 dollar loan pays 50 dollars.</td></tr>
+    <tr><td class="k">Interest spread</td><td class="v">1 to 2 percent between what borrowers pay and what suppliers receive. Recurring while the position is open.</td></tr>
+    <tr><td class="k">Credit Graph API</td><td class="v">Protocols that want to read Corolary scores for their own underwriting pay for access beyond the free tier. Recurring, not a one time purchase.</td></tr>
+    <tr><td class="k">Sponsored facts</td><td class="v">A lending protocol that wants its events indexed and proven can fund the integration and the ongoing proving cost, and reach an already verified borrower base.</td></tr>
+    <tr><td class="k">B2B licensing</td><td class="v">Credal serves off-chain credit data to fintech lenders. Corolary supplies the crypto-native half it has never had.</td></tr>
+  </table>
+  <div class="num">10</div>
+</section>
+
+<!-- 11 UNIT ECONOMICS -->
+<section class="s dark">
+  <div class="kicker">Unit economics</div>
+  <div class="rule"></div>
+  <h2>Costs are measured in fractions of a cent, revenue in dollars</h2>
+  <div class="grid g4" style="margin-top:auto">
+    <div class="card"><div class="n">2.59e-5</div><div class="lbl">CTC per fact, eager</div></div>
+    <div class="card"><div class="n">10x</div><div class="lbl">cheaper than lazy proving</div></div>
+    <div class="card"><div class="n">$50</div><div class="lbl">fee on a $10,000 loan</div></div>
+    <div class="card tint-a" style="background:var(--panel-raised);border:1px solid var(--verified)"><div class="n" style="color:var(--p900)">~100%</div><div class="lbl" style="color:var(--p700)">gross margin on that fee</div></div>
+  </div>
+  <p class="lead" style="margin-top:56px;max-width:88ch;font-size:28px">Reconstructing a borrower's full history costs a fraction of a cent in proving. Every additional reader of that same fact, whether an API subscriber or a licensed partner, is revenue with no marginal proving cost at all. This is a data infrastructure cost curve, not a lending one.</p>
+  <div class="num">11</div>
+</section>
+
+<!-- 12 MARKET -->
+<section class="s">
+  <div class="kicker">Market</div>
+  <div class="rule"></div>
+  <h2>The wedge is narrow on purpose</h2>
+  <div class="grid g2" style="margin-top:auto;align-items:start">
+    <div>
+      <table>
+        <tr><th>Tier</th><th>Collateral per $100</th><th>Capital freed</th></tr>
+        <tr><td class="k">Unproven, 150 percent</td><td class="v">$150</td><td class="v">baseline</td></tr>
+        <tr><td class="k">Mid tier, 130 percent</td><td class="v">$130</td><td class="v">$20</td></tr>
+        <tr><td class="k">Proven, 110 percent</td><td class="v">$110</td><td class="v">$40</td></tr>
+      </table>
+      <p class="body" style="margin-top:36px;font-size:23px;color:var(--ink-500)">Illustration of the mechanism, not a dollar projection. DeFi lending TVL moves with the cycle and is not quoted here as a precise figure.</p>
+    </div>
+    <div class="grid" style="margin:0">
+      <div class="card"><div class="t">Established DeFi users</div><div class="d">Wallets with long Aave, Morpho and Compound histories looking to carry that record somewhere it pays. Measured in active wallets, not in TVL.</div></div>
+      <div class="card"><div class="t">Creditcoin lender network</div><div class="d">Credal and Aella already serve 337,000 customers and 79.7 million dollars of verified credit volume. Corolary adds a crypto-native score to a user base that already exists.</div></div>
+    </div>
+  </div>
+  <div class="num">12</div>
+</section>
+
+<!-- 13 STRATEGIC FIT -->
+<section class="s">
+  <div class="kicker">Strategic fit</div>
+  <div class="rule"></div>
+  <h2>Corolary is not a competitor to Credal. It is the missing half</h2>
+  <div class="grid g2" style="margin-top:auto">
+    <div class="card">
+      <div class="t">What Credal already knows</div>
+      <div class="d">Who is creditworthy from off-chain financial history. Fintech loans, instalment payments, KYC. 4.27 million credit transactions, 79.7 million dollars in volume, 337,000 customers.</div>
+    </div>
+    <div class="card tint-v">
+      <div class="t">What Corolary adds</div>
+      <div class="d" style="color:var(--ink-700)">Who is creditworthy from on-chain financial history. DeFi borrowing and repayment, proven cryptographically, with no trusted third party data in the path.</div>
+    </div>
+  </div>
+  <p class="lead" style="margin-top:56px;max-width:92ch;font-size:28px">Creditcoin was built by Gluwa around credit for emerging markets, and all of that traction is off-chain. The score layer drawn from crypto-native activity is the one piece the ecosystem does not have yet.</p>
+  <div class="num">13</div>
+</section>
+
+<!-- 14 COMPETITIVE -->
+<section class="s dense">
+  <div class="kicker">Landscape</div>
+  <div class="rule"></div>
+  <h2>Four neighbouring categories. Nobody combines them, and nobody is on Creditcoin</h2>
+  <table style="margin-top:48px">
+    <tr><th>Category</th><th>What they built</th><th>Where Corolary differs</th></tr>
+    <tr><td class="k">On-chain credit scores</td><td class="v">Spectral, Cred, ARCx, Credora. Active, and the category is five years old.</td><td class="v">Their score is an assertion. Ours is on-chain and every component names its evidence.</td></tr>
+    <tr><td class="k">Undercollateralized lending</td><td class="v">Loans to anonymous wallets with no recourse.</td><td class="v">We refuse this space. Every loan here stays over-collateralized.</td></tr>
+    <tr><td class="k">Proof infrastructure</td><td class="v">Axiom, Herodotus, Brevis. Query per request against historical state.</td><td class="v">We pay once and store the fact forever. Reads are free after that, for everyone.</td></tr>
+    <tr><td class="k">Cross-chain oracles</td><td class="v">A committee attests to data and you trust the committee.</td><td class="v">Verification is synchronous, in the contract, against the source chain itself.</td></tr>
+  </table>
+  <div class="num">14</div>
+</section>
+
+<!-- 15 ROADMAP -->
+<section class="s">
+  <div class="kicker">Roadmap</div>
+  <div class="rule"></div>
+  <h2>What funding buys, in order</h2>
+  <div class="grid g3" style="margin-top:auto">
+    <div class="card">
+      <div class="lbl" style="margin:0 0 18px">Months 1 to 3</div>
+      <div class="t">Bootstrap</div>
+      <div class="d">Open the Credit Graph API with a free tier for builders. Begin onboarding established DeFi users. Widen protocol coverage on the adapters already specified.</div>
+    </div>
+    <div class="card">
+      <div class="lbl" style="margin:0 0 18px">With CEIP funding</div>
+      <div class="t">Security and coverage</div>
+      <div class="d">Professional contract audit before real TVL. More Ethereum protocols, and more source chains the moment Attestcoin supports them, with no change to the core architecture.</div>
+    </div>
+    <div class="card">
+      <div class="lbl" style="margin:0 0 18px">Conditional</div>
+      <div class="t">Writability</div>
+      <div class="d">Attestcoin writability is still in audit. Once it ships, a proven score can be written back to Ethereum and used in the protocols it came from. A roadmap item, not a timeline promise.</div>
+    </div>
+  </div>
+  <div class="num">15</div>
+</section>
+
+<!-- 16 TEAM AND ASK -->
+<section class="s dark">
+  <div class="kicker">Team and ask</div>
+  <div class="rule"></div>
+  <h2>Two builders, one rule</h2>
+  <div class="grid g2" style="margin-top:56px">
+    <div class="card"><div class="t">Wangsit Nursyahada</div><div class="d">Contracts, indexer and API. The four Solidity contracts, the Attestcoin proof pipeline across four mainnet protocols, and the service layer behind the product.</div></div>
+    <div class="card"><div class="t">Nabil Aufa Danaputra</div><div class="d">Frontend. The score explorer, the proof viewer that opens a single fact down to its Ethereum transaction, and the lending market interface.</div></div>
+  </div>
+  <div class="big" style="margin-top:auto;margin-bottom:72px;font-size:46px;max-width:40ch">No number in this product comes from anywhere except a real Ethereum mainnet transaction or real Creditcoin contract state. A CI gate enforces it.</div>
+  <div class="foot">corolary.vercel.app &nbsp;&nbsp;&#183;&nbsp;&nbsp; github.com/Nabil-Aufa/Corolary</div>
+  <div class="num">16</div>
+</section>
+
+</body>
+</html>
