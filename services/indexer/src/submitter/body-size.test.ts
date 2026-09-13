@@ -6,7 +6,7 @@ import {
   hexBytes,
   maxHttpCallDataBytes,
   needsWebSocket,
-} from './transport.js';
+} from './body-size.js';
 
 test('hexBytes membaca ukuran byte dari string heks', () => {
   assert.equal(hexBytes('0x'), 0);
